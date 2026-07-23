@@ -105,6 +105,36 @@ Validate [nfr-slo.md](../01-product/nfr-slo.md) and [scaling-capacity.md](../02-
 
 - Store results in `load-test-results/YYYY-MM/` (future repo)
 - Compare run-over-run regression
+- Preserve the k6 `--summary-export` JSON with the commit SHA and environment metadata.
+
+### Phase 1 reproducible SLO smoke
+
+`tests/load/phase1_slo_smoke.js` measures two protocol-boundary trends:
+
+- `tima_message_send_ack_seconds` — client POST start to successful HTTP response;
+- `tima_ws_online_delivery_seconds` — the same send start to the recipient's online
+  WebSocket event.
+
+The existing KMP black-box E2E remains the fixture producer because it creates valid
+encrypted and signed Phase 1 envelopes. With the development stack running:
+
+```text
+TIMA_E2E_BASE_URL=http://localhost:8080 \
+TIMA_REQUIRE_HTTP_E2E=true \
+TIMA_E2E_K6_FIXTURE_PATH=../build/phase1-k6-fixture.json \
+TIMA_E2E_K6_SAMPLE_COUNT=5 \
+gradle --no-daemon -p client jvmTest
+
+TIMA_K6_FIXTURE=build/phase1-k6-fixture.json \
+k6 run --summary-export build/phase1-k6-summary.json tests/load/phase1_slo_smoke.js
+```
+
+Each fixture sample has a distinct reservation and signed envelope; the generator accepts
+1–100 samples. The CI gate deliberately uses one VU and five bounded iterations, uploads
+the machine-readable summary, and enforces p99 `< 0.8s` send-to-ack and `< 2s` online
+delivery. It is a regression smoke, not evidence for the invited-cohort, 100-user, 10k
+WebSocket, or production capacity claims. Larger evidence requires an isolated staging run,
+an approved data-seeding strategy, and retained results.
 
 ## 6. Disclaimer
 

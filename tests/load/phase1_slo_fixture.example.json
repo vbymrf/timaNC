@@ -1,0 +1,18 @@
+{
+  "base_url": "http://localhost:8080",
+  "chat_id": "00000000-0000-0000-0000-000000000001",
+  "sender": {
+    "access_token": "generated-by-black-box-e2e",
+    "device_id": "00000000-0000-0000-0000-000000000002"
+  },
+  "recipient": {
+    "access_token": "generated-by-black-box-e2e",
+    "device_id": "00000000-0000-0000-0000-000000000003"
+  },
+  "samples": [
+    {
+      "idempotency_key": "00000000-0000-0000-0000-000000000004",
+      "body": {}
+    }
+  ]
+}

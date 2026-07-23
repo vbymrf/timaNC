@@ -92,7 +92,7 @@ jobs:
           cache: false
 
       - name: Install golang-migrate
-        run: go install github.com/golang-migrate/migrate/v4/cmd/migrate@${MIGRATE_VERSION}
+        run: go install "github.com/golang-migrate/migrate/v4/cmd/migrate@${MIGRATE_VERSION}"
 
       - name: Apply migrations from a clean database
         run: |

@@ -14,8 +14,8 @@
 
 | SLI | Metric | Target |
 |-----|--------|--------|
-| Message ack latency | `tima_message_ack_seconds` histogram | p99 < 800ms |
-| WS delivery | `tima_ws_delivery_seconds` | p99 < 2s |
+| Message ack latency | `tima_message_send_ack_seconds` server histogram and black-box k6 trend | p99 < 800ms |
+| WS delivery | black-box k6 trend `tima_ws_online_delivery_seconds` (send start → online WS event) | p99 < 2s |
 | API availability | `up{job="tima-api"}` | 99.9% |
 | Event consumer lag | `tima_event_consumer_lag_seconds{bus="redis_streams|kafka"}` | < 10s |
 | Outbox backlog | `tima_outbox_pending`, oldest row age | 0 sustained; age < 10s |
@@ -30,6 +30,8 @@
 | Legal hold violations | held objects deleted | 0 |
 
 SLI без утверждённого числового SLO не получает выдуманный target: baseline измеряется на staging, затем target фиксируется перед release gate.
+`tima_ws_online_delivery_seconds` is not a Prometheus server metric: Phase 1 measures it
+at the protocol boundary with `tests/load/phase1_slo_smoke.js`.
 
 ## 3. Log fields (mandatory)
 

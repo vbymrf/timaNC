@@ -89,6 +89,9 @@ Android release signing, iOS device signing/provisioning, production App Attest 
 Firebase configuration, APNs entitlements, and MSIX signing certificates are CI/deployment
 inputs and are not committed. `packageMsixUnsigned` creates an artifact suitable for later CI
 signing; Windows will not trust-install it as a release package until it is signed.
+The exact protected-environment and credential contract is documented in
+`../doc/07-operations/release-gates.md`. Pull requests use credential-free platform builds;
+signed candidates are produced only by the manually dispatched protected release workflow.
 
 The HTTP roundtrip is skipped in ordinary local unit runs. To require it against the development
 stack:

@@ -12,6 +12,7 @@ import com.tima.client.domain.EscrowPublicKeys
 import com.tima.client.domain.PlainTextDocumentV2
 import com.tima.client.domain.Region
 import com.tima.client.domain.SignedEscrowConfig
+import com.tima.client.domain.VerifiedEscrowConfig
 import com.tima.client.network.DevicePlatformDto
 import com.tima.client.network.PrivateDocumentEnvelopeDto
 import com.tima.client.network.PrivateMessageHistoryDto
@@ -176,6 +177,15 @@ class HttpTwoDeviceRoundTripTest {
             ratchetEnvelope = null,
         )
         val write = RestCryptoTransportAdapter.toTransport(envelope)
+        writeK6FixtureIfRequested(
+            http = http,
+            alice = alice,
+            recipient = bobLaptop,
+            chatId = chatId,
+            aliceIdentity = aliceIdentity,
+            recipientDevices = mapOf(alice.deviceId to aliceIdentity.publicKeys) + bobDirectoryKeys,
+            escrowConfig = verifiedEscrow,
+        )
         val realtime = RealtimeProbe.connect(baseUrl, bobLaptop, chatId)
         val sendKey = UUID.randomUUID().toString()
         val sent: JsonObject
@@ -687,6 +697,76 @@ class HttpTwoDeviceRoundTripTest {
     private fun currentQuarter(): String {
         val now = ZonedDateTime.now(ZoneOffset.UTC)
         return "%04dQ%d".format(now.year, (now.monthValue - 1) / 3 + 1)
+    }
+
+    private fun writeK6FixtureIfRequested(
+        http: TestHttpClient,
+        alice: Session,
+        recipient: Session,
+        chatId: String,
+        aliceIdentity: DeviceIdentity,
+        recipientDevices: Map<String, DevicePublicKeys>,
+        escrowConfig: VerifiedEscrowConfig,
+    ) {
+        val output = System.getenv("TIMA_E2E_K6_FIXTURE_PATH")?.takeIf { it.isNotBlank() } ?: return
+        val count = System.getenv("TIMA_E2E_K6_SAMPLE_COUNT")?.toIntOrNull() ?: 5
+        require(count in 1..100) { "TIMA_E2E_K6_SAMPLE_COUNT must be between 1 and 100" }
+        val samples = buildJsonArray {
+            repeat(count) { index ->
+                val reservationJson = http.post(
+                    "/v1/chats/$chatId/message-reservations",
+                    alice,
+                    body = null,
+                    idempotencyKey = UUID.randomUUID().toString(),
+                )
+                val reservation = RestCryptoTransportAdapter.reservation(
+                    com.tima.client.network.MessageReservationDto(
+                        message_id = reservationJson.string("message_id"),
+                        revision_id = reservationJson.string("revision_id"),
+                        expires_at = reservationJson.string("expires_at"),
+                    ),
+                )
+                val envelope = MessengerCrypto(HybridKodiumEscrowBlobBuilder()).encryptTextMessage(
+                    sender = aliceIdentity,
+                    header = EnvelopeHeader(
+                        messageId = reservation.messageId,
+                        revisionId = reservation.revisionId,
+                        parentRevisionId = null,
+                        chatId = chatId,
+                        senderId = alice.userId,
+                        senderDeviceId = alice.deviceId,
+                        messageKeyId = index.toUInt(),
+                    ),
+                    document = PlainTextDocumentV2(
+                        textNodes = listOf("k6 phase1 sample $index"),
+                        metadata = DocumentMetadata(revisionNumber = 1uL),
+                    ),
+                    recipientDevices = recipientDevices,
+                    escrowConfig = escrowConfig,
+                    ratchetEnvelope = null,
+                )
+                add(buildJsonObject {
+                    put("idempotency_key", UUID.randomUUID().toString())
+                    put("body", RestCryptoTransportAdapter.toTransport(envelope).toJson())
+                })
+            }
+        }
+        val fixture = buildJsonObject {
+            put("base_url", System.getenv("TIMA_E2E_BASE_URL")!!.trimEnd('/'))
+            put("chat_id", chatId)
+            putJsonObject("sender") {
+                put("access_token", alice.accessToken)
+                put("device_id", alice.deviceId)
+            }
+            putJsonObject("recipient") {
+                put("access_token", recipient.accessToken)
+                put("device_id", recipient.deviceId)
+            }
+            put("samples", samples)
+        }
+        val path = java.nio.file.Path.of(output)
+        path.parent?.let { java.nio.file.Files.createDirectories(it) }
+        java.nio.file.Files.writeString(path, fixture.toString())
     }
 
     private data class Session(

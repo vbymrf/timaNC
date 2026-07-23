@@ -1,0 +1,136 @@
+name: Client platform validation
+
+on:
+  pull_request:
+    paths:
+      - "client/apps/**"
+      - "client/modules/**"
+      - "client/gradle/**"
+      - "client/*.gradle.kts"
+      - "client/gradle.properties"
+      - ".github/workflows/client-platform-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "client/apps/**"
+      - "client/modules/**"
+      - "client/gradle/**"
+      - "client/*.gradle.kts"
+      - "client/gradle.properties"
+      - ".github/workflows/client-platform-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-aab:
+    name: Android unsigned internal AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.2"
+      - name: Create non-production Firebase build configuration
+        shell: bash
+        run: |
+          cat > client/apps/android/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "1234567890",
+              "project_id": "tima-build-validation"
+            },
+            "client": [{
+              "client_info": {
+                "mobilesdk_app_id": "1:1234567890:android:0000000000000000",
+                "android_client_info": {
+                  "package_name": "com.tima.client"
+                }
+              },
+              "api_key": [{
+                "current_key": "build-validation-not-a-real-api-key"
+              }]
+            }],
+            "configuration_version": "1"
+          }
+          JSON
+      - name: Build unsigned release bundle
+        working-directory: client
+        run: >-
+          gradle --no-daemon :apps:android:bundleRelease
+          -Ptima.android.baseUrl=https://invalid.example
+          -Ptima.android.integrityProjectNumber=0
+      - name: Upload unsigned internal AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-internal-unsigned-aab
+          path: client/apps/android/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+  ios-kotlin-xcode:
+    name: iOS Kotlin and unsigned Xcode build
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.2"
+      - name: Build Kotlin XCFramework
+        working-directory: client
+        run: gradle --no-daemon :apps:ios:assembleTimaIosAppDebugXCFramework
+      - name: Build unsigned simulator app
+        working-directory: client
+        run: |
+          xcodebuild \
+            -project apps/ios/xcode/Tima.xcodeproj \
+            -scheme Tima \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath build/ios-derived-data \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Archive unsigned simulator app
+        working-directory: client
+        run: ditto -c -k --sequesterRsrc --keepParent build/ios-derived-data/Build/Products/Debug-iphonesimulator/Tima.app build/Tima-ios-simulator-unsigned.zip
+      - name: Upload iOS validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-kotlin-xcode-unsigned
+          path: |
+            client/apps/ios/build/XCFrameworks/debug/*.xcframework
+            client/build/Tima-ios-simulator-unsigned.zip
+          if-no-files-found: error
+
+  windows-msix:
+    name: Windows unsigned MSIX
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.2"
+      - name: Build unsigned MSIX
+        working-directory: client
+        run: gradle --no-daemon :apps:windows:packageMsixUnsigned
+      - name: Upload unsigned MSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unsigned-msix
+          path: client/apps/windows/build/distributions/*-unsigned.msix
+          if-no-files-found: error

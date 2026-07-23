@@ -8,6 +8,7 @@ on:
       - "gen/**"
       - "infra/**"
       - "server/**"
+      - "tests/load/**"
       - ".github/workflows/dev-stack.yml"
   push:
     branches:
@@ -18,6 +19,7 @@ on:
       - "gen/**"
       - "infra/**"
       - "server/**"
+      - "tests/load/**"
       - ".github/workflows/dev-stack.yml"
   workflow_dispatch:
 
@@ -129,7 +131,29 @@ jobs:
         env:
           TIMA_E2E_BASE_URL: http://localhost:8080
           TIMA_REQUIRE_HTTP_E2E: "true"
+          TIMA_E2E_K6_FIXTURE_PATH: ${{ github.workspace }}/build/phase1-k6-fixture.json
+          TIMA_E2E_K6_SAMPLE_COUNT: "5"
         run: gradle --no-daemon jvmTest
+
+      - name: Set up k6
+        uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: "0.57.0"
+
+      - name: Run bounded Phase 1 SLO smoke
+        env:
+          TIMA_K6_FIXTURE: build/phase1-k6-fixture.json
+          TIMA_K6_VUS: "1"
+          TIMA_K6_MAX_DURATION: 2m
+        run: k6 run --summary-export build/phase1-k6-summary.json tests/load/phase1_slo_smoke.js
+
+      - name: Upload Phase 1 SLO smoke summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-k6-slo-smoke
+          path: build/phase1-k6-summary.json
+          if-no-files-found: error
 
       - name: Enforce alpha message send-to-ack budget
         shell: bash
@@ -155,8 +179,8 @@ jobs:
               XLEN message.ingest
           )"
           test "${pending}" = "0"
-          # The black-box journey publishes one create and one immutable edit event.
-          test "${stream_length}" = "2"
+          # The black-box journey publishes create/edit, then k6 publishes five unique creates.
+          test "${stream_length}" = "7"
 
       - name: Show service state
         if: always()
