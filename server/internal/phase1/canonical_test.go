@@ -65,7 +65,7 @@ func TestPersonalInputUsesBigEndianMessageID(t *testing.T) {
 		KeyCommitment: base64.StdEncoding.EncodeToString(make([]byte, 32)),
 		EscrowBlob:    base64.StdEncoding.EncodeToString(escrow.Bytes()),
 	}
-	got, err := personalSignatureInput(d, 7, zeroUUID, 1, zeroUUID, zeroUUID, zeroUUID)
+	got, err := personalSignatureInput(d, 7, zeroUUID, nil, 1, zeroUUID, zeroUUID, zeroUUID)
 	if err != nil {
 		t.Fatal(err)
 	}

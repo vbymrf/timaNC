@@ -73,7 +73,7 @@ func (r *Relay) RelayOne(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if event.Topic != "personal_message.created" {
+	if event.Topic != "personal_message.created" && event.Topic != "personal_message.edited" {
 		return false, fmt.Errorf("unsupported outbox topic %q", event.Topic)
 	}
 	if err = publishScript.Run(

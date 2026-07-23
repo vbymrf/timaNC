@@ -109,7 +109,7 @@ func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) er
 	if err != nil {
 		return err
 	}
-	if topic != "personal_message.created" {
+	if topic != "personal_message.created" && topic != "personal_message.edited" {
 		return fmt.Errorf("unsupported message ingest topic %q", topic)
 	}
 	rawPayload, err := field(message, "payload")
@@ -127,6 +127,7 @@ func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) er
 
 	notification := eventbus.DeviceNotification{
 		EventID:         eventID,
+		Topic:           topic,
 		ChatID:          payload.ChatID,
 		MessageID:       messageID,
 		SenderID:        payload.SenderID,
@@ -153,10 +154,11 @@ func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) er
 
 	rows, err := c.DB.Query(ctx, `SELECT d.device_id,
 		EXISTS(SELECT 1 FROM personal_message_keys k
-		  WHERE k.chat_id=$1 AND k.message_id=$2 AND k.recipient_key=d.device_id)
+		  WHERE k.chat_id=$1 AND k.message_id=$2 AND k.recipient_key=d.device_id
+		    AND k.revision_id=$4)
 		FROM chats c JOIN devices d ON d.user_id IN(c.user_a,c.user_b)
 		WHERE c.chat_id=$1 AND d.revoked_at IS NULL AND d.device_id<>$3`,
-		payload.ChatID, int64(messageID), payload.SenderDeviceID)
+		payload.ChatID, int64(messageID), payload.SenderDeviceID, notification.RevisionID)
 	if err != nil {
 		return err
 	}

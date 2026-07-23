@@ -209,6 +209,65 @@ class HttpTwoDeviceRoundTripTest {
             )
             assertEquals(plaintext, decrypted)
         }
+
+        val revisedPlaintext = PlainTextDocumentV2(
+            textNodes = listOf("black-box edited by Alice"),
+            metadata = DocumentMetadata(revisionNumber = 2uL),
+        )
+        val revisedEnvelope = MessengerCrypto(HybridKodiumEscrowBlobBuilder()).encryptTextMessage(
+            sender = aliceIdentity,
+            header = EnvelopeHeader(
+                messageId = reservation.messageId,
+                revisionId = UUID.randomUUID().toString(),
+                parentRevisionId = reservation.revisionId,
+                chatId = chatId,
+                senderId = alice.userId,
+                senderDeviceId = alice.deviceId,
+                messageKeyId = 1u,
+            ),
+            document = revisedPlaintext,
+            recipientDevices = mapOf(alice.deviceId to aliceIdentity.publicKeys) + bobDirectoryKeys,
+            escrowConfig = verifiedEscrow,
+        )
+        val revisedWrite = RestCryptoTransportAdapter.toTransport(revisedEnvelope)
+        val editRealtime = RealtimeProbe.connect(baseUrl, bobLaptop, chatId)
+        val edited: JsonObject
+        val editSignal: MessageCreatedSignal
+        try {
+            edited = http.post(
+                "/v1/chats/$chatId/messages/${reservation.messageId}/revisions",
+                alice,
+                revisedWrite.toJson(),
+                idempotencyKey = UUID.randomUUID().toString(),
+            )
+            editSignal = editRealtime.awaitMessageEdited()
+        } finally {
+            editRealtime.close()
+        }
+        assertEquals(revisedEnvelope.header.revisionId, edited.string("id"))
+        assertEquals(reservation.revisionId, edited.string("parent_revision_id"))
+        assertEquals(2, edited.int("revision_number"))
+        assertEquals(chatId, editSignal.chatId)
+        assertEquals(reservation.messageId, editSignal.messageId)
+
+        listOf(
+            bobLaptop to bobLaptopIdentity,
+            bobMobile to bobPhoneIdentity,
+        ).forEach { (recipientSession, recipientIdentity) ->
+            val history = http.get("/v1/chats/$chatId/messages?limit=10", recipientSession)
+                .getValue("items").jsonArray.single().jsonObject.toHistoryDto()
+            assertEquals(revisedEnvelope.header.revisionId, history.current_revision_id)
+            assertEquals(reservation.revisionId, history.parent_revision_id)
+            assertEquals(1, history.message_key_id)
+            val decrypted = MessengerCrypto(HybridKodiumEscrowBlobBuilder())
+                .decryptTextMessageViaPathB(
+                    recipientDeviceId = recipientSession.deviceId,
+                    recipient = recipientIdentity,
+                    senderPublicKeys = aliceDirectoryKeys,
+                    envelope = RestCryptoTransportAdapter.fromHistory(history),
+                )
+            assertEquals(revisedPlaintext, decrypted)
+        }
     }
 
     private fun register(
@@ -469,6 +528,9 @@ class HttpTwoDeviceRoundTripTest {
         fun awaitMessageCreated(): MessageCreatedSignal =
             ProtoFrames.parseMessageCreated(awaitFrame())
 
+        fun awaitMessageEdited(): MessageCreatedSignal =
+            ProtoFrames.parseMessageEdited(awaitFrame())
+
         fun close() {
             socket.sendClose(WebSocket.NORMAL_CLOSURE, "test complete").join()
         }
@@ -584,9 +646,17 @@ class HttpTwoDeviceRoundTripTest {
     }
 
     fun parseMessageCreated(frame: ByteArray): MessageCreatedSignal {
+        return parseMessageRevision(frame, 10)
+    }
+
+    fun parseMessageEdited(frame: ByteArray): MessageCreatedSignal {
+        return parseMessageRevision(frame, 11)
+    }
+
+    private fun parseMessageRevision(frame: ByteArray, eventField: Int): MessageCreatedSignal {
         val serverEvent = nestedField(frame, 10)
-        val messageCreated = nestedField(serverEvent, 10)
-        val revision = nestedField(messageCreated, 1)
+        val messageEvent = nestedField(serverEvent, eventField)
+        val revision = nestedField(messageEvent, 1)
         val chatUuid = nestedField(revision, 1)
         val chatBytes = nestedField(chatUuid, 1)
         val chatBuffer = ByteBuffer.wrap(chatBytes)

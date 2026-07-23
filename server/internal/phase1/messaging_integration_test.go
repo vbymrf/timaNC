@@ -118,7 +118,7 @@ func TestReserveSendHistoryAndDirectoryIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signatureInput, err := personalSignatureInput(document, messageID, reservation.RevisionID, 0,
+	signatureInput, err := personalSignatureInput(document, messageID, reservation.RevisionID, nil, 0,
 		userA, deviceA, chat.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +143,7 @@ func TestReserveSendHistoryAndDirectoryIntegration(t *testing.T) {
 	badWrite.MessageID = secondReservation.MessageID
 	badWrite.RevisionID = wrongRevision
 	secondMessageID, _ := parseMessageID(secondReservation.MessageID)
-	badInput, err := personalSignatureInput(document, secondMessageID, wrongRevision, 0, userA, deviceA, chat.ID)
+	badInput, err := personalSignatureInput(document, secondMessageID, wrongRevision, nil, 0, userA, deviceA, chat.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,6 +175,68 @@ func TestReserveSendHistoryAndDirectoryIntegration(t *testing.T) {
 		}
 	}
 
+	revisionID, _ := NewUUID()
+	revisedDocument := document
+	revisedDocument.EncryptedNodes = []string{base64.StdEncoding.EncodeToString([]byte("revised-ciphertext"))}
+	revisedDocument.Metadata = json.RawMessage(
+		`{"content_mode":"private","format_version":2,"revision_number":2}`,
+	)
+	revisionInput, err := personalSignatureInput(
+		revisedDocument, messageID, revisionID, &reservation.RevisionID, 1,
+		userA, deviceA, chat.ID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revisedDocument.Signature = base64.StdEncoding.EncodeToString(
+		ed25519.Sign(signingPrivateA, revisionInput),
+	)
+	revisionWrite := PrivateMessageWrite{
+		MessageID: reservation.MessageID, RevisionID: revisionID, MessageKeyID: 1,
+		Document: revisedDocument, WrappedKeys: []WrappedKey{
+			{DeviceID: deviceA, WrappedKey: base64.StdEncoding.EncodeToString([]byte("revision-wrap-a")),
+				ProtocolVersion: 2, KeyCommitment: revisedDocument.KeyCommitment},
+			{DeviceID: deviceB, WrappedKey: base64.StdEncoding.EncodeToString([]byte("revision-wrap-b")),
+				ProtocolVersion: 2, KeyCommitment: revisedDocument.KeyCommitment},
+		},
+	}
+	revisionRequest, _ := json.Marshal(revisionWrite)
+	revisionKey, _ := NewUUID()
+	revised, _, err := service.ReviseMessage(
+		ctx, principalA, chat.ID, reservation.MessageID, revisionKey, revisionRequest, revisionWrite,
+	)
+	if err != nil || revised.ParentRevisionID != reservation.RevisionID || revised.RevisionNumber != 2 {
+		t.Fatalf("revision = %#v, %v", revised, err)
+	}
+	replayedRevision, _, err := service.ReviseMessage(
+		ctx, principalA, chat.ID, reservation.MessageID, revisionKey, revisionRequest, revisionWrite,
+	)
+	if err != nil || replayedRevision.ID != revised.ID {
+		t.Fatalf("revision replay = %#v, %v", replayedRevision, err)
+	}
+	for _, principal := range []Principal{principalA, {UserID: userB, DeviceID: deviceB}} {
+		history, historyErr := service.ListMessages(ctx, principal, chat.ID, 10)
+		if historyErr != nil || len(history) != 1 ||
+			history[0].CurrentRevisionID != revisionID ||
+			history[0].ParentRevisionID == nil ||
+			*history[0].ParentRevisionID != reservation.RevisionID ||
+			history[0].MessageKeyID != 1 {
+			t.Fatalf("revised history for %s = %#v, %v", principal.DeviceID, history, historyErr)
+		}
+	}
+	var revisionCount, wrappedKeyCount int
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM personal_message_revisions
+		WHERE chat_id=$1 AND message_id=$2`, chat.ID, messageID).Scan(&revisionCount); err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM personal_message_keys
+		WHERE chat_id=$1 AND message_id=$2`, chat.ID, messageID).Scan(&wrappedKeyCount); err != nil {
+		t.Fatal(err)
+	}
+	if revisionCount != 2 || wrappedKeyCount != 4 {
+		t.Fatalf("immutable revision rows=%d wrapped keys=%d", revisionCount, wrappedKeyCount)
+	}
+
 	_, err = pool.Exec(ctx, `INSERT INTO prekeys(device_id,key_id,kind,public_key)
 		VALUES($1,1,'onetime',$2)`, deviceB, make([]byte, 32))
 	if err != nil {
@@ -200,5 +262,12 @@ func TestReserveSendHistoryAndDirectoryIntegration(t *testing.T) {
 	}
 	if strings.Contains(payload, "ciphertext") || strings.Contains(payload, "wrap-a") {
 		t.Fatalf("outbox contains cryptographic payload: %s", payload)
+	}
+	if err = pool.QueryRow(ctx, `SELECT payload::text FROM outbox_events
+		WHERE aggregate_id=$1 AND topic='personal_message.edited'`, chat.ID).Scan(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(payload, "ciphertext") || strings.Contains(payload, "revision-wrap") {
+		t.Fatalf("edit outbox contains cryptographic payload: %s", payload)
 	}
 }

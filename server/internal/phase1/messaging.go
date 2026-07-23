@@ -219,7 +219,7 @@ func (s *Service) SendMessage(ctx context.Context, p Principal, chatID, idemKey 
 		}
 		return out, status, tx.Commit(ctx)
 	}
-	if err := s.validateMessage(ctx, p, chatID, in); err != nil {
+	if err := s.validateMessage(ctx, p, chatID, in, nil, 1); err != nil {
 		return PrivateMessage{}, 0, err
 	}
 	messageID, _ := parseMessageID(in.MessageID)
@@ -265,8 +265,9 @@ func (s *Service) SendMessage(ctx context.Context, p Principal, chatID, idemKey 
 	for _, wrap := range in.WrappedKeys {
 		wrapped, _ := decodeNonEmpty(wrap.WrappedKey, 65536)
 		if _, err = tx.Exec(ctx, `INSERT INTO personal_message_keys
-			(message_id,chat_id,recipient_key,wrapped_key,key_commitment)
-			VALUES($1,$2,$3,$4,$5)`, messageID, chatID, wrap.DeviceID, wrapped, commitment); err != nil {
+			(message_id,chat_id,revision_id,recipient_key,wrapped_key,key_commitment)
+			VALUES($1,$2,$3,$4,$5,$6)`,
+			messageID, chatID, in.RevisionID, wrap.DeviceID, wrapped, commitment); err != nil {
 			return PrivateMessage{}, 0, err
 		}
 	}
@@ -296,7 +297,14 @@ func (s *Service) SendMessage(ctx context.Context, p Principal, chatID, idemKey 
 	return out, 201, nil
 }
 
-func (s *Service) validateMessage(ctx context.Context, p Principal, chatID string, in PrivateMessageWrite) error {
+func (s *Service) validateMessage(
+	ctx context.Context,
+	p Principal,
+	chatID string,
+	in PrivateMessageWrite,
+	parentRevisionID *string,
+	expectedRevision int64,
+) error {
 	d := in.Document
 	messageID, err := parseMessageID(in.MessageID)
 	if err != nil || in.MessageKeyID < 0 {
@@ -316,8 +324,8 @@ func (s *Service) validateMessage(ctx context.Context, p Principal, chatID strin
 	if d.PresenceBitmap != expectedBitmap {
 		return ErrInvalid
 	}
-	if _, _, err := canonicalMetadata(d.Metadata); err != nil {
-		return err
+	if _, metadata, err := canonicalMetadata(d.Metadata); err != nil || metadata.Revision != expectedRevision {
+		return ErrInvalid
 	}
 	commitment, err := decodeExact(d.KeyCommitment, 32)
 	if err != nil {
@@ -346,7 +354,7 @@ func (s *Service) validateMessage(ctx context.Context, p Principal, chatID strin
 		headers.KeyID != fmt.Sprintf("%s-%s-%d", region, epoch, acceptedShard) {
 		return ErrInvalid
 	}
-	input, err := personalSignatureInput(d, messageID, in.RevisionID, in.MessageKeyID,
+	input, err := personalSignatureInput(d, messageID, in.RevisionID, parentRevisionID, in.MessageKeyID,
 		p.UserID, p.DeviceID, chatID)
 	if err != nil {
 		return err
@@ -410,6 +418,7 @@ func (s *Service) ListMessages(ctx context.Context, p Principal, chatID string, 
 		JOIN personal_message_revisions r ON r.chat_id=m.chat_id AND r.message_id=m.message_id
 		  AND r.revision_id=m.current_revision_id
 		JOIN personal_message_keys k ON k.chat_id=m.chat_id AND k.message_id=m.message_id
+		  AND k.revision_id=m.current_revision_id
 		WHERE c.chat_id=$1 AND ($2=c.user_a OR $2=c.user_b) AND k.recipient_key=$3
 		ORDER BY m.message_id DESC LIMIT $4`, chatID, p.UserID, p.DeviceID, limit)
 	if err != nil {

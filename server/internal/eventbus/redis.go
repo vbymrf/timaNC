@@ -22,6 +22,7 @@ type StreamEvent struct {
 
 type DeviceNotification struct {
 	EventID          string    `json:"event_id"`
+	Topic            string    `json:"topic"`
 	ChatID           string    `json:"chat_id"`
 	MessageID        uint64    `json:"message_id"`
 	SenderID         string    `json:"sender_id"`

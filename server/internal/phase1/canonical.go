@@ -63,7 +63,7 @@ func canonicalMetadata(raw json.RawMessage) ([]byte, Metadata, error) {
 	}
 	var m Metadata
 	if err := json.Unmarshal(raw, &m); err != nil || m.ContentMode != "private" ||
-		m.FormatVersion != 2 || m.Revision != 1 {
+		m.FormatVersion != 2 || m.Revision < 1 {
 		return nil, Metadata{}, ErrInvalid
 	}
 	// This restricted metadata shape has exactly the same bytes under
@@ -102,7 +102,14 @@ func rejectDuplicateMetadataKeys(raw []byte) error {
 	return nil
 }
 
-func personalSignatureInput(d PrivateDocument, messageID int64, revisionID string, messageKeyID int64, senderID, deviceID, chatID string) ([]byte, error) {
+func personalSignatureInput(
+	d PrivateDocument,
+	messageID int64,
+	revisionID string,
+	parentRevisionID *string,
+	messageKeyID int64,
+	senderID, deviceID, chatID string,
+) ([]byte, error) {
 	if messageID <= 0 || messageKeyID < 0 {
 		return nil, ErrInvalid
 	}
@@ -144,7 +151,16 @@ func personalSignatureInput(d PrivateDocument, messageID int64, revisionID strin
 	w.u32(2)
 	w.u64(uint64(messageID))
 	w.Write(revision)
-	w.WriteByte(0) // parent revision absent for revision 1
+	if parentRevisionID == nil {
+		w.WriteByte(0)
+	} else {
+		parent, parentErr := uuidBytes(*parentRevisionID)
+		if parentErr != nil {
+			return nil, parentErr
+		}
+		w.WriteByte(1)
+		w.Write(parent)
+	}
 	w.u64(uint64(metadataFields.Revision))
 	w.Write(chat)
 	w.Write(sender)

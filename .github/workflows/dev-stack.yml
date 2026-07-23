@@ -123,7 +123,8 @@ jobs:
               XLEN message.ingest
           )"
           test "${pending}" = "0"
-          test "${stream_length}" = "1"
+          # The black-box journey publishes one create and one immutable edit event.
+          test "${stream_length}" = "2"
 
       - name: Show service state
         if: always()

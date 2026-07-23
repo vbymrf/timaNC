@@ -193,32 +193,37 @@ func writeNotification(
 	protocolVersion := notification.ProtocolVersion
 	presenceBitmap := notification.PresenceBitmap
 	hasWrappedKey := notification.HasWrappedKey
+	revisionEvent := &realtimev1.MessageRevisionEvent{
+		ChatId:           chatID,
+		MessageId:        notification.MessageID,
+		SenderId:         senderID,
+		ProtocolVersion:  &protocolVersion,
+		FormatVersion:    notification.FormatVersion,
+		PresenceBitmap:   &presenceBitmap,
+		KeyCommitment:    notification.KeyCommitment,
+		RevisionId:       revisionID,
+		ParentRevisionId: parentRevisionID,
+		RevisionNumber:   notification.RevisionNumber,
+		CreatedAt: &commonv1.Timestamp{
+			Seconds: notification.CreatedAt.Unix(),
+			Nanos:   int32(notification.CreatedAt.Nanosecond()),
+		},
+		HasWrappedKey: &hasWrappedKey,
+	}
+	serverEvent := &realtimev1.ServerEvent{}
+	if notification.Topic == "personal_message.edited" {
+		serverEvent.Event = &realtimev1.ServerEvent_MessageEdited{
+			MessageEdited: &realtimev1.MessageEdited{Message: revisionEvent},
+		}
+	} else {
+		serverEvent.Event = &realtimev1.ServerEvent_MessageCreated{
+			MessageCreated: &realtimev1.MessageCreated{Message: revisionEvent},
+		}
+	}
 	frame := &realtimev1.ServerFrame{
 		Seq: sequence,
 		Body: &realtimev1.ServerFrame_Event{
-			Event: &realtimev1.ServerEvent{
-				Event: &realtimev1.ServerEvent_MessageCreated{
-					MessageCreated: &realtimev1.MessageCreated{
-						Message: &realtimev1.MessageRevisionEvent{
-							ChatId:           chatID,
-							MessageId:        notification.MessageID,
-							SenderId:         senderID,
-							ProtocolVersion:  &protocolVersion,
-							FormatVersion:    notification.FormatVersion,
-							PresenceBitmap:   &presenceBitmap,
-							KeyCommitment:    notification.KeyCommitment,
-							RevisionId:       revisionID,
-							ParentRevisionId: parentRevisionID,
-							RevisionNumber:   notification.RevisionNumber,
-							CreatedAt: &commonv1.Timestamp{
-								Seconds: notification.CreatedAt.Unix(),
-								Nanos:   int32(notification.CreatedAt.Nanosecond()),
-							},
-							HasWrappedKey: &hasWrappedKey,
-						},
-					},
-				},
-			},
+			Event: serverEvent,
 		},
 	}
 	encoded, err := proto.Marshal(frame)
