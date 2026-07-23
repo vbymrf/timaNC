@@ -1,5 +1,6 @@
 pluginManagement {
     repositories {
+        google()
         gradlePluginPortal()
         mavenCentral()
     }
@@ -8,6 +9,7 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        google()
         mavenCentral()
     }
 }
@@ -22,4 +24,7 @@ include(
     ":modules:core:core-sdk",
     ":modules:messenger-crypto",
     ":integration-harness",
+    ":apps:android",
+    ":apps:ios",
+    ":apps:windows",
 )
