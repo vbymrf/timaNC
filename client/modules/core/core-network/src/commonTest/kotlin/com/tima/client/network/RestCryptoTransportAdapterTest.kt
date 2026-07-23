@@ -47,13 +47,16 @@ class RestCryptoTransportAdapterTest {
     }
 
     @Test
-    fun reversesAvailableHistoryCryptoFieldsWithoutInventingHeaders() {
+    fun reconstructsCompleteRevisionOneEnvelopeFromHistory() {
         val write = RestCryptoTransportAdapter.toTransport(fixtureEnvelope())
         val history = PrivateMessageHistoryDto(
             id = write.message_id,
             conversation_id = CHAT_ID,
             sender_id = write.sender_id,
+            sender_device_id = SENDER_DEVICE_ID,
             current_revision_id = write.revision_id,
+            message_key_id = write.message_key_id,
+            parent_revision_id = null,
             created_at = "2026-07-23T08:00:00Z",
             document = write.document,
             wrapped_keys = write.wrapped_keys,
@@ -62,14 +65,17 @@ class RestCryptoTransportAdapterTest {
 
         val decoded = RestCryptoTransportAdapter.fromHistory(history)
 
-        assertEquals(42uL, decoded.messageId)
-        assertEquals(CHAT_ID, decoded.conversationId)
-        assertEquals(write.revision_id, decoded.revisionId)
+        assertEquals(42uL, decoded.header.messageId)
+        assertEquals(CHAT_ID, decoded.header.chatId)
+        assertEquals(write.revision_id, decoded.header.revisionId)
+        assertEquals(SENDER_DEVICE_ID, decoded.header.senderDeviceId)
+        assertEquals(7u, decoded.header.messageKeyId)
+        assertNull(decoded.header.parentRevisionId)
         assertContentEquals(byteArrayOf(0, 1, 2), decoded.document.encryptedNodes.single())
         assertContentEquals(ByteArray(32) { it.toByte() }, decoded.keyCommitment)
-        assertEquals("tima/escrow-blob/v1\u0000", decoded.canonicalEscrowBlob.copyOfRange(0, 20).decodeToString())
-        assertContentEquals(ByteArray(32) { 0x11 }, decoded.wrappedKeys.single().ephemeralX25519PublicKey)
-        assertContentEquals(byteArrayOf(0x22, 0x33), decoded.wrappedKeys.single().ciphertext)
+        assertEquals("RU-2026Q3-0", decoded.escrowBlob.keyId)
+        assertContentEquals(ByteArray(32) { 0x11 }, decoded.wraps.single().ephemeralPublicKeys.x25519)
+        assertContentEquals(byteArrayOf(0x22, 0x33), decoded.wraps.single().ciphertext)
     }
 
     @Test
@@ -118,8 +124,17 @@ class RestCryptoTransportAdapterTest {
         val write = RestCryptoTransportAdapter.toTransport(fixtureEnvelope())
         val badDocument = write.document.copy(signature = "AQI")
         val history = PrivateMessageHistoryDto(
-            "42", CHAT_ID, SENDER_ID, REVISION_ID, "2026-07-23T08:00:00Z",
-            badDocument, write.wrapped_keys, null,
+            id = "42",
+            conversation_id = CHAT_ID,
+            sender_id = SENDER_ID,
+            sender_device_id = SENDER_DEVICE_ID,
+            current_revision_id = REVISION_ID,
+            message_key_id = 7,
+            parent_revision_id = null,
+            created_at = "2026-07-23T08:00:00Z",
+            document = badDocument,
+            wrapped_keys = write.wrapped_keys,
+            deleted_at = null,
         )
 
         assertFailsWith<IllegalArgumentException> {
@@ -136,7 +151,7 @@ class RestCryptoTransportAdapterTest {
                 parentRevisionId = null,
                 chatId = CHAT_ID,
                 senderId = SENDER_ID,
-                senderDeviceId = "33333333-3333-4333-8333-333333333333",
+                senderDeviceId = SENDER_DEVICE_ID,
                 protocolVersion = 2u,
                 messageKeyId = 7u,
             ),
@@ -173,5 +188,6 @@ class RestCryptoTransportAdapterTest {
         const val REVISION_ID = "00000000-0000-4000-8000-000000000042"
         const val CHAT_ID = "11111111-1111-4111-8111-111111111111"
         const val SENDER_ID = "22222222-2222-4222-8222-222222222222"
+        const val SENDER_DEVICE_ID = "33333333-3333-4333-8333-333333333333"
     }
 }

@@ -5,6 +5,7 @@ import com.tima.client.domain.EncryptedDocumentV2
 import com.tima.client.domain.EnvelopeHeader
 import com.tima.client.domain.EscrowBlob
 import com.tima.client.domain.PersonalMessageEnvelope
+import com.tima.client.domain.Region
 import com.tima.client.domain.SignedEscrowConfig
 
 object CanonicalEncoding {
@@ -80,6 +81,28 @@ object CanonicalEncoding {
         .bytes(blob.mlKem768Ciphertext)
         .bytes(blob.symmetricKeyWrap)
         .result()
+
+    fun decodeEscrowBlob(value: ByteArray): EscrowBlob {
+        val reader = Reader(value)
+        reader.domain(ESCROW_BLOB_DOMAIN)
+        val region = when (reader.u32()) {
+            Region.RU.canonicalValue -> Region.RU
+            Region.EU.canonicalValue -> Region.EU
+            else -> error("unsupported escrow region")
+        }
+        val result = EscrowBlob(
+            region = region,
+            epochId = reader.string(),
+            shardId = reader.u32(),
+            keyId = reader.string(),
+            keyCommitment = reader.fixed32(),
+            ephemeralX25519PublicKey = reader.fixed32(),
+            mlKem768Ciphertext = reader.bytes(),
+            symmetricKeyWrap = reader.bytes(),
+        )
+        reader.requireFinished()
+        return result
+    }
 
     fun escrowConfigInput(config: SignedEscrowConfig): ByteArray =
         Writer()
@@ -201,5 +224,37 @@ object CanonicalEncoding {
 
         private fun Char.isHexDigit(): Boolean =
             this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
+    }
+
+    private class Reader(private val input: ByteArray) {
+        private var position = 0
+
+        fun domain(value: String) {
+            val expected = value.encodeToByteArray() + byteArrayOf(0)
+            require(raw(expected.size).contentEquals(expected)) { "unexpected canonical domain" }
+        }
+
+        fun u32(): UInt = raw(4).fold(0u) { result, byte ->
+            (result shl 8) or byte.toUByte().toUInt()
+        }
+
+        fun string(): String = bytes().decodeToString(throwOnInvalidSequence = true)
+
+        fun bytes(): ByteArray {
+            val size = u32()
+            require(size <= Int.MAX_VALUE.toUInt()) { "canonical byte string is too large" }
+            return raw(size.toInt())
+        }
+
+        fun fixed32(): ByteArray = raw(32)
+
+        fun requireFinished() {
+            require(position == input.size) { "trailing canonical bytes" }
+        }
+
+        private fun raw(size: Int): ByteArray {
+            require(size >= 0 && size <= input.size - position) { "truncated canonical value" }
+            return input.copyOfRange(position, position + size).also { position += size }
+        }
     }
 }

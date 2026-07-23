@@ -169,6 +169,10 @@ func TestReserveSendHistoryAndDirectoryIntegration(t *testing.T) {
 			history[0].WrappedKeys[0].DeviceID != principal.DeviceID {
 			t.Fatalf("filtered history for %s = %#v, %v", principal.DeviceID, history, err)
 		}
+		if history[0].SenderDeviceID != deviceA || history[0].MessageKeyID != 0 ||
+			history[0].ParentRevisionID != nil {
+			t.Fatalf("signed history headers = %#v", history[0])
+		}
 	}
 
 	_, err = pool.Exec(ctx, `INSERT INTO prekeys(device_id,key_id,kind,public_key)

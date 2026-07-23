@@ -4,6 +4,7 @@ import com.tima.client.crypto.CanonicalEncoding
 import com.tima.client.domain.DevicePublicKeys
 import com.tima.client.domain.DocumentMetadata
 import com.tima.client.domain.EncryptedDocumentV2
+import com.tima.client.domain.EnvelopeHeader
 import com.tima.client.domain.PersonalMessageEnvelope
 import com.tima.client.domain.WrappedMessageKey
 import kotlin.io.encoding.Base64
@@ -75,35 +76,14 @@ data class PrivateMessageHistoryDto(
     val id: String,
     val conversation_id: String,
     val sender_id: String,
+    val sender_device_id: String,
     val current_revision_id: String,
+    val message_key_id: Int,
+    val parent_revision_id: String?,
     val created_at: String,
     val document: PrivateDocumentEnvelopeDto,
     val wrapped_keys: List<WrappedKeyDto>,
     val deleted_at: String?,
-)
-
-/**
- * History does not return sender_device_id, message_key_id, parent_revision_id, or the signed
- * chat routing header, so it cannot safely be inflated into a complete PersonalMessageEnvelope.
- */
-data class HistoryCryptoProjection(
-    val messageId: ULong,
-    val conversationId: String,
-    val senderId: String,
-    val revisionId: String,
-    val document: EncryptedDocumentV2,
-    val keyCommitment: ByteArray,
-    val canonicalEscrowBlob: ByteArray,
-    val ratchetEnvelope: ByteArray?,
-    val signature: ByteArray,
-    val wrappedKeys: List<TransportWrappedKeyProjection>,
-)
-
-data class TransportWrappedKeyProjection(
-    val deviceId: String,
-    val ephemeralX25519PublicKey: ByteArray,
-    val ciphertext: ByteArray,
-    val keyCommitment: ByteArray,
 )
 
 @OptIn(ExperimentalEncodingApi::class)
@@ -147,10 +127,13 @@ object RestCryptoTransportAdapter : CryptoTransportAdapter<PrivateMessageWriteDt
         )
     }
 
-    fun fromHistory(value: PrivateMessageHistoryDto): HistoryCryptoProjection {
+    fun fromHistory(value: PrivateMessageHistoryDto): PersonalMessageEnvelope {
         requireUuid(value.conversation_id, "conversation_id")
         requireUuid(value.sender_id, "sender_id")
+        requireUuid(value.sender_device_id, "sender_device_id")
         requireUuid(value.current_revision_id, "current_revision_id")
+        value.parent_revision_id?.let { requireUuid(it, "parent_revision_id") }
+        require(value.message_key_id >= 0) { "message_key_id must not be negative" }
         val document = value.document
         require(document.protocol_version == PROTOCOL_VERSION) { "unsupported protocol_version" }
         require(document.presence_bitmap == 1u) { "only strict text-only documents are supported" }
@@ -159,8 +142,9 @@ object RestCryptoTransportAdapter : CryptoTransportAdapter<PrivateMessageWriteDt
         require(encryptedNodes.all { it.isNotEmpty() }) { "encrypted_nodes contains empty ciphertext" }
         val keyCommitment = decodeFixed32(document.key_commitment, "key_commitment")
         val canonicalEscrowBlob = decodeCanonicalBase64(document.escrow_blob)
-        require(canonicalEscrowBlob.hasPrefix(ESCROW_BLOB_DOMAIN)) {
-            "escrow_blob is not a canonical tima/escrow-blob/v1 value"
+        val escrowBlob = CanonicalEncoding.decodeEscrowBlob(canonicalEscrowBlob)
+        require(escrowBlob.keyCommitment.contentEquals(keyCommitment)) {
+            "escrow commitment differs from document"
         }
         val signature = decodeCanonicalBase64(document.signature)
         require(signature.isNotEmpty()) { "signature must not be empty" }
@@ -169,21 +153,27 @@ object RestCryptoTransportAdapter : CryptoTransportAdapter<PrivateMessageWriteDt
         require(wrappedKeys.all { it.keyCommitment.contentEquals(keyCommitment) }) {
             "wrapped key commitment differs from document"
         }
-        return HistoryCryptoProjection(
-            messageId = decodeDecimalInt64(value.id),
-            conversationId = value.conversation_id,
-            senderId = value.sender_id,
-            revisionId = value.current_revision_id,
+        return PersonalMessageEnvelope(
+            header = EnvelopeHeader(
+                messageId = decodeDecimalInt64(value.id),
+                revisionId = value.current_revision_id,
+                parentRevisionId = value.parent_revision_id,
+                chatId = value.conversation_id,
+                senderId = value.sender_id,
+                senderDeviceId = value.sender_device_id,
+                protocolVersion = document.protocol_version.toUInt(),
+                messageKeyId = value.message_key_id.toUInt(),
+            ),
             document = EncryptedDocumentV2(
                 encryptedNodes = encryptedNodes,
                 metadata = document.metadata.toDomain(),
                 presenceBitmap = document.presence_bitmap,
             ),
             keyCommitment = keyCommitment,
-            canonicalEscrowBlob = canonicalEscrowBlob,
+            escrowBlob = escrowBlob,
             ratchetEnvelope = document.ratchet_envelope?.let(::decodeCanonicalBase64),
             signature = signature,
-            wrappedKeys = wrappedKeys,
+            wraps = wrappedKeys,
         )
     }
 
@@ -240,14 +230,17 @@ object RestCryptoTransportAdapter : CryptoTransportAdapter<PrivateMessageWriteDt
         )
     }
 
-    private fun decodeWrappedKey(value: WrappedKeyDto): TransportWrappedKeyProjection {
+    private fun decodeWrappedKey(value: WrappedKeyDto): WrappedMessageKey {
         requireUuid(value.device_id, "device_id")
         require(value.protocol_version == PROTOCOL_VERSION) { "unsupported wrapped-key protocol_version" }
         val packed = decodeCanonicalBase64(value.wrapped_key)
         require(packed.size > EPHEMERAL_X25519_SIZE) { "wrapped_key is missing ciphertext" }
-        return TransportWrappedKeyProjection(
-            deviceId = value.device_id,
-            ephemeralX25519PublicKey = packed.copyOfRange(0, EPHEMERAL_X25519_SIZE),
+        return WrappedMessageKey(
+            recipientDeviceId = value.device_id,
+            ephemeralPublicKeys = DevicePublicKeys(
+                x25519 = packed.copyOfRange(0, EPHEMERAL_X25519_SIZE),
+                ed25519 = ByteArray(32),
+            ),
             ciphertext = packed.copyOfRange(EPHEMERAL_X25519_SIZE, packed.size),
             keyCommitment = decodeFixed32(value.key_commitment, "wrapped key commitment"),
         )
@@ -301,8 +294,4 @@ object RestCryptoTransportAdapter : CryptoTransportAdapter<PrivateMessageWriteDt
     private fun Char.isHexDigit(): Boolean =
         this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
 
-    private fun ByteArray.hasPrefix(prefix: ByteArray): Boolean =
-        size >= prefix.size && prefix.indices.all { this[it] == prefix[it] }
-
-    private val ESCROW_BLOB_DOMAIN = "tima/escrow-blob/v1\u0000".encodeToByteArray()
 }

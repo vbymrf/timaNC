@@ -6,7 +6,8 @@ Modules:
 - `modules/core/core-network` — isolated boundary for generated Wire/OpenAPI adapters.
 - `modules/messenger-crypto` — Kodium-backed identities, commitments, text encryption,
   Path-B wraps, canonical signatures, signed escrow config verification, and hybrid escrow.
-- `integration-harness` — JVM two-logical-device roundtrip.
+- `integration-harness` — in-process crypto coverage plus a compose-backed JVM HTTP
+  two-device roundtrip.
 
 `eu.livotov.labs:kodium:1.0.0` is pinned in `gradle/libs.versions.toml`. No local Kodium
 source is compiled into this build.
@@ -32,9 +33,9 @@ fake escrow builder is under integration test sources.
 projection. Reservation IDs and signing/routing IDs remain top-level; the nested document contains
 only DocumentV2 and envelope crypto fields. Binary values use canonical padded RFC 4648 Base64,
 message IDs use positive decimal PostgreSQL BIGINT strings, and wrapped-key payloads are the
-ephemeral X25519 public key followed by the Kodium Box ciphertext. History mapping deliberately
-returns a partial crypto projection because the REST history shape does not contain enough signed
-headers to reconstruct a `PersonalMessageEnvelope`.
+ephemeral X25519 public key followed by the Kodium Box ciphertext. Private history includes the
+sender device, message-key ID, and nullable parent revision, so revision-1 responses reconstruct a
+complete signed `PersonalMessageEnvelope`.
 
 The server development escrow root (`dev-ed25519-1`) is pinned only in test sources as a public
 Ed25519 key. No private development signing material is included in the client tree.
@@ -43,4 +44,11 @@ Run from this directory with a Gradle 8.14+ installation:
 
 ```text
 gradle jvmTest
+```
+
+The HTTP roundtrip is skipped in ordinary local unit runs. To require it against the development
+stack:
+
+```text
+TIMA_E2E_BASE_URL=http://localhost:8080 TIMA_REQUIRE_HTTP_E2E=true gradle jvmTest
 ```

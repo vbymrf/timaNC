@@ -29,6 +29,11 @@ type PrivateMessage struct {
 	CurrentRevisionId string `json:"current_revision_id"`
 	CreatedAt time.Time `json:"created_at"`
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	// Device whose signing identity produced the current private revision.
+	SenderDeviceId string `json:"sender_device_id"`
+	// Message-key identifier included in canonical signing.
+	MessageKeyId int32 `json:"message_key_id"`
+	ParentRevisionId *string `json:"parent_revision_id,omitempty"`
 	Document map[string]interface{} `json:"document"`
 	WrappedKeys []WrappedKey `json:"wrapped_keys"`
 }
@@ -39,13 +44,15 @@ type _PrivateMessage PrivateMessage
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewPrivateMessage(id string, conversationId string, senderId string, currentRevisionId string, createdAt time.Time, document map[string]interface{}, wrappedKeys []WrappedKey) *PrivateMessage {
+func NewPrivateMessage(id string, conversationId string, senderId string, currentRevisionId string, createdAt time.Time, senderDeviceId string, messageKeyId int32, document map[string]interface{}, wrappedKeys []WrappedKey) *PrivateMessage {
 	this := PrivateMessage{}
 	this.Id = id
 	this.ConversationId = conversationId
 	this.SenderId = senderId
 	this.CurrentRevisionId = currentRevisionId
 	this.CreatedAt = createdAt
+	this.SenderDeviceId = senderDeviceId
+	this.MessageKeyId = messageKeyId
 	this.Document = document
 	this.WrappedKeys = wrappedKeys
 	return &this
@@ -211,6 +218,86 @@ func (o *PrivateMessage) SetDeletedAt(v time.Time) {
 	o.DeletedAt = &v
 }
 
+// GetSenderDeviceId returns the SenderDeviceId field value
+func (o *PrivateMessage) GetSenderDeviceId() string {
+	if o == nil {
+		var ret string
+		return ret
+	}
+
+	return o.SenderDeviceId
+}
+
+// GetSenderDeviceIdOk returns a tuple with the SenderDeviceId field value
+// and a boolean to check if the value has been set.
+func (o *PrivateMessage) GetSenderDeviceIdOk() (*string, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.SenderDeviceId, true
+}
+
+// SetSenderDeviceId sets field value
+func (o *PrivateMessage) SetSenderDeviceId(v string) {
+	o.SenderDeviceId = v
+}
+
+// GetMessageKeyId returns the MessageKeyId field value
+func (o *PrivateMessage) GetMessageKeyId() int32 {
+	if o == nil {
+		var ret int32
+		return ret
+	}
+
+	return o.MessageKeyId
+}
+
+// GetMessageKeyIdOk returns a tuple with the MessageKeyId field value
+// and a boolean to check if the value has been set.
+func (o *PrivateMessage) GetMessageKeyIdOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.MessageKeyId, true
+}
+
+// SetMessageKeyId sets field value
+func (o *PrivateMessage) SetMessageKeyId(v int32) {
+	o.MessageKeyId = v
+}
+
+// GetParentRevisionId returns the ParentRevisionId field value if set, zero value otherwise.
+func (o *PrivateMessage) GetParentRevisionId() string {
+	if o == nil || IsNil(o.ParentRevisionId) {
+		var ret string
+		return ret
+	}
+	return *o.ParentRevisionId
+}
+
+// GetParentRevisionIdOk returns a tuple with the ParentRevisionId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PrivateMessage) GetParentRevisionIdOk() (*string, bool) {
+	if o == nil || IsNil(o.ParentRevisionId) {
+		return nil, false
+	}
+	return o.ParentRevisionId, true
+}
+
+// HasParentRevisionId returns a boolean if a field has been set.
+func (o *PrivateMessage) HasParentRevisionId() bool {
+	if o != nil && !IsNil(o.ParentRevisionId) {
+		return true
+	}
+
+	return false
+}
+
+// SetParentRevisionId gets a reference to the given string and assigns it to the ParentRevisionId field.
+func (o *PrivateMessage) SetParentRevisionId(v string) {
+	o.ParentRevisionId = &v
+}
+
 // GetDocument returns the Document field value
 func (o *PrivateMessage) GetDocument() map[string]interface{} {
 	if o == nil {
@@ -277,6 +364,11 @@ func (o PrivateMessage) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.DeletedAt) {
 		toSerialize["deleted_at"] = o.DeletedAt
 	}
+	toSerialize["sender_device_id"] = o.SenderDeviceId
+	toSerialize["message_key_id"] = o.MessageKeyId
+	if !IsNil(o.ParentRevisionId) {
+		toSerialize["parent_revision_id"] = o.ParentRevisionId
+	}
 	toSerialize["document"] = o.Document
 	toSerialize["wrapped_keys"] = o.WrappedKeys
 	return toSerialize, nil
@@ -292,6 +384,8 @@ func (o *PrivateMessage) UnmarshalJSON(data []byte) (err error) {
 		"sender_id",
 		"current_revision_id",
 		"created_at",
+		"sender_device_id",
+		"message_key_id",
 		"document",
 		"wrapped_keys",
 	}

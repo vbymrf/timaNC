@@ -53,7 +53,10 @@ type PrivateMessage struct {
 	ID                string          `json:"id"`
 	ConversationID    string          `json:"conversation_id"`
 	SenderID          string          `json:"sender_id"`
+	SenderDeviceID    string          `json:"sender_device_id"`
 	CurrentRevisionID string          `json:"current_revision_id"`
+	MessageKeyID      int64           `json:"message_key_id"`
+	ParentRevisionID  *string         `json:"parent_revision_id"`
 	CreatedAt         time.Time       `json:"created_at"`
 	Document          PrivateDocument `json:"document"`
 	WrappedKeys       []WrappedKey    `json:"wrapped_keys"`
@@ -280,7 +283,8 @@ func (s *Service) SendMessage(ctx context.Context, p Principal, chatID, idemKey 
 		return PrivateMessage{}, 0, err
 	}
 	out := PrivateMessage{ID: in.MessageID, ConversationID: chatID,
-		SenderID: p.UserID, CurrentRevisionID: in.RevisionID, CreatedAt: now,
+		SenderID: p.UserID, SenderDeviceID: p.DeviceID, CurrentRevisionID: in.RevisionID,
+		MessageKeyID: in.MessageKeyID, ParentRevisionID: nil, CreatedAt: now,
 		Document: in.Document, WrappedKeys: in.WrappedKeys}
 	response, _ := json.Marshal(out)
 	if err = finishIdempotency(ctx, tx, p.DeviceID, idemKey, 201, response); err != nil {
@@ -398,10 +402,13 @@ func (s *Service) ListMessages(ctx context.Context, p Principal, chatID string, 
 	if limit < 1 || limit > 100 {
 		limit = 50
 	}
-	rows, err := s.DB.Query(ctx, `SELECT m.message_id,m.sender_id,m.current_revision_id,m.created_at,
+	rows, err := s.DB.Query(ctx, `SELECT m.message_id,m.sender_id,m.sender_device,m.current_revision_id,
+		m.message_key_id,r.parent_revision_id,m.created_at,
 		m.encrypted_nodes,m.encrypted_metadata,m.metadata,m.presence_bitmap,
 		m.key_commitment,m.escrow_blob,m.ratchet_envelope,m.signature,k.wrapped_key
 		FROM chats c JOIN personal_messages m ON m.chat_id=c.chat_id
+		JOIN personal_message_revisions r ON r.chat_id=m.chat_id AND r.message_id=m.message_id
+		  AND r.revision_id=m.current_revision_id
 		JOIN personal_message_keys k ON k.chat_id=m.chat_id AND k.message_id=m.message_id
 		WHERE c.chat_id=$1 AND ($2=c.user_a OR $2=c.user_b) AND k.recipient_key=$3
 		ORDER BY m.message_id DESC LIMIT $4`, chatID, p.UserID, p.DeviceID, limit)
@@ -415,7 +422,8 @@ func (s *Service) ListMessages(ctx context.Context, p Principal, chatID string, 
 		var id int64
 		var nodes [][]byte
 		var encryptedMetadata, metadata, commitment, escrow, ratchet, signature, wrapped []byte
-		if err = rows.Scan(&id, &m.SenderID, &m.CurrentRevisionID, &m.CreatedAt,
+		if err = rows.Scan(&id, &m.SenderID, &m.SenderDeviceID, &m.CurrentRevisionID,
+			&m.MessageKeyID, &m.ParentRevisionID, &m.CreatedAt,
 			&nodes, &encryptedMetadata, &metadata, &m.Document.PresenceBitmap,
 			&commitment, &escrow, &ratchet, &signature, &wrapped); err != nil {
 			return nil, err

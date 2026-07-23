@@ -29,9 +29,12 @@ import kotlinx.serialization.encoding.*
  * @param senderId 
  * @param currentRevisionId 
  * @param createdAt 
+ * @param senderDeviceId Device whose signing identity produced the current private revision.
+ * @param messageKeyId Message-key identifier included in canonical signing.
  * @param document 
  * @param wrappedKeys 
  * @param deletedAt 
+ * @param parentRevisionId
  */
 @Serializable
 
@@ -48,11 +51,19 @@ data class PrivateMessage (
 
     @SerialName(value = "created_at") @Required val createdAt: kotlin.String,
 
+    /* Device whose signing identity produced the current private revision. */
+    @SerialName(value = "sender_device_id") @Required val senderDeviceId: kotlin.String,
+
+    /* Message-key identifier included in canonical signing. */
+    @SerialName(value = "message_key_id") @Required val messageKeyId: kotlin.Int,
+
     @SerialName(value = "document") @Required val document: kotlin.collections.Map<kotlin.String, kotlinx.serialization.json.JsonElement>,
 
     @SerialName(value = "wrapped_keys") @Required val wrappedKeys: kotlin.collections.List<WrappedKey>,
 
-    @SerialName(value = "deleted_at") val deletedAt: kotlin.String? = null
+    @SerialName(value = "deleted_at") val deletedAt: kotlin.String? = null,
+
+    @SerialName(value = "parent_revision_id") val parentRevisionId: kotlin.String? = null
 
 ) {
 
