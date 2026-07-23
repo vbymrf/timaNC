@@ -83,10 +83,32 @@ jobs:
               -d '{"phone":"+15550001001","locale":"en"}' \
               http://localhost:8080/v1/auth/register | jq -r .challenge_id
           )"
+          verify_body="$(
+            jq -cn --arg challenge "${challenge}" \
+              '{challenge_id:$challenge,otp:"000000",password:"phase1-test-password",display_name:"CI user",device:{name:"CI device",platform:"android",identity_public_key:"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",signing_public_key:"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="}}'
+          )"
+          attestation="$(
+            VERIFY_BODY="${verify_body}" python3 - <<'PY'
+          import base64, hashlib, hmac, json, os
+          challenge = hashlib.sha256(os.environ["VERIFY_BODY"].encode()).digest()
+          proof = hmac.new(b"development-attestation-key", b"android\0\0" + challenge, hashlib.sha256).digest()
+          print(json.dumps({
+              "integrity_token": base64.b64encode(proof).decode(),
+              "nonce": base64.b64encode(challenge).decode(),
+          }, separators=(",", ":")))
+          PY
+          )"
+          attestation_token="$(
+            curl --fail --show-error --silent \
+              -H 'Content-Type: application/json' \
+              -d "${attestation}" \
+              http://localhost:8080/v1/verify/integrity/android | jq -r .attestation_token
+          )"
           session="$(
             curl --fail --show-error --silent \
               -H 'Content-Type: application/json' \
-              -d '{"challenge_id":"'"${challenge}"'","otp":"000000","password":"phase1-test-password","display_name":"CI user","device":{"name":"CI device","platform":"android","identity_public_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","signing_public_key":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="}}' \
+              -H "X-Attestation-Token: ${attestation_token}" \
+              -d "${verify_body}" \
               http://localhost:8080/v1/auth/verify
           )"
           device="$(jq -r .device.id <<<"${session}")"

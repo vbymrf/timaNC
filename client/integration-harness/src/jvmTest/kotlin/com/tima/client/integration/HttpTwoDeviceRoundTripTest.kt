@@ -78,12 +78,10 @@ class HttpTwoDeviceRoundTripTest {
         val suffix = (System.currentTimeMillis() % 10_000_000).toString().padStart(7, '0')
         val bobPhone = "+1666$suffix"
         val alice = register(http, "+1555$suffix", "Alice", aliceIdentity, DevicePlatformDto.ANDROID)
-        val bobLaptop = register(
-            http, bobPhone, "Bob", bobLaptopIdentity, DevicePlatformDto.WINDOWS,
+        val bobMobile = register(
+            http, bobPhone, "Bob", bobPhoneIdentity, DevicePlatformDto.ANDROID,
         )
-        val bobMobile = login(
-            http, bobPhone, "Bob mobile", bobPhoneIdentity, DevicePlatformDto.ANDROID,
-        )
+        val bobLaptop = linkWindows(http, bobMobile, bobPhoneIdentity, bobLaptopIdentity)
         assertEquals(bobLaptop.userId, bobMobile.userId)
 
         val chat = http.post(
@@ -452,40 +450,58 @@ class HttpTwoDeviceRoundTripTest {
         )
     }
 
-    private fun login(
+    private fun linkWindows(
         http: TestHttpClient,
-        phone: String,
-        deviceName: String,
-        identity: DeviceIdentity,
-        platform: DevicePlatformDto,
+        mobile: Session,
+        mobileIdentity: DeviceIdentity,
+        windowsIdentity: DeviceIdentity,
     ): Session {
-        val registration = RestCryptoTransportAdapter.deviceRegistration(
-            name = deviceName,
-            platform = platform,
-            publicKeys = identity.publicKeys,
-            appVersion = "0.1.0-e2e",
-        )
-        val loginBody = buildJsonObject {
-            put("phone", phone)
-            put("password", TEST_PASSWORD)
-            putJsonObject("device") {
-                put("name", registration.name)
-                put("platform", registration.platform.wireValue)
-                put("identity_public_key", registration.identity_public_key)
-                put("signing_public_key", registration.signing_public_key)
-                registration.app_version?.let { put("app_version", it) }
-            }
-        }
-        val auth = http.post(
-            "/v1/auth/login",
+        val identityKey = windowsIdentity.publicKeys.x25519
+        val signingKey = windowsIdentity.publicKeys.ed25519
+        val challenge = http.post(
+            "/v1/link/session",
             session = null,
-            body = loginBody,
-            headers = mapOf("X-Attestation-Token" to http.attestAndroid(loginBody)),
+            body = buildJsonObject {
+                put("desktop_public_key", Base64.getEncoder().encodeToString(identityKey))
+                put("signing_public_key", Base64.getEncoder().encodeToString(signingKey))
+                put("desktop_name", "Bob Windows")
+            },
+        )
+        val sessionId = challenge.string("session_id")
+        val qrSecret = challenge.string("qr_payload").substringAfter("&secret=")
+        check(qrSecret.isNotBlank()) { "link QR omitted secret" }
+        val wrappedSecret = ByteArray(48).also(java.security.SecureRandom()::nextBytes)
+        val signingInput = ByteArrayOutputStream().apply {
+            write("TIMA-WINDOWS-LINK-v1".toByteArray())
+            write(0)
+            write(sessionId.toByteArray())
+            write(0)
+            write(identityKey)
+            write(signingKey)
+            write(wrappedSecret)
+        }.toByteArray().let { MessageDigest.getInstance("SHA-256").digest(it) }
+        http.post(
+            "/v1/link/confirm",
+            session = mobile,
+            body = buildJsonObject {
+                put("session_id", sessionId)
+                put("qr_secret", qrSecret)
+                put("confirmation", Base64.getEncoder().encodeToString(mobileIdentity.signDetached(signingInput)))
+                put("wrapped_device_secret", Base64.getEncoder().encodeToString(wrappedSecret))
+            },
+        )
+        val claimed = http.post(
+            "/v1/link/claim",
+            session = null,
+            body = buildJsonObject {
+                put("session_id", sessionId)
+                put("claim_token", challenge.string("claim_token"))
+            },
         )
         return Session(
-            accessToken = auth.string("access_token"),
-            userId = auth.getValue("user").jsonObject.string("id"),
-            deviceId = auth.getValue("device").jsonObject.string("id"),
+            accessToken = claimed.string("access_token"),
+            userId = claimed.getValue("user").jsonObject.string("id"),
+            deviceId = claimed.getValue("device").jsonObject.string("id"),
         )
     }
 

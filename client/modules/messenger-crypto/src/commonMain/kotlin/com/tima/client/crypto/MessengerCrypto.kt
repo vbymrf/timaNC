@@ -23,6 +23,11 @@ class DeviceIdentity private constructor(internal val privateKey: KodiumPrivateK
             DevicePublicKeys(it.encryptionKey.copyOf(), it.signingKey.copyOf())
         }
 
+    fun signDetached(input: ByteArray): ByteArray =
+        Kodium.signDetached(privateKey, input.copyOf()).getOrThrow().also {
+            check(CanonicalEd25519.isCanonical(it)) { "Kodium produced non-canonical Ed25519 S" }
+        }
+
     companion object {
         fun generate(): DeviceIdentity = DeviceIdentity(Kodium.generateKeyPair())
 
