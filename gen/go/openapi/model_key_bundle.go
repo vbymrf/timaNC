@@ -27,6 +27,7 @@ type KeyBundle struct {
 	// Optional Signed PreKey for clients using a prekey handshake; envelope-only alpha clients omit it.
 	SignedPrekey *SignedPrekey `json:"signed_prekey,omitempty"`
 	OneTimePrekeys []OneTimePrekey `json:"one_time_prekeys,omitempty"`
+	SigningIdentityKey string `json:"signing_identity_key"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -36,10 +37,11 @@ type _KeyBundle KeyBundle
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewKeyBundle(deviceId string, identityKey string, updatedAt time.Time) *KeyBundle {
+func NewKeyBundle(deviceId string, identityKey string, signingIdentityKey string, updatedAt time.Time) *KeyBundle {
 	this := KeyBundle{}
 	this.DeviceId = deviceId
 	this.IdentityKey = identityKey
+	this.SigningIdentityKey = signingIdentityKey
 	this.UpdatedAt = updatedAt
 	return &this
 }
@@ -164,6 +166,30 @@ func (o *KeyBundle) SetOneTimePrekeys(v []OneTimePrekey) {
 	o.OneTimePrekeys = v
 }
 
+// GetSigningIdentityKey returns the SigningIdentityKey field value
+func (o *KeyBundle) GetSigningIdentityKey() string {
+	if o == nil {
+		var ret string
+		return ret
+	}
+
+	return o.SigningIdentityKey
+}
+
+// GetSigningIdentityKeyOk returns a tuple with the SigningIdentityKey field value
+// and a boolean to check if the value has been set.
+func (o *KeyBundle) GetSigningIdentityKeyOk() (*string, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.SigningIdentityKey, true
+}
+
+// SetSigningIdentityKey sets field value
+func (o *KeyBundle) SetSigningIdentityKey(v string) {
+	o.SigningIdentityKey = v
+}
+
 // GetUpdatedAt returns the UpdatedAt field value
 func (o *KeyBundle) GetUpdatedAt() time.Time {
 	if o == nil {
@@ -206,6 +232,7 @@ func (o KeyBundle) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.OneTimePrekeys) {
 		toSerialize["one_time_prekeys"] = o.OneTimePrekeys
 	}
+	toSerialize["signing_identity_key"] = o.SigningIdentityKey
 	toSerialize["updated_at"] = o.UpdatedAt
 	return toSerialize, nil
 }
@@ -217,6 +244,7 @@ func (o *KeyBundle) UnmarshalJSON(data []byte) (err error) {
 	requiredProperties := []string{
 		"device_id",
 		"identity_key",
+		"signing_identity_key",
 		"updated_at",
 	}
 

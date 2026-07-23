@@ -129,7 +129,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) putKeyBundle(w http.ResponseWriter, r *http.Request) {
-	var in phase1.KeyBundle
+	var in phase1.KeyBundleWrite
 	if _, err := decodeStrict(r, &in); err != nil {
 		h.problem(w, r, phase1.ErrInvalid)
 		return

@@ -184,6 +184,9 @@ func TestReserveSendHistoryAndDirectoryIntegration(t *testing.T) {
 	if err != nil || len(bundles) != 1 || bundles[0].SignedPrekey != nil || len(bundles[0].OneTimePrekeys) != 0 {
 		t.Fatalf("envelope-only directory = %#v, %v", bundles, err)
 	}
+	if bundles[0].SigningIdentityKey != base64.StdEncoding.EncodeToString(make([]byte, ed25519.PublicKeySize)) {
+		t.Fatalf("directory signing identity = %q", bundles[0].SigningIdentityKey)
+	}
 	var consumed *time.Time
 	if err = pool.QueryRow(ctx, `SELECT consumed_at FROM prekeys
 		WHERE device_id=$1 AND kind='onetime' AND key_id=1`, deviceB).Scan(&consumed); err != nil || consumed != nil {

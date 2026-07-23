@@ -1744,7 +1744,11 @@ components:
     KeyBundle:
       allOf:
         - {$ref: '#/components/schemas/KeyBundleWrite'}
-        - {type: object, required: [updated_at], properties: {updated_at: {$ref: '#/components/schemas/Timestamp'}}}
+        - type: object
+          required: [signing_identity_key, updated_at]
+          properties:
+            signing_identity_key: {$ref: '#/components/schemas/Base64', description: Ed25519 identity key used to verify envelopes signed by this device.}
+            updated_at: {$ref: '#/components/schemas/Timestamp'}
     UserKeyBundles:
       type: object
       additionalProperties: false

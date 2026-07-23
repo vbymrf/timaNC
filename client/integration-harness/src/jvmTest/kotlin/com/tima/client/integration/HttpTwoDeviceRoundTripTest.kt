@@ -78,7 +78,7 @@ class HttpTwoDeviceRoundTripTest {
         assertEquals(bob.deviceId, bobBundle.string("device_id"))
         val bobDirectoryKeys = DevicePublicKeys(
             x25519 = decodeBase64(bobBundle.string("identity_key")),
-            ed25519 = bobIdentity.publicKeys.ed25519,
+            ed25519 = decodeBase64(bobBundle.string("signing_identity_key")),
         )
 
         val epoch = currentQuarter()
@@ -162,11 +162,20 @@ class HttpTwoDeviceRoundTripTest {
         assertEquals(bob.deviceId, history.wrapped_keys.single().device_id)
         assertNull(history.document.ratchet_envelope)
 
+        val aliceBundles = http.get("/v1/keys/bundle/${alice.userId}", bob)
+            .getValue("bundles").jsonArray
+        assertEquals(1, aliceBundles.size)
+        val aliceBundle = aliceBundles.single().jsonObject
+        assertEquals(alice.deviceId, aliceBundle.string("device_id"))
+        val aliceDirectoryKeys = DevicePublicKeys(
+            x25519 = decodeBase64(aliceBundle.string("identity_key")),
+            ed25519 = decodeBase64(aliceBundle.string("signing_identity_key")),
+        )
         val fetchedEnvelope = RestCryptoTransportAdapter.fromHistory(history)
         val decrypted = MessengerCrypto(HybridKodiumEscrowBlobBuilder()).decryptTextMessageViaPathB(
             recipientDeviceId = bob.deviceId,
             recipient = bobIdentity,
-            senderPublicKeys = aliceIdentity.publicKeys,
+            senderPublicKeys = aliceDirectoryKeys,
             envelope = fetchedEnvelope,
         )
         assertEquals(plaintext, decrypted)

@@ -21,15 +21,20 @@ type OneTimePrekey struct {
 	PublicKey string `json:"public_key"`
 }
 
-type KeyBundle struct {
+type KeyBundleWrite struct {
 	DeviceID       string          `json:"device_id"`
 	IdentityKey    string          `json:"identity_key"`
 	SignedPrekey   *SignedPrekey   `json:"signed_prekey,omitempty"`
 	OneTimePrekeys []OneTimePrekey `json:"one_time_prekeys,omitempty"`
-	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
-func (s *Service) PutKeyBundle(ctx context.Context, p Principal, in KeyBundle) (KeyBundle, error) {
+type KeyBundle struct {
+	KeyBundleWrite
+	SigningIdentityKey string    `json:"signing_identity_key"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+func (s *Service) PutKeyBundle(ctx context.Context, p Principal, in KeyBundleWrite) (KeyBundle, error) {
 	if in.DeviceID != p.DeviceID || len(in.OneTimePrekeys) > 100 ||
 		(in.SignedPrekey == nil && len(in.OneTimePrekeys) > 0) {
 		return KeyBundle{}, ErrInvalid
@@ -37,6 +42,12 @@ func (s *Service) PutKeyBundle(ctx context.Context, p Principal, in KeyBundle) (
 	identity, err := decodeExact(in.IdentityKey, 32)
 	if err != nil {
 		return KeyBundle{}, ErrInvalid
+	}
+	var signingIdentity []byte
+	if err = s.DB.QueryRow(ctx, `SELECT signing_pubkey FROM devices
+		WHERE device_id=$1 AND user_id=$2 AND revoked_at IS NULL`, p.DeviceID, p.UserID).
+		Scan(&signingIdentity); err != nil {
+		return KeyBundle{}, ErrForbidden
 	}
 	var signed, signature []byte
 	if in.SignedPrekey != nil {
@@ -51,12 +62,8 @@ func (s *Service) PutKeyBundle(ctx context.Context, p Principal, in KeyBundle) (
 		if err != nil {
 			return KeyBundle{}, ErrInvalid
 		}
-		var signing []byte
-		if err = s.DB.QueryRow(ctx, `SELECT signing_pubkey FROM devices
-			WHERE device_id=$1 AND user_id=$2 AND revoked_at IS NULL`, p.DeviceID, p.UserID).Scan(&signing); err != nil {
-			return KeyBundle{}, ErrForbidden
-		}
-		if !canonicalEd25519Signature(signature) || !ed25519.Verify(ed25519.PublicKey(signing), signed, signature) {
+		if !canonicalEd25519Signature(signature) ||
+			!ed25519.Verify(ed25519.PublicKey(signingIdentity), signed, signature) {
 			return KeyBundle{}, ErrInvalid
 		}
 	}
@@ -93,13 +100,16 @@ func (s *Service) PutKeyBundle(ctx context.Context, p Principal, in KeyBundle) (
 	if err = tx.Commit(ctx); err != nil {
 		return KeyBundle{}, err
 	}
-	in.UpdatedAt = s.Now().UTC()
-	return in, nil
+	return KeyBundle{
+		KeyBundleWrite:     in,
+		SigningIdentityKey: base64.StdEncoding.EncodeToString(signingIdentity),
+		UpdatedAt:          s.Now().UTC(),
+	}, nil
 }
 
 func (s *Service) GetKeyBundles(ctx context.Context, p Principal, userID string) ([]KeyBundle, error) {
-	rows, err := s.DB.Query(ctx, `SELECT d.device_id,d.identity_pubkey,sp.key_id,sp.public_key,sp.signature,
-		sp.expires_at,coalesce(sp.created_at,d.created_at)
+	rows, err := s.DB.Query(ctx, `SELECT d.device_id,d.identity_pubkey,d.signing_pubkey,
+		sp.key_id,sp.public_key,sp.signature,sp.expires_at,coalesce(sp.created_at,d.created_at)
 		FROM devices d LEFT JOIN prekeys sp ON sp.device_id=d.device_id AND sp.kind='signed'
 		  AND sp.expires_at>now()
 		WHERE d.user_id=$1 AND d.revoked_at IS NULL ORDER BY d.device_id`, userID)
@@ -109,15 +119,16 @@ func (s *Service) GetKeyBundles(ctx context.Context, p Principal, userID string)
 	var out []KeyBundle
 	for rows.Next() {
 		var b KeyBundle
-		var identity, signed, signature []byte
+		var identity, signingIdentity, signed, signature []byte
 		var signedID *int
 		var signedExpiry *time.Time
-		if err = rows.Scan(&b.DeviceID, &identity, &signedID, &signed, &signature,
+		if err = rows.Scan(&b.DeviceID, &identity, &signingIdentity, &signedID, &signed, &signature,
 			&signedExpiry, &b.UpdatedAt); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		b.IdentityKey = base64.StdEncoding.EncodeToString(identity)
+		b.SigningIdentityKey = base64.StdEncoding.EncodeToString(signingIdentity)
 		if signedID != nil && signedExpiry != nil {
 			b.SignedPrekey = &SignedPrekey{ID: *signedID, PublicKey: base64.StdEncoding.EncodeToString(signed),
 				Signature: base64.StdEncoding.EncodeToString(signature), ExpiresAt: *signedExpiry}

@@ -27,6 +27,7 @@ import kotlinx.serialization.encoding.*
  *
  * @param deviceId 
  * @param identityKey 
+ * @param signingIdentityKey
  * @param updatedAt 
  * @param signedPrekey Optional Signed PreKey for clients using a prekey handshake; envelope-only alpha clients omit it.
  * @param oneTimePrekeys 
@@ -38,6 +39,8 @@ data class KeyBundle (
     @SerialName(value = "device_id") @Required val deviceId: kotlin.String,
 
     @SerialName(value = "identity_key") @Required val identityKey: kotlin.String,
+
+    @SerialName(value = "signing_identity_key") @Required val signingIdentityKey: kotlin.String,
 
     @SerialName(value = "updated_at") @Required val updatedAt: kotlin.String,
 
