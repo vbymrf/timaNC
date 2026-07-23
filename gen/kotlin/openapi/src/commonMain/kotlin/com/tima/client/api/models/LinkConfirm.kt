@@ -21,12 +21,12 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
+ * 
  *
- *
- * @param sessionId
- * @param qrSecret
- * @param confirmation
- * @param wrappedDeviceSecret
+ * @param sessionId 
+ * @param qrSecret 
+ * @param confirmation 
+ * @param wrappedDeviceSecret 
  */
 @Serializable
 

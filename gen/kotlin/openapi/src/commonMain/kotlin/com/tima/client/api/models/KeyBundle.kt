@@ -23,14 +23,14 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
+ * 
  *
- *
- * @param deviceId
- * @param identityKey
- * @param signingIdentityKey
- * @param updatedAt
+ * @param deviceId 
+ * @param identityKey 
+ * @param signingIdentityKey 
+ * @param updatedAt 
  * @param signedPrekey Optional Signed PreKey for clients using a prekey handshake; envelope-only alpha clients omit it.
- * @param oneTimePrekeys
+ * @param oneTimePrekeys 
  */
 @Serializable
 

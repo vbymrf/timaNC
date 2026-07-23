@@ -24,19 +24,19 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
- *
+ * 
  *
  * @param id Positive PostgreSQL BIGINT serialized as a decimal string for JavaScript safety; values must not exceed 9223372036854775807.
- * @param conversationId
- * @param senderId
- * @param currentRevisionId
- * @param createdAt
+ * @param conversationId 
+ * @param senderId 
+ * @param currentRevisionId 
+ * @param createdAt 
  * @param senderDeviceId Device whose signing identity produced the current private revision.
  * @param messageKeyId Message-key identifier included in canonical signing.
- * @param document
- * @param wrappedKeys
- * @param deletedAt
- * @param parentRevisionId
+ * @param document 
+ * @param wrappedKeys 
+ * @param deletedAt 
+ * @param parentRevisionId 
  */
 @Serializable
 

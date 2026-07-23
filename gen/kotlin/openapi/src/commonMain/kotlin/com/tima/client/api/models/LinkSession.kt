@@ -21,11 +21,11 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
+ * 
  *
- *
- * @param desktopPublicKey
- * @param signingPublicKey
- * @param desktopName
+ * @param desktopPublicKey 
+ * @param signingPublicKey 
+ * @param desktopName 
  */
 @Serializable
 

@@ -115,8 +115,8 @@ func checkOpenAPI(root string) {
 			}
 		}
 	}
-	if operations != 146 {
-		panic(fmt.Errorf("expected 146 Client API operations, got %d", operations))
+	if operations != 149 {
+		panic(fmt.Errorf("expected 149 Client API operations, got %d", operations))
 	}
 }
 
