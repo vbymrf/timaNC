@@ -1,0 +1,223 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		100000000000000000000001 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000001 /* App.swift */; };
+		100000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000002 /* ContentView.swift */; };
+		100000000000000000000003 /* TimaIosApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 200000000000000000000005 /* TimaIosApp.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		200000000000000000000001 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		200000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		200000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		200000000000000000000004 /* Tima.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Tima.entitlements; sourceTree = "<group>"; };
+		200000000000000000000005 /* TimaIosApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = TimaIosApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		200000000000000000000006 /* Tima.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = Tima.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		300000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000003 /* TimaIosApp.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		400000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				400000000000000000000002 /* Tima */,
+				400000000000000000000003 /* Frameworks */,
+				400000000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		400000000000000000000002 /* Tima */ = {
+			isa = PBXGroup;
+			children = (
+				200000000000000000000001 /* App.swift */,
+				200000000000000000000002 /* ContentView.swift */,
+				200000000000000000000003 /* Info.plist */,
+				200000000000000000000004 /* Tima.entitlements */,
+			);
+			path = Tima;
+			sourceTree = "<group>";
+		};
+		400000000000000000000003 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				200000000000000000000005 /* TimaIosApp.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		400000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				200000000000000000000006 /* Tima.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		500000000000000000000001 /* Tima */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 900000000000000000000002 /* Build configuration list for PBXNativeTarget "Tima" */;
+			buildPhases = (
+				700000000000000000000001 /* Build KMP framework */,
+				300000000000000000000001 /* Frameworks */,
+				800000000000000000000001 /* Sources */,
+				800000000000000000000002 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = Tima;
+			productName = Tima;
+			productReference = 200000000000000000000006 /* Tima.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		600000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					500000000000000000000001 = {CreatedOnToolsVersion = 16.0; };
+				};
+			};
+			buildConfigurationList = 900000000000000000000001 /* Build configuration list for PBXProject "Tima" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = 400000000000000000000001;
+			productRefGroup = 400000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (500000000000000000000001 /* Tima */);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		800000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		700000000000000000000001 /* Build KMP framework */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputFileListPaths = ();
+			inputPaths = ();
+			name = "Build KMP framework";
+			outputFileListPaths = ();
+			outputPaths = ();
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "cd \"$SRCROOT/../../..\"\ngradle :apps:ios:embedAndSignAppleFrameworkForXcode\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		800000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000001 /* App.swift in Sources */,
+				100000000000000000000002 /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A00000000000000000000001 /* Debug project */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A00000000000000000000002 /* Release project */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A00000000000000000000003 /* Debug target */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Tima/Tima.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+				INFOPLIST_FILE = Tima/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+				PRODUCT_BUNDLE_IDENTIFIER = com.tima.client.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A00000000000000000000004 /* Release target */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Tima/Tima.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+				INFOPLIST_FILE = Tima/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+				PRODUCT_BUNDLE_IDENTIFIER = com.tima.client.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		900000000000000000000001 /* Build configuration list for PBXProject "Tima" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A00000000000000000000001, A00000000000000000000002);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		900000000000000000000002 /* Build configuration list for PBXNativeTarget "Tima" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A00000000000000000000003, A00000000000000000000004);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 600000000000000000000001 /* Project object */;
+}
