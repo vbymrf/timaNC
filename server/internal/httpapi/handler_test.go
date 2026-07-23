@@ -107,3 +107,64 @@ func TestReservationRouteMatchesContract(t *testing.T) {
 		t.Fatalf("obsolete route status = %d, want 404", old.Code)
 	}
 }
+
+func TestPhase1PublicRoutesRejectUnknownJSONFields(t *testing.T) {
+	handler := New(readinessStub{ready: true}, &phase1.Service{})
+	for _, test := range []struct {
+		name string
+		path string
+		body string
+	}{
+		{
+			name: "login",
+			path: "/v1/auth/login",
+			body: `{"phone":"+79990000000","password":"password","device":{},"unexpected":true}`,
+		},
+		{
+			name: "ios attestation",
+			path: "/v1/verify/attestation/ios",
+			body: `{"key_id":"key","assertion":"proof","challenge":"challenge","unexpected":true}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, test.path, strings.NewReader(test.body))
+			request.Header.Set("Content-Type", "application/json")
+
+			handler.ServeHTTP(response, request)
+
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+			}
+			if !strings.Contains(response.Body.String(), `"INVALID_REQUEST"`) {
+				t.Fatalf("body = %q", response.Body.String())
+			}
+		})
+	}
+}
+
+func TestCriticalAuthenticatedPhase1RoutesRequireBearerToken(t *testing.T) {
+	handler := New(readinessStub{ready: true}, &phase1.Service{})
+	for _, test := range []struct {
+		method string
+		path   string
+	}{
+		{http.MethodPatch, "/v1/users/me"},
+		{http.MethodDelete, "/v1/devices/00000000-0000-4000-8000-000000000000"},
+		{http.MethodPut, "/v1/devices/push"},
+		{http.MethodDelete, "/v1/devices/push"},
+		{http.MethodPut, "/v1/keys/bundle"},
+		{http.MethodGet, "/v1/chats"},
+		{http.MethodPost, "/v1/chats/00000000-0000-4000-8000-000000000000/read"},
+	} {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(test.method, test.path, strings.NewReader(`{}`))
+
+		handler.ServeHTTP(response, request)
+
+		if response.Code != http.StatusUnauthorized {
+			t.Errorf("%s %s: status = %d, body = %s",
+				test.method, test.path, response.Code, response.Body.String())
+		}
+	}
+}

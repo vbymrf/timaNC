@@ -163,6 +163,31 @@ func TestReserveSendHistoryAndDirectoryIntegration(t *testing.T) {
 	if err != nil || retried.ID != sent.ID {
 		t.Fatalf("send replay = %#v, %v", retried, err)
 	}
+	chats, err := service.ListChats(ctx, principalA, 10)
+	if err != nil || len(chats) != 2 {
+		t.Fatalf("chat list = %#v, %v", chats, err)
+	}
+	var listed *Chat
+	for index := range chats {
+		if chats[index].ID == chat.ID {
+			listed = &chats[index]
+			break
+		}
+	}
+	if listed == nil || listed.Peer.ID != userB || listed.ConversationHomeRegion != "RU" {
+		t.Fatalf("created chat missing or malformed in list: %#v", chats)
+	}
+	read, err := service.MarkChatRead(ctx, principalA, chat.ID, messageID)
+	if err != nil || read.LastReadMessageID != reservation.MessageID ||
+		!read.ReadAt.Equal(now.Truncate(time.Microsecond)) {
+		t.Fatalf("initial read state = %#v, %v", read, err)
+	}
+	now = now.Add(time.Minute)
+	repeatedRead, err := service.MarkChatRead(ctx, principalA, chat.ID, messageID)
+	if err != nil || repeatedRead.LastReadMessageID != reservation.MessageID ||
+		!repeatedRead.ReadAt.Equal(read.ReadAt) {
+		t.Fatalf("repeated read state advanced timestamp: %#v, %v", repeatedRead, err)
+	}
 	for _, principal := range []Principal{principalA, {UserID: userB, DeviceID: deviceB}} {
 		history, err := service.ListMessages(ctx, principal, chat.ID, 10)
 		if err != nil || len(history) != 1 || len(history[0].WrappedKeys) != 1 ||
