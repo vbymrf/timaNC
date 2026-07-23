@@ -1,15 +1,18 @@
 # TIMA
 
-Design-first monorepo for the TIMA messenger. The current implementation
-milestone is Phase 0 (Foundation): machine contracts, reproducible database
-migrations, a minimal health backend, and a single-host development/staging
-stack.
+TIMA messenger monorepo. The current implementation milestone is the Phase 1
+Messaging Alpha exit candidate: machine contracts, KMP SDK and platform shells,
+Go auth/messaging/media services, realtime delivery, reproducible migrations,
+and a single-host development stack. The current exit decision is
+[BLOCKED](doc/09-delivery/phase1-exit-review.md) on external credentials,
+signed internal builds and invited-cohort evidence.
 
 ## Repository layout
 
 - `schema/` is the source of truth for OpenAPI, Protobuf, JSON Schema, and
   contract fixtures.
 - `gen/` contains committed Go and Kotlin models generated from `schema/`.
+- `client/` contains the KMP libraries and Android, iOS and Windows shells.
 - `server/` contains the Go services and forward-only database migrations.
 - `infra/` contains local and VPS Docker Compose manifests.
 - `doc/` contains the product and architecture specifications.
@@ -39,7 +42,7 @@ The local directories `kodium-main git/`, `livekit-master git/`, and
 See `doc/09-delivery/dependency-policy.md` for the authoritative dependency
 policy.
 
-## Phase 0 local run
+## Phase 1 local run
 
 Copy the environment template and start the development stack:
 

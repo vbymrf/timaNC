@@ -11,7 +11,8 @@ tima/
 └── .github/workflows/
 ```
 
-Current workspace: documentation + vendor copies only.
+Current workspace contains generated contracts, KMP client libraries and platform
+shells, Go services, Compose infrastructure, and Phase 1 release/SLO workflows.
 
 ## 2. Pipelines
 
@@ -53,7 +54,8 @@ Release smoke проверяет URL-контракт: `/healthz`, `/readyz`, `/
 | Phase | Server modules | Client flags | CI gate |
 |-------|----------------|--------------|---------|
 | 0 | core schema + migration baseline | — | schema validation + clean `golang-migrate up` |
-| 1–2 | `auth`, `messages`, `media`, `calls` | `calls` | messaging E2E + content/media/revision matrix |
+| 1 | `auth`, `messages`, `media`, realtime, push | — | messaging HTTP/WS E2E + content/media/revision + platform build matrix |
+| 2 | `calls` | `calls` | call interoperability and Communication MVP gates |
 | 3 | `feed`, `emotions`, `attributes`, `shelves`, `inbox` | `public_feed`, `social_inbox`, `emotions` | [test-strategy.md](../08-quality/test-strategy.md) §8 Phase 3 |
 | 3b | `bot_gateway`, webhook workers | `bot_platform` | [bot-platform-test-plan.md](../08-quality/bot-platform-test-plan.md) §12 |
 | 4+ | sharding, HSM escrow, retention/legal hold | `blogger_mode` | HSM mandatory before production; load S1–S13 + hold drill |
@@ -95,7 +97,8 @@ Release smoke проверяет URL-контракт: `/healthz`, `/readyz`, `/
 
 ```bash
 docker compose -f infra/docker-compose.dev.yml up
-# postgres, redis streams, minio, livekit, mailhog, tima-server, realtime-gw, tima-worker
+# postgres, redis streams, minio, tima-server, realtime-gw, tima-worker
+# LiveKit is Phase 2-only and requires: --profile phase2
 ```
 
 Production-like beta stack: [mvp-server-setup.md](../07-operations/mvp-server-setup.md).

@@ -30,13 +30,15 @@
 - [x] Auth-gated presigned URL with fixed TTL 15 minutes
 - [x] Immutable message revisions + `message.edited`
 - [x] Domain API and SDK formats ([domain-api-formats.md](../10-sdk/domain-api-formats.md))
-- [ ] Attestation iOS/Android
-- [ ] Windows QR linking
+- [ ] Attestation iOS/Android — production adapters are implemented; real vendor credential gate remains open
+- [x] Windows QR linking — server, DPAPI-backed client flow and black-box roundtrip
 - [x] Private 1:1 participant E2E (envelope + escrow)
-- [ ] Minimal generic push for offline delivery: no sender, message text, media caption or other plaintext content
-- [ ] Internal-track builds for Android/iOS and internal MSIX distribution
+- [ ] Minimal generic push for offline delivery: fail-closed FCM/APNs adapters and generic payload policy exist; real gateway delivery remains open
+- [ ] Internal-track builds for Android/iOS and internal MSIX distribution — workflows exist; signed artifacts have not been produced
 
 **Exit:** invited cohort до 100 пользователей работает в non-production single-region alpha; message SLO выполнен; каждое private message имеет `escrow_blob`; content/media/revision contract gates проходят. Signed PreKey не блокирует envelope-only alpha и становится blocking перед внешним тестированием ratchet path A.
+
+**Current review:** [Phase 1 exit is BLOCKED](./phase1-exit-review.md) pending credentialed platform builds, real attestation/push and invited-cohort evidence.
 
 ## Phase 2: Communication MVP (Month 3)
 
