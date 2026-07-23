@@ -30,11 +30,14 @@ docker compose --env-file infra/.env -f infra/docker-compose.dev.yml config
 docker compose --env-file infra/.env -f infra/docker-compose.dev.yml up --build -d
 ```
 
-Caddy exposes the API at `http://localhost:8080`. PostgreSQL, Redis, the MinIO
+Caddy exposes REST and protobuf WebSocket `/v1/ws` at `http://localhost:8080`.
+`tima-worker` drains the PostgreSQL transactional outbox into the
+`message.ingest` Redis Stream, and `realtime-gw` delivers metadata-only
+`message.created` frames; clients fetch ciphertext through REST. PostgreSQL, Redis, the MinIO
 API, and the MinIO console are available on the ports in `.env`. The
 `minio-bootstrap` job idempotently creates the private `media` and `previews`
 buckets. The `migrate` image packages `server/migrations` at build time and
-applies them before `tima-server` starts. Rebuild that image after adding a
+applies them before `tima-server`, `tima-worker`, and `realtime-gw` start. Rebuild that image after adding a
 migration. Caddy configuration is likewise packaged into its image so the
 stack works when the checkout is located on a VMware shared drive. The optional
 LiveKit renderer packages its template for the same reason.

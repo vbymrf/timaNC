@@ -4,12 +4,18 @@
 
 ```text
 WSS /v1/ws?token={access_token}
+X-Device-Id: {device_uuid}
+Sec-WebSocket-Protocol: tima.pb.v1
 ```
 
 - Heartbeat: ping/pong every 30s.
 - Reconnect with exponential backoff + cursor sync.
 
 ## 2. Frame format
+
+Machine wire truth is binary Protobuf `ClientFrame` / `ServerFrame` from
+`schema/proto/tima/v1/realtime/ws_frames.proto`. Text and JSON WebSocket frames
+are rejected with close code `1003`. JSON below is a conceptual event map only.
 
 ```json
 {

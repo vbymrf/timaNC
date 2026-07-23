@@ -18,3 +18,9 @@ kotlin {
         }
     }
 }
+
+tasks.withType<Test>().configureEach {
+    if (System.getenv("TIMA_REQUIRE_HTTP_E2E") == "true") {
+        outputs.upToDateWhen { false }
+    }
+}

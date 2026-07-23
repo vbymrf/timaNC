@@ -19,15 +19,21 @@ import com.tima.client.network.PrivateMessageWriteDto
 import com.tima.client.network.PrivateMetadataDto
 import com.tima.client.network.RestCryptoTransportAdapter
 import com.tima.client.network.WrappedKeyDto
+import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.net.http.WebSocket
+import java.nio.ByteBuffer
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.util.Base64
 import java.util.UUID
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -144,21 +150,32 @@ class HttpTwoDeviceRoundTripTest {
             ratchetEnvelope = null,
         )
         val write = RestCryptoTransportAdapter.toTransport(envelope)
+        val realtime = RealtimeProbe.connect(baseUrl, bobLaptop, chatId)
         val sendKey = UUID.randomUUID().toString()
-        val sent = http.post(
-            "/v1/chats/$chatId/messages",
-            alice,
-            write.toJson(),
-            idempotencyKey = sendKey,
-        )
-        val replayed = http.post(
-            "/v1/chats/$chatId/messages",
-            alice,
-            write.toJson(),
-            idempotencyKey = sendKey,
-        )
+        val sent: JsonObject
+        val replayed: JsonObject
+        val signal: MessageCreatedSignal
+        try {
+            sent = http.post(
+                "/v1/chats/$chatId/messages",
+                alice,
+                write.toJson(),
+                idempotencyKey = sendKey,
+            )
+            replayed = http.post(
+                "/v1/chats/$chatId/messages",
+                alice,
+                write.toJson(),
+                idempotencyKey = sendKey,
+            )
+            signal = realtime.awaitMessageCreated()
+        } finally {
+            realtime.close()
+        }
         assertEquals(sent.string("id"), replayed.string("id"))
         assertEquals(3, sent.getValue("wrapped_keys").jsonArray.size)
+        assertEquals(chatId, signal.chatId)
+        assertEquals(reservation.messageId, signal.messageId)
 
         val aliceBundles = http.get("/v1/keys/bundle/${alice.userId}", bobLaptop)
             .getValue("bundles").jsonArray
@@ -438,6 +455,186 @@ class HttpTwoDeviceRoundTripTest {
             if (response.body().isBlank()) return buildJsonObject {}
             return kotlinx.serialization.json.Json.parseToJsonElement(response.body()).jsonObject
         }
+    }
+
+    private data class MessageCreatedSignal(
+        val chatId: String,
+        val messageId: ULong,
+    )
+
+    private class RealtimeProbe private constructor(
+        private val socket: WebSocket,
+        private val frames: LinkedBlockingQueue<Any>,
+    ) {
+        fun awaitMessageCreated(): MessageCreatedSignal =
+            ProtoFrames.parseMessageCreated(awaitFrame())
+
+        fun close() {
+            socket.sendClose(WebSocket.NORMAL_CLOSURE, "test complete").join()
+        }
+
+        private fun awaitFrame(): ByteArray {
+            val value = frames.poll(10, TimeUnit.SECONDS)
+                ?: error("timed out waiting for realtime frame")
+            if (value is Throwable) throw AssertionError("realtime websocket failed", value)
+            return value as ByteArray
+        }
+
+        companion object {
+            fun connect(baseUrl: String, session: Session, chatId: String): RealtimeProbe {
+                val frames = LinkedBlockingQueue<Any>()
+                val listener = BinaryFrameListener(frames)
+                val wsBase = when {
+                    baseUrl.startsWith("https://") -> "wss://" + baseUrl.removePrefix("https://")
+                    baseUrl.startsWith("http://") -> "ws://" + baseUrl.removePrefix("http://")
+                    else -> error("unsupported realtime base URL")
+                }
+                val socket = HttpClient.newHttpClient().newWebSocketBuilder()
+                    .subprotocols("tima.pb.v1")
+                    .header("X-Device-Id", session.deviceId)
+                    .buildAsync(URI.create("$wsBase/v1/ws?token=${session.accessToken}"), listener)
+                    .join()
+                check(socket.subprotocol == "tima.pb.v1") { "realtime protobuf subprotocol not selected" }
+                socket.sendBinary(ByteBuffer.wrap(ProtoFrames.subscribeFrame(chatId)), true).join()
+                val probe = RealtimeProbe(socket, frames)
+                probe.awaitFrame() // subscription Ack
+                return probe
+            }
+        }
+    }
+
+    private class BinaryFrameListener(
+        private val frames: LinkedBlockingQueue<Any>,
+    ) : WebSocket.Listener {
+        private val current = ByteArrayOutputStream()
+
+        override fun onOpen(webSocket: WebSocket) {
+            webSocket.request(1)
+        }
+
+        @Synchronized
+        override fun onBinary(
+            webSocket: WebSocket,
+            data: ByteBuffer,
+            last: Boolean,
+        ): CompletionStage<*>? {
+            val part = ByteArray(data.remaining())
+            data.get(part)
+            current.write(part)
+            if (last) {
+                frames.put(current.toByteArray())
+                current.reset()
+            }
+            webSocket.request(1)
+            return null
+        }
+
+        override fun onError(webSocket: WebSocket, error: Throwable) {
+            frames.offer(error)
+        }
+    }
+
+    private class ProtoReader(private val value: ByteArray) {
+        private var position = 0
+
+        fun hasRemaining(): Boolean = position < value.size
+
+        fun tag(): Int = varint().toInt()
+
+        fun varint(): ULong {
+            var result = 0uL
+            var shift = 0
+            while (shift < 64) {
+                require(position < value.size) { "truncated protobuf varint" }
+                val byte = value[position++].toInt() and 0xff
+                result = result or ((byte and 0x7f).toULong() shl shift)
+                if (byte and 0x80 == 0) return result
+                shift += 7
+            }
+            error("invalid protobuf varint")
+        }
+
+        fun bytes(): ByteArray {
+            val size = varint()
+            require(size <= Int.MAX_VALUE.toULong()) { "protobuf field too large" }
+            val end = position + size.toInt()
+            require(end <= value.size) { "truncated protobuf bytes" }
+            return value.copyOfRange(position, end).also { position = end }
+        }
+
+        fun skip(wireType: Int) {
+            when (wireType) {
+                0 -> varint()
+                2 -> bytes()
+                else -> error("unsupported protobuf wire type $wireType")
+            }
+        }
+    }
+
+    private object ProtoFrames {
+    fun subscribeFrame(chatId: String): ByteArray {
+        val uuid = UUID.fromString(chatId)
+        val uuidBytes = ByteBuffer.allocate(16)
+            .putLong(uuid.mostSignificantBits)
+            .putLong(uuid.leastSignificantBits)
+            .array()
+        val uuidMessage = protoBytesField(1, uuidBytes)
+        val subscribe = protoBytesField(1, uuidMessage)
+        return protoVarintField(1, 1uL) + protoBytesField(10, subscribe)
+    }
+
+    fun parseMessageCreated(frame: ByteArray): MessageCreatedSignal {
+        val serverEvent = nestedField(frame, 10)
+        val messageCreated = nestedField(serverEvent, 10)
+        val revision = nestedField(messageCreated, 1)
+        val chatUuid = nestedField(revision, 1)
+        val chatBytes = nestedField(chatUuid, 1)
+        val chatBuffer = ByteBuffer.wrap(chatBytes)
+        val chatId = UUID(chatBuffer.long, chatBuffer.long).toString()
+        val reader = ProtoReader(revision)
+        var messageId: ULong? = null
+        while (reader.hasRemaining()) {
+            val tag = reader.tag()
+            val field = tag ushr 3
+            val wire = tag and 7
+            if (field == 2 && wire == 0) {
+                messageId = reader.varint()
+            } else {
+                reader.skip(wire)
+            }
+        }
+        return MessageCreatedSignal(chatId, requireNotNull(messageId))
+    }
+
+    private fun nestedField(value: ByteArray, expectedField: Int): ByteArray {
+        val reader = ProtoReader(value)
+        while (reader.hasRemaining()) {
+            val tag = reader.tag()
+            val field = tag ushr 3
+            val wire = tag and 7
+            if (field == expectedField && wire == 2) return reader.bytes()
+            reader.skip(wire)
+        }
+        error("protobuf field $expectedField not found")
+    }
+
+    private fun protoVarintField(field: Int, value: ULong): ByteArray =
+        protoVarint((field shl 3).toULong()) + protoVarint(value)
+
+    private fun protoBytesField(field: Int, value: ByteArray): ByteArray =
+        protoVarint(((field shl 3) or 2).toULong()) +
+            protoVarint(value.size.toULong()) + value
+
+    private fun protoVarint(value: ULong): ByteArray {
+        var remaining = value
+        val result = mutableListOf<Byte>()
+        while (remaining >= 0x80u) {
+            result += ((remaining and 0x7fuL).toInt() or 0x80).toByte()
+            remaining = remaining shr 7
+        }
+        result += remaining.toByte()
+        return result.toByteArray()
+    }
     }
 
     private companion object {

@@ -5,6 +5,8 @@
 
 :80 {
 	encode zstd gzip
+	@realtime path /v1/ws
+	reverse_proxy @realtime realtime-gw:8081
 	reverse_proxy tima-server:8080 {
 		health_uri /healthz
 		health_interval 10s

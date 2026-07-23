@@ -1,0 +1,162 @@
+package worker
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
+
+	"tima-server/internal/eventbus"
+)
+
+type MessageConsumer struct {
+	DB           *pgxpool.Pool
+	Redis        *redis.Client
+	ConsumerName string
+}
+
+type outboxPayload struct {
+	ChatID         string `json:"chat_id"`
+	MessageID      string `json:"message_id"`
+	SenderID       string `json:"sender_id"`
+	SenderDeviceID string `json:"sender_device_id"`
+}
+
+func (c *MessageConsumer) Run(ctx context.Context) error {
+	if err := c.Redis.XGroupCreateMkStream(
+		ctx, eventbus.MessageIngestStream, eventbus.MessageWorkerGroup, "0",
+	).Err(); err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
+		return err
+	}
+	name := c.ConsumerName
+	if name == "" {
+		name = "worker-1"
+	}
+	for {
+		streams, err := c.Redis.XReadGroup(ctx, &redis.XReadGroupArgs{
+			Group:    eventbus.MessageWorkerGroup,
+			Consumer: name,
+			Streams: []string{
+				eventbus.MessageIngestStream, ">",
+			},
+			Count: 10,
+			Block: time.Second,
+		}).Result()
+		if errors.Is(err, redis.Nil) {
+			continue
+		}
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return err
+		}
+		for _, stream := range streams {
+			for _, message := range stream.Messages {
+				if err = c.handle(ctx, message); err != nil {
+					return err
+				}
+				if err = c.Redis.XAck(
+					ctx, eventbus.MessageIngestStream, eventbus.MessageWorkerGroup, message.ID,
+				).Err(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+}
+
+func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) error {
+	eventID, err := field(message, "event_id")
+	if err != nil {
+		return err
+	}
+	topic, err := field(message, "topic")
+	if err != nil {
+		return err
+	}
+	if topic != "personal_message.created" {
+		return fmt.Errorf("unsupported message ingest topic %q", topic)
+	}
+	rawPayload, err := field(message, "payload")
+	if err != nil {
+		return err
+	}
+	var payload outboxPayload
+	if err = json.Unmarshal([]byte(rawPayload), &payload); err != nil {
+		return err
+	}
+	messageID, err := strconv.ParseUint(payload.MessageID, 10, 64)
+	if err != nil || messageID == 0 {
+		return fmt.Errorf("invalid message id %q", payload.MessageID)
+	}
+
+	notification := eventbus.DeviceNotification{
+		EventID:         eventID,
+		ChatID:          payload.ChatID,
+		MessageID:       messageID,
+		SenderID:        payload.SenderID,
+		ProtocolVersion: 2,
+		FormatVersion:   2,
+	}
+	err = c.DB.QueryRow(ctx, `SELECT m.current_revision_id,r.parent_revision_id,
+		r.revision_number,m.presence_bitmap,m.key_commitment,m.created_at
+		FROM personal_messages m JOIN personal_message_revisions r
+		  ON r.chat_id=m.chat_id AND r.message_id=m.message_id
+		  AND r.revision_id=m.current_revision_id
+		WHERE m.chat_id=$1 AND m.message_id=$2`,
+		payload.ChatID, int64(messageID)).Scan(
+		&notification.RevisionID,
+		&notification.ParentRevisionID,
+		&notification.RevisionNumber,
+		&notification.PresenceBitmap,
+		&notification.KeyCommitment,
+		&notification.CreatedAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := c.DB.Query(ctx, `SELECT d.device_id,
+		EXISTS(SELECT 1 FROM personal_message_keys k
+		  WHERE k.chat_id=$1 AND k.message_id=$2 AND k.recipient_key=d.device_id)
+		FROM chats c JOIN devices d ON d.user_id IN(c.user_a,c.user_b)
+		WHERE c.chat_id=$1 AND d.revoked_at IS NULL AND d.device_id<>$3`,
+		payload.ChatID, int64(messageID), payload.SenderDeviceID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var deviceID string
+		if err = rows.Scan(&deviceID, &notification.HasWrappedKey); err != nil {
+			return err
+		}
+		encoded, marshalErr := json.Marshal(notification)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		if err = c.Redis.Publish(ctx, eventbus.NotifyChannel(deviceID), encoded).Err(); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
+}
+
+func field(message redis.XMessage, name string) (string, error) {
+	value, ok := message.Values[name]
+	if !ok {
+		return "", fmt.Errorf("stream entry %s is missing %s", message.ID, name)
+	}
+	text, ok := value.(string)
+	if !ok || text == "" {
+		return "", fmt.Errorf("stream entry %s has invalid %s", message.ID, name)
+	}
+	return text, nil
+}

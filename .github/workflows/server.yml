@@ -3,12 +3,14 @@ name: Phase 1 Server
 on:
   pull_request:
     paths:
+      - "gen/go/proto/**"
       - "server/**"
       - ".github/workflows/server.yml"
   push:
     branches:
       - main
     paths:
+      - "gen/go/proto/**"
       - "server/**"
       - ".github/workflows/server.yml"
   workflow_dispatch:
