@@ -1,0 +1,44 @@
+name: MessNC
+options:
+  minimumXcodeGenVersion: 2.38.0
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    PRODUCT_BUNDLE_IDENTIFIER: com.tima.messnc
+    SWIFT_VERSION: "5.10"
+targets:
+  MessNC:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - MessNC
+    info:
+      path: MessNC/Info.plist
+      properties:
+        CFBundleDisplayName: MessNC
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: "$(TIMA_APPLE_TEAM_ID)"
+        CODE_SIGN_ENTITLEMENTS: MessNC/MessNC.entitlements
+      configs:
+        Debug:
+          TIMA_APP_ATTEST_ENVIRONMENT: development
+          TIMA_APNS_ENVIRONMENT: development
+        Release:
+          TIMA_APP_ATTEST_ENVIRONMENT: production
+          TIMA_APNS_ENVIRONMENT: production
+    preBuildScripts:
+      - name: Build Kotlin framework
+        script: |
+          set -e
+          cd "$SRCROOT/../.."
+          ./gradlew :apps:ios-framework:assembleMessNcPlatformDebugXCFramework
+        basedOnDependencyAnalysis: false
+    dependencies:
+      - framework: ../ios-framework/build/XCFrameworks/debug/MessNcPlatform.xcframework
+        embed: false

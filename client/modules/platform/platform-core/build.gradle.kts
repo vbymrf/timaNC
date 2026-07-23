@@ -1,0 +1,19 @@
+plugins {
+    alias(libs.plugins.kotlin.multiplatform)
+}
+
+kotlin {
+    jvmToolchain(17)
+    jvm()
+
+    sourceSets {
+        commonMain.dependencies {
+            api(project(":modules:core:core-network"))
+            implementation(libs.kotlinx.serialization.json)
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
+    }
+}
