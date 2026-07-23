@@ -394,7 +394,9 @@ func (s *Service) validateMessage(
 		return ErrInvalid
 	}
 	var public []byte
-	if err = s.DB.QueryRow(ctx, `SELECT signing_pubkey FROM devices WHERE device_id=$1 AND user_id=$2 AND revoked_at IS NULL`,
+	if err = s.DB.QueryRow(ctx, `SELECT signing_pubkey FROM devices
+		WHERE device_id=$1 AND user_id=$2 AND revoked_at IS NULL
+		  AND attestation_ok=true AND attested_at>now()-interval '30 days'`,
 		p.DeviceID, p.UserID).Scan(&public); err != nil {
 		return fmt.Errorf("signing key lookup: %w", ErrInvalid)
 	}
@@ -453,6 +455,7 @@ func (s *Service) ListMessages(ctx context.Context, p Principal, chatID string, 
 		JOIN personal_message_keys k ON k.chat_id=m.chat_id AND k.message_id=m.message_id
 		  AND k.revision_id=m.current_revision_id
 		WHERE c.chat_id=$1 AND ($2=c.user_a OR $2=c.user_b) AND k.recipient_key=$3
+		  AND m.deleted=false
 		ORDER BY m.message_id DESC LIMIT $4`, chatID, p.UserID, p.DeviceID, limit)
 	if err != nil {
 		return nil, err

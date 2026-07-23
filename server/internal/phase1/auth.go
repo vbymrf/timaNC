@@ -99,8 +99,8 @@ func (s *Service) VerifyRegistration(
 		return AuthSession{}, err
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO devices
-		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,app_version,attestation_ok,is_trust_anchor,last_seen,created_at)
-		VALUES($1,$2,$3,$4,$5,$6,$7,true,true,$8,$8)`,
+		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,app_version,attestation_ok,is_trust_anchor,attested_at,last_seen,created_at)
+		VALUES($1,$2,$3,$4,$5,$6,$7,true,true,$8,$8,$8)`,
 		deviceID, userID, in.Platform, identityKey, signingKey, in.Name, in.AppVersion, now); err != nil {
 		return AuthSession{}, err
 	}
@@ -150,8 +150,8 @@ func (s *Service) Login(
 	deviceID, _ := NewUUID()
 	now := s.Now().UTC()
 	if _, err = tx.Exec(ctx, `INSERT INTO devices
-		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,app_version,attestation_ok,is_trust_anchor,last_seen,created_at)
-		VALUES($1,$2,$3,$4,$5,$6,$7,true,true,$8,$8)`, deviceID, user.ID, in.Platform,
+		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,app_version,attestation_ok,is_trust_anchor,attested_at,last_seen,created_at)
+		VALUES($1,$2,$3,$4,$5,$6,$7,true,true,$8,$8,$8)`, deviceID, user.ID, in.Platform,
 		identityKey, signingKey, in.Name, in.AppVersion, now); err != nil {
 		return AuthSession{}, err
 	}

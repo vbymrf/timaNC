@@ -63,9 +63,29 @@ func TestMetrics(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d", response.Code)
 	}
-	for _, metric := range []string{"tima_http_requests_total 2", "tima_ready 1", "tima_process_uptime_seconds"} {
+	for _, metric := range []string{
+		"tima_http_requests_total 2",
+		"tima_ready 1",
+		"tima_process_uptime_seconds",
+		"tima_message_send_ack_seconds_bucket{le=\"0.8\"}",
+	} {
 		if !strings.Contains(response.Body.String(), metric) {
 			t.Errorf("metrics do not contain %q:\n%s", metric, response.Body.String())
+		}
+	}
+}
+
+func TestMessageSendMetricPathClassification(t *testing.T) {
+	if !isMessageSendPath("/v1/chats/chat-id/messages") {
+		t.Fatal("canonical send route was not classified")
+	}
+	for _, path := range []string{
+		"/v1/chats/chat-id/messages/1/revisions",
+		"/v1/groups/group-id/messages",
+		"/v1/chats/chat-id/message-reservations",
+	} {
+		if isMessageSendPath(path) {
+			t.Fatalf("non-send route %q was classified as message send", path)
 		}
 	}
 }

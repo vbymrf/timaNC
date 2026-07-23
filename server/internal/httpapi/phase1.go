@@ -29,15 +29,23 @@ func (h *Handler) registerPhase1(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/link/claim", h.claimDeviceLink)
 	mux.Handle("PUT /v1/devices/push", h.auth(http.HandlerFunc(h.registerPush)))
 	mux.Handle("DELETE /v1/devices/push", h.auth(http.HandlerFunc(h.deletePush)))
+	mux.Handle("GET /v1/users/me", h.auth(http.HandlerFunc(h.getCurrentUser)))
+	mux.Handle("PATCH /v1/users/me", h.auth(http.HandlerFunc(h.updateCurrentUser)))
+	mux.Handle("GET /v1/devices", h.auth(http.HandlerFunc(h.listDevices)))
+	mux.Handle("DELETE /v1/devices/{id}", h.auth(http.HandlerFunc(h.revokeDevice)))
 	mux.Handle("PUT /v1/keys/bundle", h.auth(http.HandlerFunc(h.putKeyBundle)))
 	mux.Handle("GET /v1/keys/bundle/{user_id}", h.auth(http.HandlerFunc(h.getKeyBundles)))
+	mux.Handle("POST /v1/keys/prekeys/replenish", h.auth(http.HandlerFunc(h.replenishPrekeys)))
 	mux.Handle("GET /v1/escrow/config", h.auth(http.HandlerFunc(h.getEscrowConfig)))
 	mux.Handle("GET /v1/chats", h.auth(http.HandlerFunc(h.listChats)))
 	mux.Handle("POST /v1/chats", h.auth(http.HandlerFunc(h.createChat)))
 	mux.Handle("POST /v1/chats/{id}/message-reservations", h.auth(http.HandlerFunc(h.reserveMessage)))
 	mux.Handle("GET /v1/chats/{id}/messages", h.auth(http.HandlerFunc(h.listMessages)))
 	mux.Handle("POST /v1/chats/{id}/messages", h.auth(http.HandlerFunc(h.sendMessage)))
+	mux.Handle("DELETE /v1/chats/{id}/messages/{msg_id}", h.auth(http.HandlerFunc(h.deleteChatMessage)))
+	mux.HandleFunc("POST /v1/chats/{id}/messages/reservations", http.NotFound)
 	mux.Handle("POST /v1/chats/{id}/messages/{msg_id}/revisions", h.auth(http.HandlerFunc(h.reviseMessage)))
+	mux.Handle("POST /v1/chats/{id}/read", h.auth(http.HandlerFunc(h.markChatRead)))
 	mux.Handle("POST /v1/chats/{chat_id}/media/uploads", h.auth(http.HandlerFunc(h.createChatMediaUpload)))
 	mux.Handle("POST /v1/posts/assets", h.auth(http.HandlerFunc(h.createPublicMediaUpload)))
 	mux.Handle("POST /v1/media/uploads/{media_id}/complete", h.auth(http.HandlerFunc(h.completeMediaUpload)))
@@ -165,6 +173,34 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) getCurrentUser(w http.ResponseWriter, r *http.Request) {
+	out, err := h.phase1.GetCurrentUser(r.Context(), principal(r))
+	h.respond(w, r, http.StatusOK, out, err)
+}
+
+func (h *Handler) updateCurrentUser(w http.ResponseWriter, r *http.Request) {
+	var in phase1.UserPatch
+	if _, err := decodeStrict(r, &in); err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, err := h.phase1.UpdateCurrentUser(r.Context(), principal(r), in)
+	h.respond(w, r, http.StatusOK, out, err)
+}
+
+func (h *Handler) listDevices(w http.ResponseWriter, r *http.Request) {
+	out, err := h.phase1.ListDevices(r.Context(), principal(r))
+	h.respond(w, r, http.StatusOK, map[string]any{"items": out}, err)
+}
+
+func (h *Handler) revokeDevice(w http.ResponseWriter, r *http.Request) {
+	if err := h.phase1.RevokeDevice(r.Context(), principal(r), r.PathValue("id")); err != nil {
+		h.problem(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) startDeviceLink(w http.ResponseWriter, r *http.Request) {
 	var in phase1.LinkSession
 	if _, err := decodeStrict(r, &in); err != nil {
@@ -232,6 +268,16 @@ func (h *Handler) getKeyBundles(w http.ResponseWriter, r *http.Request) {
 	h.respond(w, r, http.StatusOK, map[string]any{"user_id": id, "bundles": out}, err)
 }
 
+func (h *Handler) replenishPrekeys(w http.ResponseWriter, r *http.Request) {
+	var in phase1.PrekeyBatch
+	if _, err := decodeStrict(r, &in); err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, err := h.phase1.ReplenishPrekeys(r.Context(), principal(r), in)
+	h.respond(w, r, http.StatusOK, out, err)
+}
+
 func (h *Handler) getEscrowConfig(w http.ResponseWriter, r *http.Request) {
 	shard, err := strconv.Atoi(r.URL.Query().Get("shard"))
 	if err != nil {
@@ -285,6 +331,38 @@ func (h *Handler) listMessages(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	out, err := h.phase1.ListMessages(r.Context(), principal(r), r.PathValue("id"), limit)
 	h.respond(w, r, http.StatusOK, map[string]any{"items": out}, err)
+}
+
+func (h *Handler) deleteChatMessage(w http.ResponseWriter, r *http.Request) {
+	messageID, err := strconv.ParseInt(r.PathValue("msg_id"), 10, 64)
+	if err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	if err = h.phase1.DeleteChatMessage(
+		r.Context(), principal(r), r.PathValue("id"), messageID,
+	); err != nil {
+		h.problem(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) markChatRead(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		MessageID string `json:"message_id"`
+	}
+	if _, err := decodeStrict(r, &in); err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	messageID, err := strconv.ParseInt(in.MessageID, 10, 64)
+	if err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, err := h.phase1.MarkChatRead(r.Context(), principal(r), r.PathValue("id"), messageID)
+	h.respond(w, r, http.StatusOK, out, err)
 }
 
 func (h *Handler) reviseMessage(w http.ResponseWriter, r *http.Request) {

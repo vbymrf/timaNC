@@ -104,6 +104,7 @@ func (s *Service) ConfirmDeviceLink(
 		FROM device_link_sessions l JOIN devices d ON d.device_id=$2
 		WHERE l.session_id=$1 AND l.expires_at>now() AND l.confirmed_at IS NULL
 		  AND d.user_id=$3 AND d.revoked_at IS NULL AND d.attestation_ok=true
+		  AND d.attested_at>now()-interval '24 hours'
 		FOR UPDATE`, in.SessionID, p.DeviceID, p.UserID).
 		Scan(&identityKey, &desktopSigningKey, &desktopName, &qrHash, &phoneSigningKey, &platform)
 	if err != nil || (platform != "ios" && platform != "android") ||
@@ -120,8 +121,8 @@ func (s *Service) ConfirmDeviceLink(
 	}
 	now := s.Now().UTC()
 	if _, err = tx.Exec(ctx, `INSERT INTO devices
-		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,attestation_ok,trust_via_phone,last_seen,created_at)
-		VALUES($1,$2,'windows',$3,$4,$5,true,true,$6,$6)`,
+		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,attestation_ok,trust_via_phone,attested_at,last_seen,created_at)
+		VALUES($1,$2,'windows',$3,$4,$5,true,true,$6,$6,$6)`,
 		deviceID, p.UserID, identityKey, desktopSigningKey, desktopName, now); err != nil {
 		return Device{}, err
 	}

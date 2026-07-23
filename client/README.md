@@ -1,13 +1,17 @@
-# MessNC minimal KMP/JVM client slice
+# MessNC Phase 1 KMP client foundation
 
 Modules:
 
 - `modules/core/core-domain` — transport-independent DocumentV2/envelope/key models.
 - `modules/core/core-network` — isolated boundary for generated Wire/OpenAPI adapters.
+- `modules/core/core-database` — SQLDelight identity, revision, media queue and persistent outbox storage.
+- `modules/core/core-sync` — crash recovery, idempotent outbox delivery and bounded retry scheduling.
+- `modules/core/core-sdk` — transport-independent `Message`, `MessageRevision`, `MediaAsset`,
+  `DocumentV2` and typed SDK errors.
 - `modules/messenger-crypto` — Kodium-backed identities, commitments, text encryption,
   Path-B wraps, canonical signatures, signed escrow config verification, and hybrid escrow.
-- `integration-harness` — in-process crypto coverage plus a compose-backed JVM HTTP
-  two-device roundtrip.
+- `integration-harness` — in-process crypto coverage plus a compose-backed JVM HTTP/WS
+  roundtrip with mobile attestation, Windows QR linking, revisions and dual media.
 
 `eu.livotov.labs:kodium:1.0.0` is pinned in `gradle/libs.versions.toml`. No local Kodium
 source is compiled into this build.

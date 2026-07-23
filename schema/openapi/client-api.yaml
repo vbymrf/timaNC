@@ -542,7 +542,7 @@ paths:
     post:
       tags: [Media]
       operationId: createGroupMediaUpload
-      x-tima-implementation-phase: phase-1
+      x-tima-implementation-phase: phase-2
       parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {$ref: '#/components/requestBodies/MediaUploadCreate'}
       responses:

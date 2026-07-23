@@ -38,6 +38,16 @@ func TestLoadRejectsMediaURLTTLAboveFifteenMinutes(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsMediaURLTTLBelowFifteenMinutes(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://db/tima")
+	t.Setenv("MEDIA_URL_TTL", "14m")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "MEDIA_URL_TTL") {
+		t.Fatalf("Load() error = %v, want fixed MEDIA_URL_TTL error", err)
+	}
+}
+
 func TestLoadRequiresDatabaseURL(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("POSTGRES_DSN", "")
@@ -55,5 +65,26 @@ func TestLoadRejectsInvalidTimeout(t *testing.T) {
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), "READINESS_TIMEOUT") {
 		t.Fatalf("Load() error = %v, want READINESS_TIMEOUT error", err)
+	}
+}
+
+func TestLoadRequiresStrictEscrowOutsideDevelopment(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://db/tima")
+	t.Setenv("APP_ENV", "beta")
+	t.Setenv("ESCROW_STRICT", "false")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "ESCROW_STRICT=true") {
+		t.Fatalf("Load() error = %v, want strict escrow error", err)
+	}
+}
+
+func TestLoadRejectsInvalidEscrowStrictValue(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://db/tima")
+	t.Setenv("ESCROW_STRICT", "sometimes")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "ESCROW_STRICT must be true or false") {
+		t.Fatalf("Load() error = %v, want ESCROW_STRICT syntax error", err)
 	}
 }

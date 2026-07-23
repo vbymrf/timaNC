@@ -1,10 +1,17 @@
 package phase1
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"time"
 )
 
@@ -32,6 +39,83 @@ type AttestationVerifier interface {
 
 type developmentAttestationVerifier struct {
 	secret []byte
+}
+
+type HTTPAttestationVerifier struct {
+	URL         string
+	BearerToken string
+	Client      *http.Client
+}
+
+func (v *HTTPAttestationVerifier) VerifyIOS(
+	ctx context.Context,
+	in IOSAttestation,
+	challenge []byte,
+) (string, error) {
+	return v.verify(ctx, "ios", in, challenge)
+}
+
+func (v *HTTPAttestationVerifier) VerifyAndroid(
+	ctx context.Context,
+	in AndroidIntegrity,
+	challenge []byte,
+) (string, error) {
+	return v.verify(ctx, "android", in, challenge)
+}
+
+func (v *HTTPAttestationVerifier) verify(
+	ctx context.Context,
+	platform string,
+	proof any,
+	challenge []byte,
+) (string, error) {
+	if v.URL == "" || v.BearerToken == "" {
+		return "", ErrUnavailable
+	}
+	body, err := json.Marshal(map[string]any{
+		"platform":           platform,
+		"proof":              proof,
+		"expected_challenge": base64.StdEncoding.EncodeToString(challenge),
+	})
+	if err != nil {
+		return "", err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, v.URL, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	request.Header.Set("Authorization", "Bearer "+v.BearerToken)
+	request.Header.Set("Content-Type", "application/json")
+	client := v.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return "", fmt.Errorf("%w: attestation vendor unavailable", ErrUnavailable)
+	}
+	defer response.Body.Close()
+	if response.StatusCode >= 500 {
+		_, _ = io.Copy(io.Discard, response.Body)
+		return "", fmt.Errorf("%w: attestation vendor unavailable", ErrUnavailable)
+	}
+	if response.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, response.Body)
+		return "", ErrForbidden
+	}
+	var result struct {
+		Verdict string `json:"verdict"`
+	}
+	decoder := json.NewDecoder(io.LimitReader(response.Body, 4097))
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(&result); err != nil ||
+		(result.Verdict != "trusted" && result.Verdict != "limited") {
+		return "", errors.New("invalid attestation gateway response")
+	}
+	if strings.TrimSpace(result.Verdict) != result.Verdict {
+		return "", errors.New("invalid attestation gateway verdict")
+	}
+	return result.Verdict, nil
 }
 
 func NewDevelopmentAttestationVerifier(secret string) AttestationVerifier {

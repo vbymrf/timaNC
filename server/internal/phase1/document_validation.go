@@ -21,7 +21,7 @@ func validateAndCanonicalizeMarkup(
 ) ([]byte, markupInfo, error) {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) ||
-		bytes.Equal(trimmed, []byte("{}")) {
+		bytes.Equal(trimmed, []byte("{}")) || bytes.Equal(trimmed, []byte("[]")) {
 		return nil, markupInfo{}, nil
 	}
 	decoder := json.NewDecoder(bytes.NewReader(trimmed))

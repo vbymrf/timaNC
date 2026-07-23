@@ -19,6 +19,7 @@ include(
     ":modules:core:core-network",
     ":modules:core:core-database",
     ":modules:core:core-sync",
+    ":modules:core:core-sdk",
     ":modules:messenger-crypto",
     ":integration-harness",
 )

@@ -56,8 +56,8 @@ func TestReserveSendHistoryAndDirectoryIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = pool.Exec(ctx, `INSERT INTO devices
-		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name) VALUES
-		($1,$2,'android',$3,$4,'a'),($5,$6,'android',$7,$8,'b')`,
+		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,attestation_ok,attested_at) VALUES
+		($1,$2,'android',$3,$4,'a',true,now()),($5,$6,'android',$7,$8,'b',true,now())`,
 		deviceA, userA, identityA, signingPublicA, deviceB, userB, identityB, make([]byte, 32))
 	if err != nil {
 		t.Fatal(err)

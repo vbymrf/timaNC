@@ -40,3 +40,12 @@ func TestPrivateMarkupRejectsExecutableAndInvalidReferences(t *testing.T) {
 		}
 	}
 }
+
+func TestOptionalMarkupEmptyFormsNormalizeToAbsence(t *testing.T) {
+	for _, raw := range []json.RawMessage{nil, json.RawMessage(`null`), json.RawMessage(`{}`), json.RawMessage(`[]`)} {
+		canonical, info, err := validateAndCanonicalizeMarkup(raw, 0)
+		if err != nil || canonical != nil || info.HasMedia || info.HasSecrets || len(info.MediaIDs) != 0 {
+			t.Fatalf("markup %q normalized to %q, %#v, %v", raw, canonical, info, err)
+		}
+	}
+}

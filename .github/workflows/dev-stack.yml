@@ -131,6 +131,16 @@ jobs:
           TIMA_REQUIRE_HTTP_E2E: "true"
         run: gradle --no-daemon jvmTest
 
+      - name: Enforce alpha message send-to-ack budget
+        shell: bash
+        run: |
+          metrics="$(curl --fail --show-error --silent http://localhost:8080/metrics)"
+          count="$(awk '/^tima_message_send_ack_seconds_count / {print $2}' <<<"${metrics}")"
+          within_budget="$(awk '/^tima_message_send_ack_seconds_bucket\{le="0.8"\} / {print $2}' <<<"${metrics}")"
+          test -n "${count}"
+          test "${count}" -ge 1
+          test "${within_budget}" = "${count}"
+
       - name: Verify outbox and Redis Stream state
         shell: bash
         run: |

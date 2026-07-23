@@ -35,25 +35,28 @@ class TimaHttpTransport(
     private val baseUrl = baseUrl.trimEnd('/')
 
     suspend fun get(path: String): JsonObject =
-        execute(HttpMethod.Get, path, null, null)
+        execute(HttpMethod.Get, path, null, null, emptyMap())
 
     suspend fun post(
         path: String,
         body: JsonObject? = null,
         idempotencyKey: String? = null,
-    ): JsonObject = execute(HttpMethod.Post, path, body, idempotencyKey)
+        headers: Map<String, String> = emptyMap(),
+    ): JsonObject = execute(HttpMethod.Post, path, body, idempotencyKey, headers)
 
     suspend fun put(
         path: String,
         body: JsonObject,
         idempotencyKey: String? = null,
-    ): JsonObject = execute(HttpMethod.Put, path, body, idempotencyKey)
+        headers: Map<String, String> = emptyMap(),
+    ): JsonObject = execute(HttpMethod.Put, path, body, idempotencyKey, headers)
 
     private suspend fun execute(
         method: HttpMethod,
         path: String,
         body: JsonObject?,
         idempotencyKey: String?,
+        headers: Map<String, String>,
     ): JsonObject {
         require(path.startsWith("/") && !path.startsWith("//")) { "path must be absolute and host-relative" }
         val response = client.request(baseUrl + path) {
@@ -64,6 +67,7 @@ class TimaHttpTransport(
                 header("X-Device-Id", it.deviceId)
             }
             idempotencyKey?.let { header("Idempotency-Key", it) }
+            headers.forEach { (name, value) -> header(name, value) }
             if (body != null) {
                 contentType(ContentType.Application.Json)
                 setBody(body.toString())

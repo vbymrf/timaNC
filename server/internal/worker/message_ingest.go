@@ -155,7 +155,7 @@ func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) er
 		return err
 	}
 
-	rows, err := c.DB.Query(ctx, `SELECT d.device_id,
+	rows, err := c.DB.Query(ctx, `SELECT d.device_id,d.user_id,
 		EXISTS(SELECT 1 FROM personal_message_keys k
 		  WHERE k.chat_id=$1 AND k.message_id=$2 AND k.recipient_key=d.device_id
 		    AND k.revision_id=$4),p.provider,p.token_ciphertext
@@ -167,11 +167,12 @@ func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) er
 		return err
 	}
 	defer rows.Close()
+	pushAllowed := map[string]bool{}
 	for rows.Next() {
-		var deviceID string
+		var deviceID, userID string
 		var provider *string
 		var tokenCiphertext []byte
-		if err = rows.Scan(&deviceID, &notification.HasWrappedKey, &provider, &tokenCiphertext); err != nil {
+		if err = rows.Scan(&deviceID, &userID, &notification.HasWrappedKey, &provider, &tokenCiphertext); err != nil {
 			return err
 		}
 		encoded, marshalErr := json.Marshal(notification)
@@ -187,6 +188,31 @@ func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) er
 				return presenceErr
 			}
 			if online == 0 {
+				allowed, known := pushAllowed[userID]
+				if !known {
+					collapseKey := fmt.Sprintf("push:collapse:%s:%s", userID, payload.ChatID)
+					allowed, err = c.Redis.SetNX(ctx, collapseKey, eventID, 5*time.Minute).Result()
+					if err != nil {
+						return err
+					}
+					rateKey := fmt.Sprintf("push:private:%s:%s", userID, time.Now().UTC().Format("2006010215"))
+					var count int64
+					var rateErr error
+					if allowed {
+						count, rateErr = c.Redis.Incr(ctx, rateKey).Result()
+					}
+					if rateErr != nil {
+						return rateErr
+					}
+					if allowed && count == 1 {
+						_ = c.Redis.Expire(ctx, rateKey, 2*time.Hour).Err()
+					}
+					allowed = allowed && count <= 12
+					pushAllowed[userID] = allowed
+				}
+				if !allowed {
+					continue
+				}
 				token, decryptErr := push.DecryptToken(c.PushTokenKey, tokenCiphertext)
 				if decryptErr != nil {
 					return decryptErr

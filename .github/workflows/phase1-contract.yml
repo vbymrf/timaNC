@@ -1,0 +1,58 @@
+name: Phase 1 contract gate
+
+on:
+  pull_request:
+    paths:
+      - "client/**"
+      - "server/internal/phase1/**"
+      - "server/internal/push/**"
+      - "server/migrations/**"
+      - "schema/**"
+      - ".github/workflows/phase1-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "server/internal/phase1/**"
+      - "server/internal/push/**"
+      - "server/migrations/**"
+      - "schema/**"
+      - ".github/workflows/phase1-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  content-media-revision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.5"
+          cache-dependency-path: server/go.sum
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.2"
+
+      - name: Test server content, media, revision and push contracts
+        working-directory: server
+        run: go test ./internal/phase1 ./internal/push
+
+      - name: Require every Phase 1 OpenAPI operation to have a route
+        run: python3 schema/codegen/check_phase1_routes.py
+
+      - name: Test KMP domain, crypto, storage and transport contracts
+        working-directory: client
+        run: gradle --no-daemon jvmTest
+
+      - name: Reject uncommitted generated or formatted drift
+        run: git diff --exit-code

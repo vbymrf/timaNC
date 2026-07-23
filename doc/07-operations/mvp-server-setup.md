@@ -73,12 +73,21 @@ DOMAIN=example.com
 ENVIRONMENT=beta
 EVENT_BUS=redis-streams
 ESCROW_STRICT=true
+PUSH_TOKEN_ENCRYPTION_KEY=<base64-encoded-32-byte-key>
+PUSH_GATEWAY_URL=https://push-gateway.internal.example/v1/send
+PUSH_GATEWAY_TOKEN=<secret>
+ATTESTATION_GATEWAY_URL=https://attestation-gateway.internal.example/v1/verify
+ATTESTATION_GATEWAY_TOKEN=<secret>
 TIMA_VERSION=<immutable-release-tag-or-sha>
 ```
 
 Ротация серверных секретов — каждые 90 дней ([key-lifecycle.md](../03-security/key-lifecycle.md) §7). При росте — вынести в Vault/SOPS.
 
 `ESCROW_STRICT=false` разрешён только в local dev/test без пользовательских данных. Beta использует stub как backend ключей, но сохраняет строгий инвариант: `ESCROW_STRICT=true`, private send без валидного `escrow_blob` блокируется. Production startup обязан завершаться ошибкой при `ESCROW_STRICT!=true`, отсутствии regional HSM или попытке включить bypass.
+
+`PUSH_TOKEN_ENCRYPTION_KEY` шифрует APNs/FCM/WNS device tokens в PostgreSQL и не должен совпадать с token/OTP pepper. `PUSH_GATEWAY_URL` обязан использовать HTTPS; gateway получает только generic private-message payload без sender, текста и caption.
+
+App Attest и Play Integrity в production требуют отдельных Apple/Google credentials и реальных signed internal-track builds. Development HMAC verifier предназначен только для compose/CI и не является заменой vendor verification.
 
 ## 5. `docker-compose.yml`
 

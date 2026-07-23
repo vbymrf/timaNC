@@ -30,8 +30,8 @@ func NewStore(
 	if err != nil {
 		return nil, err
 	}
-	if ttl <= 0 || ttl > 15*time.Minute {
-		return nil, errors.New("media URL TTL must be between zero and 15 minutes")
+	if ttl != 15*time.Minute {
+		return nil, errors.New("media URL TTL must be exactly 15 minutes")
 	}
 	return &Store{internal: internal, public: public, ttl: ttl}, nil
 }

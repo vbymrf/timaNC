@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -82,6 +83,11 @@ func New(db *pgxpool.Pool, cfg config.Config) (*Service, error) {
 		s.AttestationVerifier = NewDevelopmentAttestationVerifier(cfg.DevAttestationKey)
 		if cfg.PushTokenKey == "" {
 			cfg.PushTokenKey = "ZGV2LXB1c2gtdG9rZW4ta2V5LTMyLWJ5dGVzISEhISE="
+		}
+	} else {
+		s.AttestationVerifier = &HTTPAttestationVerifier{
+			URL: cfg.AttestationGatewayURL, BearerToken: cfg.AttestationGatewayToken,
+			Client: &http.Client{Timeout: 10 * time.Second},
 		}
 	}
 	s.PushTokenKey, err = push.DecodeKey(cfg.PushTokenKey)

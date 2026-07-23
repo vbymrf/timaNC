@@ -34,6 +34,51 @@ type KeyBundle struct {
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 
+type PrekeyBatch struct {
+	DeviceID string          `json:"device_id"`
+	Prekeys  []OneTimePrekey `json:"prekeys"`
+}
+
+type PrekeyResult struct {
+	Stored    int `json:"stored"`
+	Available int `json:"available"`
+}
+
+func (s *Service) ReplenishPrekeys(ctx context.Context, p Principal, in PrekeyBatch) (PrekeyResult, error) {
+	if in.DeviceID != p.DeviceID || len(in.Prekeys) == 0 || len(in.Prekeys) > 100 {
+		return PrekeyResult{}, ErrInvalid
+	}
+	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return PrekeyResult{}, err
+	}
+	defer tx.Rollback(ctx)
+	seen := map[int]bool{}
+	for _, key := range in.Prekeys {
+		public, decodeErr := decodeExact(key.PublicKey, 32)
+		if decodeErr != nil || key.ID < 1 || seen[key.ID] {
+			return PrekeyResult{}, ErrInvalid
+		}
+		seen[key.ID] = true
+		command, execErr := tx.Exec(ctx, `INSERT INTO prekeys(device_id,key_id,kind,public_key)
+			SELECT $1,$2,'onetime',$3 WHERE EXISTS(SELECT 1 FROM devices
+			  WHERE device_id=$1 AND user_id=$4 AND revoked_at IS NULL)
+			ON CONFLICT DO NOTHING`, p.DeviceID, key.ID, public, p.UserID)
+		if execErr != nil || command.RowsAffected() != 1 {
+			return PrekeyResult{}, ErrConflict
+		}
+	}
+	var available int
+	if err = tx.QueryRow(ctx, `SELECT count(*) FROM prekeys
+		WHERE device_id=$1 AND kind='onetime' AND consumed_at IS NULL`, p.DeviceID).Scan(&available); err != nil {
+		return PrekeyResult{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return PrekeyResult{}, err
+	}
+	return PrekeyResult{Stored: len(in.Prekeys), Available: available}, nil
+}
+
 func (s *Service) PutKeyBundle(ctx context.Context, p Principal, in KeyBundleWrite) (KeyBundle, error) {
 	if in.DeviceID != p.DeviceID || len(in.OneTimePrekeys) > 100 ||
 		(in.SignedPrekey == nil && len(in.OneTimePrekeys) > 0) {
@@ -45,7 +90,8 @@ func (s *Service) PutKeyBundle(ctx context.Context, p Principal, in KeyBundleWri
 	}
 	var signingIdentity []byte
 	if err = s.DB.QueryRow(ctx, `SELECT signing_pubkey FROM devices
-		WHERE device_id=$1 AND user_id=$2 AND revoked_at IS NULL`, p.DeviceID, p.UserID).
+		WHERE device_id=$1 AND user_id=$2 AND revoked_at IS NULL
+		  AND attestation_ok=true AND attested_at>now()-interval '24 hours'`, p.DeviceID, p.UserID).
 		Scan(&signingIdentity); err != nil {
 		return KeyBundle{}, ErrForbidden
 	}

@@ -83,6 +83,25 @@ class HttpTwoDeviceRoundTripTest {
         )
         val bobLaptop = linkWindows(http, bobMobile, bobPhoneIdentity, bobLaptopIdentity)
         assertEquals(bobLaptop.userId, bobMobile.userId)
+        assertEquals("Bob", http.get("/v1/users/me", bobMobile).string("display_name"))
+        assertEquals(
+            2,
+            http.get("/v1/devices", bobMobile).getValue("items").jsonArray.size,
+        )
+        val prekeys = http.post(
+            "/v1/keys/prekeys/replenish",
+            bobLaptop,
+            buildJsonObject {
+                put("device_id", bobLaptop.deviceId)
+                putJsonArray("prekeys") {
+                    add(buildJsonObject {
+                        put("id", 1)
+                        put("public_key", Base64.getEncoder().encodeToString(ByteArray(32) { 7 }))
+                    })
+                }
+            },
+        )
+        assertEquals(1, prekeys.getValue("stored").jsonPrimitive.int)
 
         val chat = http.post(
             "/v1/chats",
@@ -401,6 +420,17 @@ class HttpTwoDeviceRoundTripTest {
                 )
             assertEquals(revisedPlaintext, decrypted)
         }
+        val readState = http.post(
+            "/v1/chats/$chatId/read",
+            bobMobile,
+            buildJsonObject { put("message_id", reservation.messageId.toString()) },
+        )
+        assertEquals(reservation.messageId.toString(), readState.string("last_read_message_id"))
+        http.delete("/v1/chats/$chatId/messages/${reservation.messageId}", alice)
+        assertTrue(
+            http.get("/v1/chats/$chatId/messages?limit=10", bobMobile)
+                .getValue("items").jsonArray.isEmpty(),
+        )
     }
 
     private fun register(
@@ -664,6 +694,9 @@ class HttpTwoDeviceRoundTripTest {
 
         fun get(path: String, session: Session): JsonObject =
             execute("GET", path, session, null, null, emptyMap())
+
+        fun delete(path: String, session: Session): JsonObject =
+            execute("DELETE", path, session, null, null, emptyMap())
 
         fun post(
             path: String,

@@ -5,7 +5,10 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -44,6 +47,39 @@ func TestDevelopmentAndroidProofCannotBeReplayedAsIOS(t *testing.T) {
 	}, challenge[:])
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("cross-platform proof replay: %v", err)
+	}
+}
+
+func TestHTTPAttestationVerifierBindsGatewayRequestAndVerdict(t *testing.T) {
+	challenge := sha256.Sum256([]byte("request"))
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer gateway-secret" {
+			t.Error("missing gateway authorization")
+		}
+		var body struct {
+			Platform          string `json:"platform"`
+			ExpectedChallenge string `json:"expected_challenge"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if body.Platform != "android" ||
+			body.ExpectedChallenge != base64.StdEncoding.EncodeToString(challenge[:]) {
+			t.Errorf("gateway body = %#v", body)
+		}
+		_, _ = w.Write([]byte(`{"verdict":"trusted"}`))
+	}))
+	defer server.Close()
+	verifier := &HTTPAttestationVerifier{
+		URL: server.URL, BearerToken: "gateway-secret", Client: server.Client(),
+	}
+	verdict, err := verifier.VerifyAndroid(
+		context.Background(),
+		AndroidIntegrity{IntegrityToken: "vendor-proof"},
+		challenge[:],
+	)
+	if err != nil || verdict != "trusted" {
+		t.Fatalf("verdict=%q err=%v", verdict, err)
 	}
 }
 

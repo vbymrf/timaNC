@@ -20,19 +20,19 @@
 
 ## Phase 1: Messaging Alpha (Months 1–2)
 
-- [ ] KMP project scaffold + SQLDelight
-- [ ] `messenger-crypto` module (envelope, signatures, escrow client, wrapped-key fallback)
-- [ ] Go tima-server: auth, users, messages, keys
-- [ ] Separate Realtime GW + workers; transactional outbox → Redis Streams в beta profile
-- [ ] MinIO media pipeline (client encrypt)
-- [ ] `DocumentV2` contract: `nodes`, `markup`, private `encrypted_metadata`; executable content blocked
-- [ ] Dual media pipeline: private ciphertext / public processing; public exactly 3 variants, no `Original`
-- [ ] Auth-gated presigned URL with fixed TTL 15 minutes
-- [ ] Immutable message revisions + `message.edited`
-- [ ] Domain API and SDK formats ([domain-api-formats.md](../10-sdk/domain-api-formats.md))
+- [x] KMP project scaffold + SQLDelight
+- [x] `messenger-crypto` module (envelope, signatures, escrow client, wrapped-key fallback)
+- [x] Go tima-server: auth, users, messages, keys
+- [x] Separate Realtime GW + workers; transactional outbox → Redis Streams в beta profile
+- [x] MinIO media pipeline (client encrypt)
+- [x] `DocumentV2` contract: `nodes`, `markup`, private `encrypted_metadata`; executable content blocked
+- [x] Dual media pipeline: private ciphertext / public processing; public exactly 3 variants, no `Original`
+- [x] Auth-gated presigned URL with fixed TTL 15 minutes
+- [x] Immutable message revisions + `message.edited`
+- [x] Domain API and SDK formats ([domain-api-formats.md](../10-sdk/domain-api-formats.md))
 - [ ] Attestation iOS/Android
 - [ ] Windows QR linking
-- [ ] Private 1:1 participant E2E (envelope + escrow)
+- [x] Private 1:1 participant E2E (envelope + escrow)
 - [ ] Minimal generic push for offline delivery: no sender, message text, media caption or other plaintext content
 - [ ] Internal-track builds for Android/iOS and internal MSIX distribution
 
