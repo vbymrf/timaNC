@@ -10,6 +10,14 @@ Modules:
   `DocumentV2` and typed SDK errors.
 - `modules/messenger-crypto` — Kodium-backed identities, commitments, text encryption,
   Path-B wraps, canonical signatures, signed escrow config verification, and hybrid escrow.
+- `modules/platform/platform-core` — fail-closed attestation/push orchestration and Windows
+  one-time QR claim boundaries.
+- `apps/android` — minimal API 26+ app/AAB target with Play Integrity, Android Keystore and
+  FCM host lifecycle adapters.
+- `apps/ios-framework` + `apps/ios` — static XCFramework and XcodeGen iOS 15 app project with
+  App Attest, this-device-only Keychain storage and APNs lifecycle adapters.
+- `apps/windows` — minimal JVM/Swing target with DPAPI storage, phone-anchored QR linking and
+  local unsigned MSIX packaging inputs.
 - `integration-harness` — in-process crypto coverage plus a compose-backed JVM HTTP/WS
   roundtrip with mobile attestation, Windows QR linking, revisions and dual media.
 
@@ -56,3 +64,19 @@ stack:
 ```text
 TIMA_E2E_BASE_URL=http://localhost:8080 TIMA_REQUIRE_HTTP_E2E=true gradle jvmTest
 ```
+
+Local platform build entry points:
+
+```text
+gradle :apps:android:bundleDebug
+gradle :apps:ios-framework:assembleMessNcPlatformDebugXCFramework  # macOS only
+xcodegen generate --spec apps/ios/project.yml                      # macOS only
+gradle :apps:windows:windowsAppImage
+gradle :apps:windows:packageUnsignedMsix                            # requires makeappx.exe
+```
+
+Android Play Integrity requires `TIMA_PLAY_CLOUD_PROJECT_NUMBER`; FCM requires
+`TIMA_FIREBASE_PROJECT_ID`, `TIMA_FIREBASE_APPLICATION_ID`, and `TIMA_FIREBASE_SENDER_ID`.
+The Windows app requires an HTTPS `TIMA_API_BASE_URL`. Missing vendor configuration fails
+closed; production code has no development-HMAC fallback. Android/iOS store signing and MSIX
+certificate signing remain external release steps.
