@@ -19,6 +19,17 @@ type Relay struct {
 	PollInterval time.Duration
 }
 
+var publishScript = redis.NewScript(`
+if redis.call('SET', KEYS[2], '1', 'NX', 'EX', 604800) then
+  return redis.call('XADD', KEYS[1], '*',
+    'event_id', ARGV[1],
+    'topic', ARGV[2],
+    'aggregate_id', ARGV[3],
+    'payload', ARGV[4])
+end
+return ''
+`)
+
 func (r *Relay) Run(ctx context.Context) error {
 	interval := r.PollInterval
 	if interval <= 0 {
@@ -65,15 +76,18 @@ func (r *Relay) RelayOne(ctx context.Context) (bool, error) {
 	if event.Topic != "personal_message.created" {
 		return false, fmt.Errorf("unsupported outbox topic %q", event.Topic)
 	}
-	if err = r.Redis.XAdd(ctx, &redis.XAddArgs{
-		Stream: eventbus.MessageIngestStream,
-		Values: map[string]any{
-			"event_id":     event.EventID,
-			"topic":        event.Topic,
-			"aggregate_id": event.AggregateID,
-			"payload":      string(event.Payload),
+	if err = publishScript.Run(
+		ctx,
+		r.Redis,
+		[]string{
+			eventbus.MessageIngestStream,
+			"tima.outbox.published." + event.EventID,
 		},
-	}).Err(); err != nil {
+		event.EventID,
+		event.Topic,
+		event.AggregateID,
+		string(event.Payload),
+	).Err(); err != nil {
 		return false, err
 	}
 	if _, err = tx.Exec(ctx, `UPDATE outbox_events SET published_at=now()

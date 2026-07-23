@@ -109,6 +109,22 @@ jobs:
           TIMA_REQUIRE_HTTP_E2E: "true"
         run: gradle --no-daemon jvmTest
 
+      - name: Verify outbox and Redis Stream state
+        shell: bash
+        run: |
+          pending="$(
+            docker compose -f "${COMPOSE_FILE}" exec -T postgres \
+              psql -U "${POSTGRES_USER:-tima}" -d "${POSTGRES_DB:-tima}" -Atc \
+              "SELECT count(*) FROM outbox_events WHERE published_at IS NULL"
+          )"
+          stream_length="$(
+            docker compose -f "${COMPOSE_FILE}" exec -T redis \
+              redis-cli -a "${REDIS_PASSWORD:-dev_redis_change_me}" --no-auth-warning \
+              XLEN message.ingest
+          )"
+          test "${pending}" = "0"
+          test "${stream_length}" = "1"
+
       - name: Show service state
         if: always()
         run: docker compose -f "${COMPOSE_FILE}" ps --all

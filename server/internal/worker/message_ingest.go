@@ -39,6 +39,9 @@ func (c *MessageConsumer) Run(ctx context.Context) error {
 		name = "worker-1"
 	}
 	for {
+		if err := c.reclaimPending(ctx, name); err != nil {
+			return err
+		}
 		streams, err := c.Redis.XReadGroup(ctx, &redis.XReadGroupArgs{
 			Group:    eventbus.MessageWorkerGroup,
 			Consumer: name,
@@ -58,18 +61,43 @@ func (c *MessageConsumer) Run(ctx context.Context) error {
 			return err
 		}
 		for _, stream := range streams {
-			for _, message := range stream.Messages {
-				if err = c.handle(ctx, message); err != nil {
-					return err
-				}
-				if err = c.Redis.XAck(
-					ctx, eventbus.MessageIngestStream, eventbus.MessageWorkerGroup, message.ID,
-				).Err(); err != nil {
-					return err
-				}
+			if err = c.process(ctx, stream.Messages); err != nil {
+				return err
 			}
 		}
 	}
+}
+
+func (c *MessageConsumer) reclaimPending(ctx context.Context, consumer string) error {
+	messages, _, err := c.Redis.XAutoClaim(ctx, &redis.XAutoClaimArgs{
+		Stream:   eventbus.MessageIngestStream,
+		Group:    eventbus.MessageWorkerGroup,
+		Consumer: consumer,
+		MinIdle:  30 * time.Second,
+		Start:    "0-0",
+		Count:    10,
+	}).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return c.process(ctx, messages)
+}
+
+func (c *MessageConsumer) process(ctx context.Context, messages []redis.XMessage) error {
+	for _, message := range messages {
+		if err := c.handle(ctx, message); err != nil {
+			return err
+		}
+		if err := c.Redis.XAck(
+			ctx, eventbus.MessageIngestStream, eventbus.MessageWorkerGroup, message.ID,
+		).Err(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) error {
