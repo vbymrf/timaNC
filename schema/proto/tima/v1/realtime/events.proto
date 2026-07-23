@@ -1,0 +1,322 @@
+syntax = "proto3";
+
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+package tima.v1.realtime;
+
+import "tima/v1/common/types.proto";
+import "tima/v1/crypto/recovery.proto";
+
+option csharp_namespace = "Tima.V1.Realtime";
+option go_package = "github.com/tima/messnc/gen/go/proto/tima/v1/realtime;realtimev1";
+option java_multiple_files = true;
+option java_package = "com.tima.v1.realtime";
+
+message SubscribeChats {
+  repeated tima.v1.common.Uuid chat_ids = 1;
+}
+message SubscribeInbox {}
+message SubscribeCommunities {
+  repeated tima.v1.common.Uuid community_ids = 1;
+}
+message SubscribeChannels {
+  repeated tima.v1.common.Uuid channel_ids = 1;
+}
+message UnsubscribeChats {
+  repeated tima.v1.common.Uuid chat_ids = 1;
+}
+message UnsubscribeCommunities {
+  repeated tima.v1.common.Uuid community_ids = 1;
+}
+message UnsubscribeChannels {
+  repeated tima.v1.common.Uuid channel_ids = 1;
+}
+message TypingStart {
+  tima.v1.common.Uuid chat_id = 1;
+}
+message TypingStop {
+  tima.v1.common.Uuid chat_id = 1;
+}
+
+enum PresenceStatus {
+  PRESENCE_STATUS_UNSPECIFIED = 0;
+  PRESENCE_STATUS_ONLINE = 1;
+  PRESENCE_STATUS_AWAY = 2;
+}
+message PresenceUpdate {
+  PresenceStatus status = 1;
+}
+
+message MessageRevisionEvent {
+  tima.v1.common.Uuid chat_id = 1;
+  uint64 message_id = 2;
+  tima.v1.common.Uuid sender_id = 3;
+  optional uint32 protocol_version = 4;
+  uint32 format_version = 5;
+  optional uint32 presence_bitmap = 6;
+  optional bytes key_commitment = 7; // Exactly 32 bytes when present.
+  tima.v1.common.Uuid revision_id = 8;
+  optional tima.v1.common.Uuid parent_revision_id = 9;
+  uint64 revision_number = 10;
+  tima.v1.common.Timestamp created_at = 11;
+  optional bool has_wrapped_key = 12;
+}
+message MessageCreated {
+  MessageRevisionEvent message = 1;
+}
+message MessageEdited {
+  MessageRevisionEvent message = 1;
+}
+message MessageDeleted {
+  tima.v1.common.Uuid chat_id = 1;
+  uint64 message_id = 2;
+  tima.v1.common.Uuid revision_id = 3;
+  tima.v1.common.Timestamp deleted_at = 4;
+}
+message MessageRead {
+  tima.v1.common.Uuid chat_id = 1;
+  tima.v1.common.Uuid reader_id = 2;
+  uint64 through_message_id = 3;
+  tima.v1.common.Timestamp read_at = 4;
+}
+message ChatUpdate {
+  tima.v1.common.Uuid chat_id = 1;
+  uint64 version = 2;
+  repeated tima.v1.common.Uuid member_ids = 3;
+  optional string title = 4;
+}
+message GroupKeyRotate {
+  tima.v1.common.Uuid group_id = 1;
+  uint32 group_key_version = 2;
+  string reason = 3;
+}
+
+message CallIncoming {
+  tima.v1.common.Uuid call_id = 1;
+  tima.v1.common.Uuid chat_id = 2;
+  tima.v1.common.Uuid caller_id = 3;
+  tima.v1.common.Timestamp expires_at = 4;
+}
+message CallEnded {
+  tima.v1.common.Uuid call_id = 1;
+  string reason = 2;
+  tima.v1.common.Timestamp ended_at = 3;
+}
+
+message CommunityMemberJoined {
+  tima.v1.common.Uuid community_id = 1;
+  tima.v1.common.Uuid member_id = 2;
+}
+message CommunityMemberLeft {
+  tima.v1.common.Uuid community_id = 1;
+  tima.v1.common.Uuid member_id = 2;
+}
+message CommunityChildAdded {
+  tima.v1.common.Uuid community_id = 1;
+  tima.v1.common.ObjectRef child = 2;
+}
+message CommunityObjectAclChanged {
+  tima.v1.common.Uuid community_id = 1;
+  tima.v1.common.ObjectRef object = 2;
+  uint64 acl_version = 3;
+}
+
+message VoiceRoomParticipantJoined {
+  tima.v1.common.Uuid room_id = 1;
+  tima.v1.common.Uuid participant_id = 2;
+}
+message VoiceRoomParticipantLeft {
+  tima.v1.common.Uuid room_id = 1;
+  tima.v1.common.Uuid participant_id = 2;
+}
+
+message ContentRevisionEvent {
+  uint64 object_id = 1;
+  tima.v1.common.Uuid revision_id = 2;
+  optional tima.v1.common.Uuid parent_revision_id = 3;
+  uint64 revision_number = 4;
+  tima.v1.common.Timestamp updated_at = 5;
+}
+message PostPublished {
+  ContentRevisionEvent post = 1;
+}
+message PostEdited {
+  ContentRevisionEvent post = 1;
+}
+message PostFailed {
+  uint64 post_id = 1;
+  string error_code = 2;
+  string message = 3;
+}
+
+message MediaProcessing {
+  tima.v1.common.Uuid media_id = 1;
+  string stage = 2;
+}
+message MediaReady {
+  tima.v1.common.Uuid media_id = 1;
+}
+message MediaFailed {
+  tima.v1.common.Uuid media_id = 1;
+  string error_code = 2;
+  string message = 3;
+}
+
+message CommentCreated {
+  ContentRevisionEvent comment = 1;
+  tima.v1.common.ObjectRef target = 2;
+}
+message CommentEdited {
+  ContentRevisionEvent comment = 1;
+}
+message CommentDeleted {
+  uint64 comment_id = 1;
+  tima.v1.common.Timestamp deleted_at = 2;
+}
+
+message EmotionAdded {
+  tima.v1.common.ObjectRef target = 1;
+  tima.v1.common.Uuid actor_id = 2;
+  uint32 emotion = 3; // 1..9.
+}
+message EmotionRemoved {
+  tima.v1.common.ObjectRef target = 1;
+  tima.v1.common.Uuid actor_id = 2;
+  uint32 emotion = 3;
+}
+message EmotionCount {
+  uint32 emotion = 1;
+  uint64 count = 2;
+}
+message EmotionCounters {
+  tima.v1.common.ObjectRef target = 1;
+  repeated EmotionCount counters = 2;
+}
+message RatingUpdated {
+  tima.v1.common.ObjectRef target = 1;
+  sint64 rating = 2;
+  uint64 votes = 3;
+}
+message RecommendationAdded {
+  tima.v1.common.ObjectRef target = 1;
+  tima.v1.common.Uuid actor_id = 2;
+  bool positive = 3;
+}
+message RecommendationRemoved {
+  tima.v1.common.ObjectRef target = 1;
+  tima.v1.common.Uuid actor_id = 2;
+}
+message FeedNew {
+  uint64 new_posts_count = 1;
+}
+
+message ShelfItemAdded {
+  tima.v1.common.Uuid owner_id = 1;
+  tima.v1.common.ObjectRef item = 2;
+}
+message ShelfItemRemoved {
+  tima.v1.common.Uuid owner_id = 1;
+  tima.v1.common.ObjectRef item = 2;
+}
+message ShelfAccessRequested {
+  tima.v1.common.Uuid owner_id = 1;
+  tima.v1.common.Uuid requester_id = 2;
+  tima.v1.common.Uuid request_id = 3;
+}
+message ShelfAccessGranted {
+  tima.v1.common.Uuid owner_id = 1;
+  tima.v1.common.Uuid grantee_id = 2;
+  uint32 key_version = 3;
+}
+message ShelfAccessRevoked {
+  tima.v1.common.Uuid owner_id = 1;
+  tima.v1.common.Uuid grantee_id = 2;
+  uint32 new_key_version = 3;
+}
+
+message VirtualUserCreated {
+  tima.v1.common.Uuid virtual_user_id = 1;
+  tima.v1.common.Uuid owner_id = 2;
+}
+message VirtualUserOperatorChanged {
+  tima.v1.common.Uuid virtual_user_id = 1;
+  tima.v1.common.Uuid operator_id = 2;
+  bool granted = 3;
+}
+message VirtualUserKeysRotated {
+  tima.v1.common.Uuid virtual_user_id = 1;
+  uint32 key_version = 2;
+}
+message VirtualUserTransferUpdated {
+  tima.v1.common.Uuid virtual_user_id = 1;
+  tima.v1.common.Uuid transfer_id = 2;
+  string state = 3;
+}
+
+enum InboxIdentityType {
+  INBOX_IDENTITY_TYPE_UNSPECIFIED = 0;
+  INBOX_IDENTITY_TYPE_VIRTUAL_USER = 1;
+  INBOX_IDENTITY_TYPE_GROUP = 2;
+  INBOX_IDENTITY_TYPE_CHANNEL = 3;
+  INBOX_IDENTITY_TYPE_COMMUNITY = 4;
+}
+enum InboxThreadStatus {
+  INBOX_THREAD_STATUS_UNSPECIFIED = 0;
+  INBOX_THREAD_STATUS_NEW = 1;
+  INBOX_THREAD_STATUS_TAKEN = 2;
+  INBOX_THREAD_STATUS_SNOOZED = 3;
+  INBOX_THREAD_STATUS_CLOSED = 4;
+}
+message InboxThread {
+  tima.v1.common.Uuid thread_id = 1;
+  InboxIdentityType identity_type = 2;
+  tima.v1.common.Uuid identity_id = 3;
+  InboxThreadStatus status = 4;
+  optional tima.v1.common.Uuid assignee_id = 5;
+  optional tima.v1.common.Timestamp snoozed_until = 6;
+  tima.v1.common.Timestamp updated_at = 7;
+}
+enum InboxEventType {
+  INBOX_EVENT_TYPE_UNSPECIFIED = 0;
+  INBOX_EVENT_TYPE_APPEAL = 1;
+  INBOX_EVENT_TYPE_ENTITY_MESSAGE = 2;
+  INBOX_EVENT_TYPE_REPLY = 3;
+  INBOX_EVENT_TYPE_MENTION = 4;
+  INBOX_EVENT_TYPE_REACTION = 5;
+  INBOX_EVENT_TYPE_COMMENT = 6;
+  INBOX_EVENT_TYPE_ROLE_ASSIGNED = 7;
+  INBOX_EVENT_TYPE_MODERATION_REQUEST = 8;
+  INBOX_EVENT_TYPE_THREAD_ACTIVITY = 9;
+}
+message InboxEvent {
+  uint64 event_id = 1;
+  InboxEventType event_type = 2;
+  tima.v1.common.Uuid identity_id = 3;
+  tima.v1.common.ObjectRef target_ref = 4;
+  string preview = 5;
+  tima.v1.common.Timestamp created_at = 6;
+}
+
+message DeviceRevoked {
+  tima.v1.common.Uuid device_id = 1;
+  string reason = 2;
+}
+message SyncRequired {
+  optional tima.v1.common.Uuid chat_id = 1;
+  uint64 resume_after_seq = 2;
+  string reason = 3;
+}
+message RecoveryRequested {
+  tima.v1.common.Uuid request_id = 1;
+  tima.v1.common.Uuid chat_id = 2;
+  tima.v1.common.Uuid requester_id = 3;
+}
+message RecoveryResponded {
+  tima.v1.common.Uuid request_id = 1;
+  tima.v1.crypto.RecoveryDecision decision = 2;
+  tima.v1.common.Uuid responder_device_id = 3;
+}
+message RecoveryCompleted {
+  tima.v1.common.Uuid request_id = 1;
+  uint64 transferred_revision_count = 2;
+  tima.v1.common.Timestamp completed_at = 3;
+}

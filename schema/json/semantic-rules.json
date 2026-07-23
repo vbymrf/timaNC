@@ -1,0 +1,101 @@
+{
+  "manifest_version": 1,
+  "document_format_version": 2,
+  "canonical_schemas": {
+    "document": "document-v2.schema.json",
+    "public_document": "document-v2.schema.json#/$defs/publicDocument",
+    "private_document": "document-v2.schema.json#/$defs/privateDocument",
+    "private_envelope": "private-document-envelope.schema.json"
+  },
+  "pre_validation_normalization": [
+    {
+      "id": "normalize-optional-null",
+      "rule": "Remove encrypted_nodes, nodes, markup and encrypted_metadata when their value is null."
+    },
+    {
+      "id": "normalize-optional-empty",
+      "rule": "Remove optional empty arrays and empty objects before canonical schema validation."
+    },
+    {
+      "id": "reject-empty-ciphertext",
+      "rule": "An empty string is not an absent ciphertext and must be rejected."
+    }
+  ],
+  "rules": [
+    {
+      "id": "document-total-code-points",
+      "schema_expressible": false,
+      "rule": "The sum of Unicode code points in all plaintext nodes must not exceed 4096."
+    },
+    {
+      "id": "layout-depth",
+      "schema_expressible": false,
+      "rule": "Layout nesting depth must not exceed 10."
+    },
+    {
+      "id": "node-index-bounds",
+      "schema_expressible": false,
+      "rule": "Every entity and layout node index must be less than the number of nodes or encrypted_nodes in the document."
+    },
+    {
+      "id": "secret-ref-uniqueness",
+      "schema_expressible": false,
+      "rule": "Every secret_ref must be unique within a revision."
+    },
+    {
+      "id": "secret-ref-resolution",
+      "schema_expressible": false,
+      "rule": "After decrypting encrypted_metadata, its non-empty object keys must match the document secret_ref set exactly; dangling and unused keys are rejected."
+    },
+    {
+      "id": "private-media-secret",
+      "schema_expressible": true,
+      "rule": "Every private media binding requires secret_ref and structural presence of encrypted_metadata."
+    },
+    {
+      "id": "private-link-secret",
+      "schema_expressible": true,
+      "rule": "Private text_link requires secret_ref and forbids href; public text_link requires href and forbids secret_ref."
+    },
+    {
+      "id": "has-content",
+      "schema_expressible": true,
+      "rule": "Send or publish requires a non-empty text array or a recursive media binding with media_id."
+    },
+    {
+      "id": "group-mode-match",
+      "schema_expressible": false,
+      "rule": "metadata.content_mode must equal groups.kind; one-to-one messages require private mode."
+    },
+    {
+      "id": "revision-match",
+      "schema_expressible": false,
+      "rule": "When an enclosing revision_number field exists, it must equal metadata.revision_number."
+    },
+    {
+      "id": "presence-bitmap",
+      "schema_expressible": true,
+      "rule": "Private envelope bitmap uses bit order encrypted_nodes, nodes, markup, encrypted_metadata; nodes bit is always zero."
+    },
+    {
+      "id": "version-lockstep",
+      "schema_expressible": true,
+      "rule": "Private envelope protocol_version and metadata.format_version are both fixed to 2."
+    },
+    {
+      "id": "key-commitment-runtime-check",
+      "schema_expressible": false,
+      "rule": "After recovering a content key on every ratchet, wrapped or escrow path, recompute HKDF-SHA256(key, info=tima/commit/v1, L=32) and compare in constant time with key_commitment."
+    },
+    {
+      "id": "executable-content",
+      "schema_expressible": false,
+      "rule": "Reject scripts, macros, active HTML or SVG, event handlers, embedded executables, polyglots and javascript URLs after decoding and canonical URL inspection."
+    },
+    {
+      "id": "base64-decoding",
+      "schema_expressible": true,
+      "rule": "Byte strings use canonical padded base64; implementations must still perform strict decoding because contentEncoding can be annotation-only in validators."
+    }
+  ]
+}

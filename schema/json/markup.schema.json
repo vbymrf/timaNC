@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tima.example/json/markup.schema.json",
+  "title": "DocumentV2 markup",
+  "$ref": "#/$defs/markup",
+  "$defs": {
+    "layoutType": {
+      "enum": [
+        "document",
+        "paragraph",
+        "heading",
+        "quote",
+        "list",
+        "list_item",
+        "div",
+        "table",
+        "flex",
+        "grid"
+      ]
+    },
+    "publicLayoutBlock": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/layoutType"
+        },
+        "nodes": {
+          "$ref": "entity.schema.json#/$defs/nodeIndexes"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/publicLayoutNode"
+          }
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "secret_ref"
+            ]
+          },
+          {
+            "required": [
+              "media_id"
+            ]
+          }
+        ]
+      },
+      "additionalProperties": true
+    },
+    "privateLayoutBlock": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/layoutType"
+        },
+        "nodes": {
+          "$ref": "entity.schema.json#/$defs/nodeIndexes"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/privateLayoutNode"
+          }
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "secret_ref"
+            ]
+          },
+          {
+            "required": [
+              "media_id"
+            ]
+          }
+        ]
+      },
+      "additionalProperties": true
+    },
+    "publicLayoutNode": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/publicLayoutBlock"
+        },
+        {
+          "$ref": "entity.schema.json#/$defs/publicMedia"
+        }
+      ]
+    },
+    "privateLayoutNode": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/privateLayoutBlock"
+        },
+        {
+          "$ref": "entity.schema.json#/$defs/privateMedia"
+        }
+      ]
+    },
+    "publicContentLayoutNode": {
+      "oneOf": [
+        {
+          "$ref": "entity.schema.json#/$defs/publicMedia"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/publicLayoutBlock"
+            },
+            {
+              "required": [
+                "children"
+              ],
+              "properties": {
+                "children": {
+                  "contains": {
+                    "$ref": "#/$defs/publicContentLayoutNode"
+                  },
+                  "minContains": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "privateContentLayoutNode": {
+      "oneOf": [
+        {
+          "$ref": "entity.schema.json#/$defs/privateMedia"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/privateLayoutBlock"
+            },
+            {
+              "required": [
+                "children"
+              ],
+              "properties": {
+                "children": {
+                  "contains": {
+                    "$ref": "#/$defs/privateContentLayoutNode"
+                  },
+                  "minContains": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "publicMarkup": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "entities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "entity.schema.json#/$defs/publicEntity"
+          }
+        },
+        "layout": {
+          "$ref": "#/$defs/publicLayoutNode"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "entities"
+          ]
+        },
+        {
+          "required": [
+            "layout"
+          ]
+        }
+      ],
+      "additionalProperties": true
+    },
+    "privateMarkup": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "entities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "entity.schema.json#/$defs/privateEntity"
+          }
+        },
+        "layout": {
+          "$ref": "#/$defs/privateLayoutNode"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "entities"
+          ]
+        },
+        {
+          "required": [
+            "layout"
+          ]
+        }
+      ],
+      "additionalProperties": true
+    },
+    "publicContentMarkup": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/publicMarkup"
+        },
+        {
+          "anyOf": [
+            {
+              "required": [
+                "entities"
+              ],
+              "properties": {
+                "entities": {
+                  "contains": {
+                    "$ref": "entity.schema.json#/$defs/publicMedia"
+                  },
+                  "minContains": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "layout"
+              ],
+              "properties": {
+                "layout": {
+                  "$ref": "#/$defs/publicContentLayoutNode"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "privateContentMarkup": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/privateMarkup"
+        },
+        {
+          "anyOf": [
+            {
+              "required": [
+                "entities"
+              ],
+              "properties": {
+                "entities": {
+                  "contains": {
+                    "$ref": "entity.schema.json#/$defs/privateMedia"
+                  },
+                  "minContains": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "layout"
+              ],
+              "properties": {
+                "layout": {
+                  "$ref": "#/$defs/privateContentLayoutNode"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "privateMarkupWithSecrets": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/privateMarkup"
+        },
+        {
+          "anyOf": [
+            {
+              "required": [
+                "entities"
+              ],
+              "properties": {
+                "entities": {
+                  "contains": {
+                    "oneOf": [
+                      {
+                        "$ref": "entity.schema.json#/$defs/privateTextLink"
+                      },
+                      {
+                        "$ref": "entity.schema.json#/$defs/privateMedia"
+                      }
+                    ]
+                  },
+                  "minContains": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "layout"
+              ],
+              "properties": {
+                "layout": {
+                  "$ref": "#/$defs/privateContentLayoutNode"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "privateMarkupWithoutSecrets": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/privateMarkup"
+        },
+        {
+          "not": {
+            "$ref": "#/$defs/privateMarkupWithSecrets"
+          }
+        }
+      ]
+    },
+    "markup": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/publicMarkup"
+        },
+        {
+          "$ref": "#/$defs/privateMarkup"
+        }
+      ]
+    }
+  }
+}

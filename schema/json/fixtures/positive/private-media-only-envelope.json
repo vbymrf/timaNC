@@ -1,0 +1,22 @@
+{
+  "markup": {
+    "entities": [
+      {
+        "type": "media",
+        "media_id": "123e4567-e89b-12d3-a456-426614174000",
+        "secret_ref": "media-1"
+      }
+    ]
+  },
+  "encrypted_metadata": "Y2lwaGVydGV4dA==",
+  "metadata": {
+    "format_version": 2,
+    "revision_number": 3,
+    "content_mode": "private"
+  },
+  "protocol_version": 2,
+  "presence_bitmap": 12,
+  "key_commitment": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "escrow_blob": "ZXNjcm93",
+  "signature": "c2lnbmF0dXJl"
+}

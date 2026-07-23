@@ -1,0 +1,70 @@
+name: Phase 0 Dev Stack
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "server/**"
+      - ".github/workflows/dev-stack.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/**"
+      - "server/**"
+      - ".github/workflows/dev-stack.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-stack-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COMPOSE_FILE: infra/docker-compose.dev.yml
+
+jobs:
+  compose-config:
+    name: Validate Compose configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate configuration
+        run: docker compose -f "${COMPOSE_FILE}" config --quiet
+
+  smoke:
+    name: Smoke health and readiness
+    needs: compose-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Start development stack
+        run: docker compose -f "${COMPOSE_FILE}" up -d --build --wait
+
+      - name: Check liveness
+        run: curl --fail --show-error --silent --retry 30 --retry-delay 2 --retry-all-errors http://localhost:8080/healthz
+
+      - name: Check readiness
+        run: curl --fail --show-error --silent --retry 30 --retry-delay 2 --retry-all-errors http://localhost:8080/readyz
+
+      - name: Show service state
+        if: always()
+        run: docker compose -f "${COMPOSE_FILE}" ps --all
+
+      - name: Show service logs
+        if: failure()
+        run: docker compose -f "${COMPOSE_FILE}" logs --no-color
+
+      - name: Stop development stack
+        if: always()
+        run: docker compose -f "${COMPOSE_FILE}" down --volumes --remove-orphans

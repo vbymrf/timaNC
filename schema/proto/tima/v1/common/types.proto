@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+package tima.v1.common;
+
+option csharp_namespace = "Tima.V1.Common";
+option go_package = "github.com/tima/messnc/gen/go/proto/tima/v1/common;commonv1";
+option java_multiple_files = true;
+option java_package = "com.tima.v1.common";
+
+// UUID is the 16 RFC 4122 network-order bytes. Text UUIDs are not accepted.
+message Uuid {
+  bytes value = 1;
+}
+
+// UTC instant. nanos MUST be in [0, 999999999].
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
+}
+
+// UTF-8 RFC 8785 JSON Serialization Scheme bytes.
+message CanonicalJson {
+  bytes value = 1;
+}
+
+message ObjectRef {
+  string type = 1;
+  Uuid id = 2;
+}
+
+enum Region {
+  REGION_UNSPECIFIED = 0;
+  REGION_RU = 1;
+  REGION_EU = 2;
+}

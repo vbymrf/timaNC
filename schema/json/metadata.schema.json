@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tima.example/json/metadata.schema.json",
+  "title": "DocumentV2 metadata",
+  "$ref": "#/$defs/metadata",
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "required": [
+        "format_version",
+        "revision_number",
+        "content_mode"
+      ],
+      "properties": {
+        "format_version": {
+          "const": 2
+        },
+        "revision_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content_mode": {
+          "enum": [
+            "public",
+            "private"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "publicMetadata": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/metadata"
+        },
+        {
+          "properties": {
+            "content_mode": {
+              "const": "public"
+            }
+          }
+        }
+      ]
+    },
+    "privateMetadata": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/metadata"
+        },
+        {
+          "properties": {
+            "content_mode": {
+              "const": "private"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

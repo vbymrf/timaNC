@@ -1,0 +1,11 @@
+generatorName: go
+globalProperties:
+  models: ""
+  modelDocs: "false"
+  modelTests: "false"
+  apis: "false"
+  supportingFiles: "utils.go"
+additionalProperties:
+  packageName: clientapi
+  packageVersion: 0.0.0
+  enumClassPrefix: true

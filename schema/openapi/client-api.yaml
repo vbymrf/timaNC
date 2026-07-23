@@ -1,0 +1,2769 @@
+openapi: 3.1.0
+info:
+  title: Tima Client API
+  version: 1.0.0-phase0
+  description: |
+    User-facing REST contract. Bot runtime, WebSocket, operations, internal and legal APIs are excluded.
+    All timestamps are RFC 3339 UTC. All IDs are UUIDs unless a schema says otherwise.
+    Successful and error responses may include X-RateLimit-Limit, X-RateLimit-Remaining and
+    X-RateLimit-Reset. A 429 response also includes Retry-After.
+  x-tima-implementation-phase: phase-0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+servers:
+  - url: https://api.tima.example/v1
+security:
+  - bearerAuth: []
+    deviceId: []
+tags:
+  - {name: Auth}
+  - {name: Users}
+  - {name: Keys}
+  - {name: Chats}
+  - {name: Groups}
+  - {name: Channels}
+  - {name: Communities}
+  - {name: Voice rooms}
+  - {name: Media}
+  - {name: Posts}
+  - {name: Social graph}
+  - {name: Recovery}
+  - {name: Comments}
+  - {name: Reactions}
+  - {name: Discovery}
+  - {name: Calls}
+  - {name: Reports}
+  - {name: Virtual users}
+  - {name: Owner apps}
+  - {name: Inbox}
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: startRegistration
+      security: []
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/RegisterStart'}
+      responses:
+        '202': {description: OTP sent, content: {application/json: {schema: {$ref: '#/components/schemas/OtpChallenge'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /auth/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyRegistration
+      security: []
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/AttestationToken'}]
+      requestBody: {$ref: '#/components/requestBodies/RegisterVerify'}
+      responses:
+        '201': {description: Account and session created, content: {application/json: {schema: {$ref: '#/components/schemas/AuthSession'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/AttestationToken'}]
+      requestBody: {$ref: '#/components/requestBodies/Login'}
+      responses:
+        '200': {description: Authenticated, content: {application/json: {schema: {$ref: '#/components/schemas/AuthSession'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshSession
+      security: []
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/Refresh'}
+      responses:
+        '200': {description: Tokens rotated, content: {application/json: {schema: {$ref: '#/components/schemas/AuthSession'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      x-tima-implementation-phase: phase-1
+      responses:
+        '204': {description: Session revoked}
+        default: {$ref: '#/components/responses/Error'}
+  /verify/attestation/ios:
+    post:
+      tags: [Auth]
+      operationId: verifyIosAttestation
+      security: []
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/IosAttestation'}
+      responses:
+        '200': {description: Attestation accepted, content: {application/json: {schema: {$ref: '#/components/schemas/AttestationResult'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /verify/integrity/android:
+    post:
+      tags: [Auth]
+      operationId: verifyAndroidIntegrity
+      security: []
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/AndroidIntegrity'}
+      responses:
+        '200': {description: Integrity accepted, content: {application/json: {schema: {$ref: '#/components/schemas/AttestationResult'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /users/me:
+    get:
+      tags: [Users]
+      operationId: getCurrentUser
+      x-tima-implementation-phase: phase-1
+      responses:
+        '200': {description: Current profile, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    patch:
+      tags: [Users]
+      operationId: updateCurrentUser
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/UserPatch'}
+      responses:
+        '200': {description: Updated profile, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /devices:
+    get:
+      tags: [Users]
+      operationId: listDevices
+      x-tima-implementation-phase: phase-1
+      responses:
+        '200': {description: Active sessions, content: {application/json: {schema: {$ref: '#/components/schemas/DeviceList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /devices/{id}:
+    delete:
+      tags: [Users]
+      operationId: revokeDevice
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Device revoked}
+        default: {$ref: '#/components/responses/Error'}
+  /link/session:
+    post:
+      tags: [Users]
+      operationId: startDeviceLink
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/LinkSession'}
+      responses:
+        '201': {description: Link session, content: {application/json: {schema: {$ref: '#/components/schemas/LinkChallenge'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /link/confirm:
+    post:
+      tags: [Users]
+      operationId: confirmDeviceLink
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/LinkConfirm'}
+      responses:
+        '200': {description: Linked device, content: {application/json: {schema: {$ref: '#/components/schemas/Device'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /keys/bundle:
+    put:
+      tags: [Keys]
+      operationId: putKeyBundle
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/KeyBundle'}
+      responses:
+        '200': {description: Bundle stored, content: {application/json: {schema: {$ref: '#/components/schemas/KeyBundle'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /keys/bundle/{user_id}:
+    get:
+      tags: [Keys]
+      operationId: getKeyBundle
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/UserId'}]
+      responses:
+        '200': {description: Device bundles and consumed one-time prekey, content: {application/json: {schema: {$ref: '#/components/schemas/UserKeyBundles'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /keys/prekeys/replenish:
+    post:
+      tags: [Keys]
+      operationId: replenishPrekeys
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/Prekeys'}
+      responses:
+        '200': {description: Prekeys stored, content: {application/json: {schema: {$ref: '#/components/schemas/PrekeyResult'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /escrow/config:
+    get:
+      tags: [Keys]
+      operationId: getEscrowConfig
+      x-tima-implementation-phase: phase-1
+      parameters:
+        - {$ref: '#/components/parameters/ConversationType'}
+        - {$ref: '#/components/parameters/ConversationId'}
+        - {$ref: '#/components/parameters/Epoch'}
+        - {$ref: '#/components/parameters/Shard'}
+      responses:
+        '200': {description: Signed current and next regional public configuration, content: {application/json: {schema: {$ref: '#/components/schemas/EscrowConfig'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /chats:
+    get:
+      tags: [Chats]
+      operationId: listChats
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Chats, content: {application/json: {schema: {$ref: '#/components/schemas/ChatList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      tags: [Chats]
+      operationId: createChat
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/ChatCreate'}
+      responses:
+        '201': {description: Chat created, content: {application/json: {schema: {$ref: '#/components/schemas/Chat'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /chats/{id}/messages:
+    get:
+      tags: [Chats]
+      operationId: listChatMessages
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Private message history, content: {application/json: {schema: {$ref: '#/components/schemas/PrivateMessageList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      tags: [Chats]
+      operationId: sendChatMessage
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PrivateMessage'}
+      responses:
+        '201': {description: Private message accepted, content: {application/json: {schema: {$ref: '#/components/schemas/PrivateMessage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /chats/{id}/messages/{msg_id}:
+    delete:
+      tags: [Chats]
+      operationId: deleteChatMessage
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/MessageId'}]
+      responses:
+        '204': {description: Message soft-deleted}
+        default: {$ref: '#/components/responses/Error'}
+  /chats/{id}/messages/{msg_id}/revisions:
+    post:
+      tags: [Chats]
+      operationId: reviseChatMessage
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/MessageId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PrivateMessage'}
+      responses:
+        '201': {description: Immutable private revision, content: {application/json: {schema: {$ref: '#/components/schemas/PrivateRevision'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /chats/{id}/read:
+    post:
+      tags: [Chats]
+      operationId: markChatRead
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/ReadCursor'}
+      responses:
+        '200': {description: Read cursor stored, content: {application/json: {schema: {$ref: '#/components/schemas/ReadState'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /groups:
+    post:
+      tags: [Groups]
+      operationId: createGroup
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/GroupCreate'}
+      responses:
+        '201': {description: Group created, content: {application/json: {schema: {$ref: '#/components/schemas/Group'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /groups/{id}/messages:
+    get:
+      tags: [Groups]
+      operationId: listGroupMessages
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Group history, content: {application/json: {schema: {$ref: '#/components/schemas/MessageList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      tags: [Groups]
+      operationId: sendGroupMessage
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/GroupMessage'}
+      responses:
+        '201': {description: Message accepted, content: {application/json: {schema: {$ref: '#/components/schemas/Message'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /groups/{id}/messages/{msg_id}/revisions:
+    post:
+      tags: [Groups]
+      operationId: reviseGroupMessage
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/MessageId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/GroupMessage'}
+      responses:
+        '201': {description: Immutable revision, content: {application/json: {schema: {$ref: '#/components/schemas/Revision'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /groups/{id}/messages/{msg_id}:
+    delete:
+      tags: [Groups]
+      operationId: deleteGroupMessage
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/MessageId'}]
+      responses:
+        '204': {description: Message soft-deleted}
+        default: {$ref: '#/components/responses/Error'}
+  /groups/{id}/members:
+    post:
+      tags: [Groups]
+      operationId: addGroupMember
+      x-tima-implementation-phase: phase-2
+      requestBody: {$ref: '#/components/requestBodies/GroupMember'}
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '201': {description: Member added and GK rotation started, content: {application/json: {schema: {$ref: '#/components/schemas/GroupMember'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /groups/{id}/members/{user_id}:
+    delete:
+      tags: [Groups]
+      operationId: removeGroupMember
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/UserId'}]
+      responses:
+        '204': {description: Member removed and GK rotated}
+        default: {$ref: '#/components/responses/Error'}
+  /groups/{id}/gk/{version}/wrapped:
+    get:
+      tags: [Groups]
+      operationId: getWrappedGroupKey
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Version'}]
+      responses:
+        '200': {description: Wrapped group key, content: {application/json: {schema: {$ref: '#/components/schemas/WrappedGroupKey'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /channels:
+    post:
+      tags: [Channels]
+      operationId: createChannel
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/ChannelCreate'}
+      responses:
+        '201': {description: Channel created, content: {application/json: {schema: {$ref: '#/components/schemas/Channel'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /channels/{id}:
+    get:
+      tags: [Channels]
+      operationId: getChannel
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Channel, content: {application/json: {schema: {$ref: '#/components/schemas/Channel'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    patch:
+      tags: [Channels]
+      operationId: updateChannel
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/ChannelPatch'}
+      responses:
+        '200': {description: Updated channel, content: {application/json: {schema: {$ref: '#/components/schemas/Channel'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Channels]
+      operationId: deleteChannel
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Channel soft-deleted}
+        default: {$ref: '#/components/responses/Error'}
+  /channels/{id}/subscribe:
+    post:
+      tags: [Channels]
+      operationId: subscribeChannel
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Subscribed to channel only}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Channels]
+      operationId: unsubscribeChannel
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Unsubscribed}
+        default: {$ref: '#/components/responses/Error'}
+  /channels/{id}/posts:
+    get:
+      tags: [Channels]
+      operationId: listChannelPosts
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Channel posts, content: {application/json: {schema: {$ref: '#/components/schemas/PostList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /communities:
+    post:
+      tags: [Communities]
+      operationId: createCommunity
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/CommunityCreate'}
+      responses:
+        '201': {description: Community created, content: {application/json: {schema: {$ref: '#/components/schemas/Community'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /communities/{id}:
+    get:
+      tags: [Communities]
+      operationId: getCommunity
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Community and child objects, content: {application/json: {schema: {$ref: '#/components/schemas/Community'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /communities/{id}/subscribe:
+    post:
+      tags: [Communities]
+      operationId: subscribeCommunity
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Subscribed to community only}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Communities]
+      operationId: unsubscribeCommunity
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Unsubscribed}
+        default: {$ref: '#/components/responses/Error'}
+  /communities/{id}/objects:
+    post:
+      tags: [Communities]
+      operationId: attachCommunityObject
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/CommunityObject'}
+      responses:
+        '201': {description: Child object attached or created, content: {application/json: {schema: {$ref: '#/components/schemas/CommunityObject'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /communities/{id}/objects/{object_id}/acl:
+    patch:
+      tags: [Communities]
+      operationId: updateCommunityObjectAcl
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/ObjectId'}]
+      requestBody: {$ref: '#/components/requestBodies/ObjectAcl'}
+      responses:
+        '200': {description: ACL updated, content: {application/json: {schema: {$ref: '#/components/schemas/ObjectAcl'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /voice-rooms:
+    post:
+      tags: [Voice rooms]
+      operationId: createVoiceRoom
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/VoiceRoomCreate'}
+      responses:
+        '201': {description: Voice room created, content: {application/json: {schema: {$ref: '#/components/schemas/VoiceRoom'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /voice-rooms/{id}/join:
+    post:
+      tags: [Voice rooms]
+      operationId: joinVoiceRoom
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: LiveKit grant, content: {application/json: {schema: {$ref: '#/components/schemas/RtcGrant'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /voice-rooms/{id}/leave:
+    post:
+      tags: [Voice rooms]
+      operationId: leaveVoiceRoom
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Left room}
+        default: {$ref: '#/components/responses/Error'}
+
+  /chats/{chat_id}/media/uploads:
+    post:
+      tags: [Media]
+      operationId: createChatMediaUpload
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/ChatId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/MediaUploadCreate'}
+      responses:
+        '201': {description: Private upload slots, content: {application/json: {schema: {$ref: '#/components/schemas/MediaUpload'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /groups/{group_id}/media/uploads:
+    post:
+      tags: [Media]
+      operationId: createGroupMediaUpload
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/GroupId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/MediaUploadCreate'}
+      responses:
+        '201': {description: Policy-matched upload slots, content: {application/json: {schema: {$ref: '#/components/schemas/MediaUpload'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /posts/assets:
+    post:
+      tags: [Media, Posts]
+      operationId: createPostAssetUpload
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/MediaUploadCreate'}
+      responses:
+        '201': {description: Public staging upload slots, content: {application/json: {schema: {$ref: '#/components/schemas/MediaUpload'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /media/uploads/{media_id}/complete:
+    post:
+      tags: [Media]
+      operationId: completeMediaUpload
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/MediaId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/MediaComplete'}
+      responses:
+        '202': {description: Scan and processing started, content: {application/json: {schema: {$ref: '#/components/schemas/Media'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /media/{media_id}/access:
+    post:
+      tags: [Media]
+      operationId: createMediaAccess
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/MediaId'}]
+      requestBody: {$ref: '#/components/requestBodies/MediaAccess'}
+      responses:
+        '200': {description: Variant URL valid for 15 minutes, content: {application/json: {schema: {$ref: '#/components/schemas/MediaAccess'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /posts/drafts:
+    post:
+      tags: [Posts]
+      operationId: createPostDraft
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/PostWrite'}
+      responses:
+        '201': {description: Draft created, content: {application/json: {schema: {$ref: '#/components/schemas/PostDraft'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /posts/drafts/{id}:
+    get:
+      tags: [Posts]
+      operationId: getPostDraft
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Draft, content: {application/json: {schema: {$ref: '#/components/schemas/PostDraft'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    put:
+      tags: [Posts]
+      operationId: updatePostDraft
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/PostWrite'}
+      responses:
+        '200': {description: Draft autosaved, content: {application/json: {schema: {$ref: '#/components/schemas/PostDraft'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Posts]
+      operationId: deletePostDraft
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Draft deleted}
+        default: {$ref: '#/components/responses/Error'}
+  /posts/drafts/{id}/publish:
+    post:
+      tags: [Posts]
+      operationId: publishPostDraft
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      responses:
+        '201': {description: Published post, content: {application/json: {schema: {$ref: '#/components/schemas/Post'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /posts/drafts/{id}/schedule:
+    post:
+      tags: [Posts]
+      operationId: schedulePostDraft
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/Schedule'}
+      responses:
+        '200': {description: Draft scheduled, content: {application/json: {schema: {$ref: '#/components/schemas/PostDraft'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /posts:
+    post:
+      tags: [Posts]
+      operationId: publishPost
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PostWrite'}
+      responses:
+        '201': {description: Published post, content: {application/json: {schema: {$ref: '#/components/schemas/Post'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /posts/{id}:
+    get:
+      tags: [Posts]
+      operationId: getPost
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/PostId'}]
+      responses:
+        '200': {description: Published post, content: {application/json: {schema: {$ref: '#/components/schemas/Post'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /posts/{id}/revisions:
+    post:
+      tags: [Posts]
+      operationId: revisePost
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/PostId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PublicDocument'}
+      responses:
+        '201': {description: Immutable public revision, content: {application/json: {schema: {$ref: '#/components/schemas/PublicRevision'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /posts/{id}/approve:
+    post:
+      tags: [Posts]
+      operationId: approvePost
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/PostId'}]
+      responses:
+        '200': {description: Post approved, content: {application/json: {schema: {$ref: '#/components/schemas/Post'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /posts/{id}/reject:
+    post:
+      tags: [Posts]
+      operationId: rejectPost
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/PostId'}]
+      requestBody: {$ref: '#/components/requestBodies/Rejection'}
+      responses:
+        '200': {description: Post rejected, content: {application/json: {schema: {$ref: '#/components/schemas/Post'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /friends/requests:
+    post:
+      tags: [Social graph]
+      operationId: sendFriendRequest
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/FriendRequest'}
+      responses:
+        '201': {description: Request sent, content: {application/json: {schema: {$ref: '#/components/schemas/FriendRequest'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    get:
+      tags: [Social graph]
+      operationId: listFriendRequests
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Direction'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Pending requests, content: {application/json: {schema: {$ref: '#/components/schemas/FriendRequestList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /friends/requests/{from_user_id}/accept:
+    post:
+      tags: [Social graph]
+      operationId: acceptFriendRequest
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/FromUserId'}]
+      responses:
+        '200': {description: Friendship, content: {application/json: {schema: {$ref: '#/components/schemas/Friendship'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /friends/requests/{from_user_id}/decline:
+    post:
+      tags: [Social graph]
+      operationId: declineFriendRequest
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/FromUserId'}]
+      responses:
+        '204': {description: Request declined}
+        default: {$ref: '#/components/responses/Error'}
+  /friends/{user_id}:
+    delete:
+      tags: [Social graph]
+      operationId: removeFriend
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/UserId'}]
+      responses:
+        '204': {description: Mutual friendship removed}
+        default: {$ref: '#/components/responses/Error'}
+  /friends:
+    get:
+      tags: [Social graph]
+      operationId: listFriends
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Friends, content: {application/json: {schema: {$ref: '#/components/schemas/UserList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /subscriptions:
+    get:
+      tags: [Social graph]
+      operationId: listSubscriptions
+      x-tima-implementation-phase: phase-3
+      parameters:
+        - {name: target_type, in: query, required: true, schema: {type: string, enum: [user]}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200': {description: User subscriptions, content: {application/json: {schema: {$ref: '#/components/schemas/SubscriptionList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /recovery/requests:
+    post:
+      tags: [Recovery]
+      operationId: createRecoveryRequest
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/RecoveryRequest'}
+      responses:
+        '201': {description: Recovery session, content: {application/json: {schema: {$ref: '#/components/schemas/RecoverySession'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /recovery/requests/{id}:
+    get:
+      tags: [Recovery]
+      operationId: getRecoveryRequest
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Recovery status, content: {application/json: {schema: {$ref: '#/components/schemas/RecoverySession'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /recovery/requests/{id}/respond:
+    post:
+      tags: [Recovery]
+      operationId: respondRecoveryRequest
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/RecoveryChunks'}
+      responses:
+        '202': {description: Rewrapped chunks accepted, content: {application/json: {schema: {$ref: '#/components/schemas/RecoverySession'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /recovery/requests/{id}/decline:
+    post:
+      tags: [Recovery]
+      operationId: declineRecoveryRequest
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/RecoveryDecline'}
+      responses:
+        '200': {description: Request declined, content: {application/json: {schema: {$ref: '#/components/schemas/RecoverySession'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /recovery/requests/{id}/confirm:
+    post:
+      tags: [Recovery]
+      operationId: confirmRecoveryRequest
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/RecoveryConfirm'}
+      responses:
+        '200': {description: Recovery completed, content: {application/json: {schema: {$ref: '#/components/schemas/RecoverySession'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /recovery/phrase-backup:
+    post:
+      tags: [Recovery]
+      operationId: putRecoveryPhraseBackup
+      x-tima-implementation-phase: phase-4
+      requestBody: {$ref: '#/components/requestBodies/PhraseBackup'}
+      responses:
+        '201': {description: Encrypted backup stored, content: {application/json: {schema: {$ref: '#/components/schemas/PhraseBackup'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    get:
+      tags: [Recovery]
+      operationId: getRecoveryPhraseBackup
+      x-tima-implementation-phase: phase-4
+      responses:
+        '200': {description: Encrypted backup, content: {application/json: {schema: {$ref: '#/components/schemas/PhraseBackup'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Recovery]
+      operationId: deleteRecoveryPhraseBackup
+      x-tima-implementation-phase: phase-4
+      responses:
+        '204': {description: Backup removed}
+        default: {$ref: '#/components/responses/Error'}
+
+  /comments:
+    get:
+      tags: [Comments]
+      operationId: listComments
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/TargetType'}, {$ref: '#/components/parameters/TargetId'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Comments, content: {application/json: {schema: {$ref: '#/components/schemas/CommentList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      tags: [Comments]
+      operationId: createComment
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/CommentCreate'}
+      responses:
+        '201': {description: Comment created, content: {application/json: {schema: {$ref: '#/components/schemas/Comment'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /comments/{id}/revisions:
+    post:
+      tags: [Comments]
+      operationId: reviseComment
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/CommentId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PublicDocument'}
+      responses:
+        '201': {description: Immutable public revision, content: {application/json: {schema: {$ref: '#/components/schemas/PublicRevision'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /comments/{id}:
+    delete:
+      tags: [Comments]
+      operationId: deleteComment
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/CommentId'}]
+      responses:
+        '204': {description: Comment soft-deleted}
+        default: {$ref: '#/components/responses/Error'}
+
+  /emotions:
+    get:
+      tags: [Reactions]
+      operationId: getEmotionCounters
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/TargetType'}, {$ref: '#/components/parameters/TargetId'}]
+      responses:
+        '200': {description: Nine emotion counters and current choice, content: {application/json: {schema: {$ref: '#/components/schemas/EmotionCounters'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    put:
+      tags: [Reactions]
+      operationId: setEmotion
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/Emotion'}
+      responses:
+        '200': {description: Updated counters, content: {application/json: {schema: {$ref: '#/components/schemas/EmotionCounters'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Reactions]
+      operationId: deleteEmotion
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/TargetType'}, {$ref: '#/components/parameters/TargetId'}]
+      responses:
+        '204': {description: Emotion removed}
+        default: {$ref: '#/components/responses/Error'}
+  /ratings:
+    get:
+      tags: [Reactions]
+      operationId: getRating
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/SubjectType'}, {$ref: '#/components/parameters/SubjectId'}]
+      responses:
+        '200': {description: Positive and negative totals, content: {application/json: {schema: {$ref: '#/components/schemas/Rating'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /recommend:
+    post:
+      tags: [Reactions]
+      operationId: recommendPublicContent
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/Recommendation'}
+      responses:
+        '200': {description: Updated public rating, content: {application/json: {schema: {$ref: '#/components/schemas/Rating'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /attributes:
+    get:
+      tags: [Discovery]
+      operationId: searchAttributes
+      x-tima-implementation-phase: phase-3
+      parameters:
+        - {name: q, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 100}}
+        - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200': {description: Attribute matches, content: {application/json: {schema: {$ref: '#/components/schemas/AttributeList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      tags: [Discovery]
+      operationId: createAttribute
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/AttributeCreate'}
+      responses:
+        '201': {description: Attribute or similar candidates, content: {application/json: {schema: {$ref: '#/components/schemas/AttributeCreateResult'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /attributes/{id}:
+    get:
+      tags: [Discovery]
+      operationId: getAttribute
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Attribute card, content: {application/json: {schema: {$ref: '#/components/schemas/Attribute'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /attributes/{id}/posts:
+    get:
+      tags: [Discovery]
+      operationId: listAttributePosts
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Approved posts, content: {application/json: {schema: {$ref: '#/components/schemas/PostList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /attributes/{id}/follow:
+    post:
+      tags: [Discovery]
+      operationId: followAttribute
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Added to my attributes}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Discovery]
+      operationId: unfollowAttribute
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Removed from my attributes}
+        default: {$ref: '#/components/responses/Error'}
+  /genres:
+    get:
+      tags: [Discovery]
+      operationId: listGenres
+      x-tima-implementation-phase: phase-3
+      responses:
+        '200': {description: Genres, content: {application/json: {schema: {$ref: '#/components/schemas/GenreList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /genres/{id}/attributes:
+    get:
+      tags: [Discovery]
+      operationId: listGenreAttributes
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Attributes by popularity, content: {application/json: {schema: {$ref: '#/components/schemas/AttributeList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /feed:
+    get:
+      tags: [Discovery]
+      operationId: getFeed
+      x-tima-implementation-phase: phase-3
+      parameters:
+        - {name: tab, in: query, schema: {type: string, enum: [general, friends], default: general}}
+        - {name: genre, in: query, schema: {type: string, format: uuid}}
+        - {name: attribute, in: query, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200': {description: Ranked or chronological feed, content: {application/json: {schema: {$ref: '#/components/schemas/FeedPage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /favorites:
+    get:
+      tags: [Discovery]
+      operationId: listFavorites
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Shelf'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Public favorites, content: {application/json: {schema: {$ref: '#/components/schemas/FavoriteList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      tags: [Discovery]
+      operationId: addFavorite
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Shelf'}]
+      requestBody: {$ref: '#/components/requestBodies/Favorite'}
+      responses:
+        '201': {description: Favorite added, content: {application/json: {schema: {$ref: '#/components/schemas/Favorite'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Discovery]
+      operationId: removeFavorite
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Shelf'}, {$ref: '#/components/parameters/TargetType'}, {$ref: '#/components/parameters/TargetId'}]
+      responses:
+        '204': {description: Favorite removed}
+        default: {$ref: '#/components/responses/Error'}
+  /shelf/private:
+    get:
+      tags: [Discovery]
+      operationId: getPrivateShelf
+      x-tima-implementation-phase: phase-3
+      responses:
+        '200': {description: Encrypted shelf and device wraps, content: {application/json: {schema: {$ref: '#/components/schemas/PrivateShelf'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    put:
+      tags: [Discovery]
+      operationId: putPrivateShelf
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/PrivateShelf'}
+      responses:
+        '200': {description: Encrypted shelf stored, content: {application/json: {schema: {$ref: '#/components/schemas/PrivateShelf'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /shelf/access/request:
+    post:
+      tags: [Discovery]
+      operationId: requestShelfAccess
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/ShelfAccessRequest'}
+      responses:
+        '201': {description: Access request created, content: {application/json: {schema: {$ref: '#/components/schemas/ShelfAccess'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /shelf/access/grant:
+    post:
+      tags: [Discovery]
+      operationId: grantShelfAccess
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/ShelfAccessGrant'}
+      responses:
+        '200': {description: Wrapped shelf key granted, content: {application/json: {schema: {$ref: '#/components/schemas/ShelfAccess'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /shelf/access/revoke:
+    post:
+      tags: [Discovery]
+      operationId: revokeShelfAccess
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/ShelfAccessRevoke'}
+      responses:
+        '200': {description: Key rotated and remaining grants rewrapped, content: {application/json: {schema: {$ref: '#/components/schemas/ShelfAccess'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /search:
+    get:
+      tags: [Discovery]
+      operationId: search
+      x-tima-implementation-phase: phase-3
+      parameters:
+        - {name: q, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 256}}
+        - {name: types, in: query, style: form, explode: false, schema: {type: array, items: {type: string, enum: [user, virtual_user, group, channel, community, post, attribute]}}}
+        - {name: community_id, in: query, schema: {type: string, format: uuid}}
+        - {name: author_id, in: query, schema: {type: string, format: uuid}}
+        - {name: created_after, in: query, schema: {type: string, format: date-time}}
+        - {name: created_before, in: query, schema: {type: string, format: date-time}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200': {description: Unified public results, content: {application/json: {schema: {$ref: '#/components/schemas/SearchPage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /calls:
+    post:
+      tags: [Calls]
+      operationId: initiateCall
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/CallCreate'}
+      responses:
+        '201': {description: Outgoing call, content: {application/json: {schema: {$ref: '#/components/schemas/Call'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /calls/{id}/accept:
+    post:
+      tags: [Calls]
+      operationId: acceptCall
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Accepted with LiveKit token, content: {application/json: {schema: {$ref: '#/components/schemas/CallJoin'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /calls/{id}/reject:
+    post:
+      tags: [Calls]
+      operationId: rejectCall
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/CallEnd'}
+      responses:
+        '200': {description: Call rejected, content: {application/json: {schema: {$ref: '#/components/schemas/Call'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /calls/{id}/end:
+    post:
+      tags: [Calls]
+      operationId: endCall
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/CallEnd'}
+      responses:
+        '200': {description: Call ended, content: {application/json: {schema: {$ref: '#/components/schemas/Call'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /calls/history:
+    get:
+      tags: [Calls]
+      operationId: listCallHistory
+      x-tima-implementation-phase: phase-2
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Call log, content: {application/json: {schema: {$ref: '#/components/schemas/CallList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /reports:
+    post:
+      tags: [Reports]
+      operationId: createReport
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/Report'}
+      responses:
+        '201': {description: Report accepted, content: {application/json: {schema: {$ref: '#/components/schemas/Report'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /virtual-users:
+    get:
+      tags: [Virtual users]
+      operationId: listVirtualUsers
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Owned or operated virtual users, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualUserList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      tags: [Virtual users]
+      operationId: createVirtualUser
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/VirtualUserCreate'}
+      responses:
+        '201': {description: Virtual user, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualUser'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /virtual-users/{id}:
+    get:
+      tags: [Virtual users]
+      operationId: getVirtualUser
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Profile and operator summary, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualUser'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    patch:
+      tags: [Virtual users]
+      operationId: updateVirtualUser
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/VirtualUserPatch'}
+      responses:
+        '200': {description: Updated virtual user, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualUser'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Virtual users]
+      operationId: deleteVirtualUser
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Virtual user soft-deleted}
+        default: {$ref: '#/components/responses/Error'}
+  /virtual-users/{id}/operators:
+    get:
+      tags: [Virtual users]
+      operationId: listVirtualUserOperators
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Operators, content: {application/json: {schema: {$ref: '#/components/schemas/OperatorList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    post:
+      tags: [Virtual users]
+      operationId: grantVirtualUserOperator
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/OperatorGrant'}
+      responses:
+        '201': {description: Operator grant, content: {application/json: {schema: {$ref: '#/components/schemas/Operator'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /virtual-users/{id}/operators/{user_id}:
+    delete:
+      tags: [Virtual users]
+      operationId: revokeVirtualUserOperator
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/UserId'}]
+      responses:
+        '204': {description: Operator revoked and key rotation triggered}
+        default: {$ref: '#/components/responses/Error'}
+  /virtual-users/{id}/keys/rotate:
+    post:
+      tags: [Virtual users]
+      operationId: rotateVirtualUserKeys
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/KeyRotation'}
+      responses:
+        '202': {description: Rotation started, content: {application/json: {schema: {$ref: '#/components/schemas/KeyRotation'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /virtual-users/{id}/key-wraps:
+    get:
+      tags: [Virtual users]
+      operationId: getVirtualUserKeyWraps
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Private key wraps for current device, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualKeyWrapList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /virtual-users/{id}/transfer:
+    post:
+      tags: [Virtual users]
+      operationId: transferVirtualUser
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/VirtualTransfer'}
+      responses:
+        '201': {description: Ownership transfer, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualTransfer'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /virtual-users/{id}/transfer/{transfer_id}/accept:
+    post:
+      tags: [Virtual users]
+      operationId: acceptVirtualUserTransfer
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/TransferId'}]
+      requestBody: {$ref: '#/components/requestBodies/TransferAccept'}
+      responses:
+        '200': {description: Transfer accepted, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualTransfer'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /virtual-users/{id}/transfer/{transfer_id}/reject:
+    post:
+      tags: [Virtual users]
+      operationId: rejectVirtualUserTransfer
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/TransferId'}]
+      requestBody: {$ref: '#/components/requestBodies/Rejection'}
+      responses:
+        '200': {description: Transfer rejected, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualTransfer'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+  /apps:
+    post:
+      tags: [Owner apps]
+      operationId: createApp
+      x-tima-implementation-phase: phase-3b
+      requestBody: {$ref: '#/components/requestBodies/AppCreate'}
+      responses:
+        '201': {description: Application, content: {application/json: {schema: {$ref: '#/components/schemas/App'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    get:
+      tags: [Owner apps]
+      operationId: listApps
+      x-tima-implementation-phase: phase-3b
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Owned applications, content: {application/json: {schema: {$ref: '#/components/schemas/AppList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /apps/{id}:
+    get:
+      tags: [Owner apps]
+      operationId: getApp
+      x-tima-implementation-phase: phase-3b
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: Application, content: {application/json: {schema: {$ref: '#/components/schemas/App'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    patch:
+      tags: [Owner apps]
+      operationId: updateApp
+      x-tima-implementation-phase: phase-3b
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/AppPatch'}
+      responses:
+        '200': {description: Updated application, content: {application/json: {schema: {$ref: '#/components/schemas/App'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Owner apps]
+      operationId: deleteApp
+      x-tima-implementation-phase: phase-3b
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '204': {description: Application soft-deleted}
+        default: {$ref: '#/components/responses/Error'}
+  /apps/{id}/tokens:
+    post:
+      tags: [Owner apps]
+      operationId: issueAppToken
+      x-tima-implementation-phase: phase-3b
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/AppToken'}
+      responses:
+        '201': {description: Plaintext token returned once, content: {application/json: {schema: {$ref: '#/components/schemas/IssuedAppToken'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /apps/{id}/tokens/{token_id}:
+    delete:
+      tags: [Owner apps]
+      operationId: revokeAppToken
+      x-tima-implementation-phase: phase-3b
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/TokenId'}]
+      responses:
+        '204': {description: Token revoked}
+        default: {$ref: '#/components/responses/Error'}
+  /apps/{id}/installations:
+    post:
+      tags: [Owner apps]
+      operationId: requestAppInstallation
+      x-tima-implementation-phase: phase-3b
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/InstallationCreate'}
+      responses:
+        '201': {description: Installation request, content: {application/json: {schema: {$ref: '#/components/schemas/Installation'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    get:
+      tags: [Owner apps]
+      operationId: listAppInstallations
+      x-tima-implementation-phase: phase-3b
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Installations, content: {application/json: {schema: {$ref: '#/components/schemas/InstallationList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /apps/{id}/installations/{installation_id}:
+    delete:
+      tags: [Owner apps]
+      operationId: revokeAppInstallation
+      x-tima-implementation-phase: phase-3b
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/InstallationId'}]
+      responses:
+        '204': {description: Installation revoked}
+        default: {$ref: '#/components/responses/Error'}
+
+  /inbox/threads:
+    get:
+      tags: [Inbox]
+      operationId: listInboxThreads
+      x-tima-implementation-phase: phase-3
+      parameters:
+        - {name: identity, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/ThreadStatus'}}
+        - {name: assignee, in: query, schema: {type: string, format: uuid}}
+        - {name: priority, in: query, schema: {type: string, enum: [low, normal, high, urgent]}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200': {description: Managed appeal threads, content: {application/json: {schema: {$ref: '#/components/schemas/InboxThreadList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /inbox/threads/{id}:
+    patch:
+      tags: [Inbox]
+      operationId: updateInboxThread
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      requestBody: {$ref: '#/components/requestBodies/InboxThreadPatch'}
+      responses:
+        '200': {description: Thread state updated, content: {application/json: {schema: {$ref: '#/components/schemas/InboxThread'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /inbox/events:
+    get:
+      tags: [Inbox]
+      operationId: listInboxEvents
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
+      responses:
+        '200': {description: Personal events, content: {application/json: {schema: {$ref: '#/components/schemas/InboxEventList'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /inbox/events/read:
+    post:
+      tags: [Inbox]
+      operationId: readInboxEvents
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/EventIds'}
+      responses:
+        '200': {description: Read state updated, content: {application/json: {schema: {$ref: '#/components/schemas/BatchResult'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /inbox/events/hide:
+    post:
+      tags: [Inbox]
+      operationId: hideInboxEvents
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/EventIds'}
+      responses:
+        '200': {description: Events hidden, content: {application/json: {schema: {$ref: '#/components/schemas/BatchResult'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /inbox/preferences:
+    get:
+      tags: [Inbox]
+      operationId: getInboxPreferences
+      x-tima-implementation-phase: phase-3
+      responses:
+        '200': {description: Aggregation rules, content: {application/json: {schema: {$ref: '#/components/schemas/InboxPreferences'}}}}
+        default: {$ref: '#/components/responses/Error'}
+    put:
+      tags: [Inbox]
+      operationId: putInboxPreferences
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/InboxPreferences'}
+      responses:
+        '200': {description: Synchronized rules, content: {application/json: {schema: {$ref: '#/components/schemas/InboxPreferences'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /appeals:
+    post:
+      tags: [Inbox]
+      operationId: createAppeal
+      x-tima-implementation-phase: phase-3
+      requestBody: {$ref: '#/components/requestBodies/Appeal'}
+      responses:
+        '201': {description: Appeal created, content: {application/json: {schema: {$ref: '#/components/schemas/Appeal'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /inbox/notify:
+    post:
+      tags: [Inbox]
+      operationId: notifyFromOwnedEntity
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/EntityMessage'}
+      responses:
+        '201': {description: Owner API entity message, content: {application/json: {schema: {$ref: '#/components/schemas/EntityMessage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /inbox/entity-messages/{id}:
+    get:
+      tags: [Inbox]
+      operationId: getEntityMessage
+      x-tima-implementation-phase: phase-3
+      parameters: [{$ref: '#/components/parameters/Id'}]
+      responses:
+        '200': {description: ACL-authorized entity message, content: {application/json: {schema: {$ref: '#/components/schemas/EntityMessage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Device-bound user access token.
+    deviceId:
+      type: apiKey
+      in: header
+      name: X-Device-Id
+      description: UUID of the authenticated device.
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    UserId: {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}
+    FromUserId: {name: from_user_id, in: path, required: true, schema: {type: string, format: uuid}}
+    MessageId: {name: msg_id, in: path, required: true, schema: {$ref: '#/components/schemas/DecimalInt64String'}}
+    PostId: {name: id, in: path, required: true, schema: {$ref: '#/components/schemas/DecimalInt64String'}}
+    CommentId: {name: id, in: path, required: true, schema: {$ref: '#/components/schemas/DecimalInt64String'}}
+    ChatId: {name: chat_id, in: path, required: true, schema: {type: string, format: uuid}}
+    GroupId: {name: group_id, in: path, required: true, schema: {type: string, format: uuid}}
+    MediaId: {name: media_id, in: path, required: true, schema: {type: string, format: uuid}}
+    ObjectId: {name: object_id, in: path, required: true, schema: {type: string, format: uuid}}
+    TransferId: {name: transfer_id, in: path, required: true, schema: {type: string, format: uuid}}
+    TokenId: {name: token_id, in: path, required: true, schema: {type: string, format: uuid}}
+    InstallationId: {name: installation_id, in: path, required: true, schema: {type: string, format: uuid}}
+    Version: {name: version, in: path, required: true, schema: {type: integer, minimum: 1}}
+    Cursor: {name: cursor, in: query, schema: {type: string, minLength: 1, maxLength: 2048}, description: Opaque continuation cursor.}
+    Limit: {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID; replay result retained for 24 hours per device. Never sent in a JSON body.
+      schema: {type: string, format: uuid}
+    AttestationToken:
+      name: X-Attestation-Token
+      in: header
+      required: false
+      description: Required for mobile clients according to platform policy.
+      schema: {type: string, minLength: 16, maxLength: 8192}
+    ConversationType: {name: conversation_type, in: query, required: true, schema: {type: string, enum: [chat, group]}}
+    ConversationId: {name: conversation_id, in: query, required: true, schema: {type: string, format: uuid}}
+    Epoch: {name: epoch, in: query, required: true, schema: {type: string, pattern: '^[0-9]{4}Q[1-4]$'}}
+    Shard: {name: shard, in: query, required: true, schema: {type: integer, minimum: 0}}
+    Direction: {name: direction, in: query, required: true, schema: {type: string, enum: [incoming, outgoing]}}
+    TargetType: {name: target_type, in: query, required: true, schema: {$ref: '#/components/schemas/PublicTargetType'}}
+    TargetId: {name: target_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 255}}
+    SubjectType: {name: subject_type, in: query, required: true, schema: {$ref: '#/components/schemas/PublicTargetType'}}
+    SubjectId: {name: subject_id, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 255}}
+    Shelf: {name: shelf, in: query, required: true, schema: {type: string, const: public}}
+  headers:
+    RateLimitLimit: {description: Request limit for the active bucket., schema: {type: integer, minimum: 0}}
+    RateLimitRemaining: {description: Requests left in the active bucket., schema: {type: integer, minimum: 0}}
+    RateLimitReset: {description: Unix epoch seconds when the bucket resets., schema: {type: integer, minimum: 0}}
+    RetryAfter: {description: Seconds before retrying., schema: {type: integer, minimum: 1}}
+    RequestId: {description: Correlation UUID., schema: {type: string, format: uuid}}
+  responses:
+    Error:
+      description: Validation, authentication, authorization, absence, conflict, rate-limit or dependency failure.
+      headers:
+        X-Request-Id: {$ref: '#/components/headers/RequestId'}
+        X-RateLimit-Limit: {$ref: '#/components/headers/RateLimitLimit'}
+        X-RateLimit-Remaining: {$ref: '#/components/headers/RateLimitRemaining'}
+        X-RateLimit-Reset: {$ref: '#/components/headers/RateLimitReset'}
+        Retry-After: {$ref: '#/components/headers/RetryAfter'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/ErrorEnvelope'}
+  requestBodies:
+    RegisterStart: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RegisterStart'}}}}
+    RegisterVerify: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RegisterVerify'}}}}
+    Login: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Login'}}}}
+    Refresh: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Refresh'}}}}
+    IosAttestation: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/IosAttestation'}}}}
+    AndroidIntegrity: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AndroidIntegrity'}}}}
+    UserPatch: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UserPatch'}}}}
+    LinkSession: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LinkSession'}}}}
+    LinkConfirm: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LinkConfirm'}}}}
+    KeyBundle: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/KeyBundleWrite'}}}}
+    Prekeys: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PrekeyBatch'}}}}
+    ChatCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ChatCreate'}}}}
+    PrivateMessage: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PrivateMessageWrite'}}}}
+    GroupMessage: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/GroupMessageWrite'}}}}
+    ReadCursor: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReadCursor'}}}}
+    GroupCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/GroupCreate'}}}}
+    GroupMember: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/GroupMemberAdd'}}}}
+    ChannelCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ChannelCreate'}}}}
+    ChannelPatch: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ChannelPatch'}}}}
+    CommunityCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CommunityCreate'}}}}
+    CommunityObject: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CommunityObjectWrite'}}}}
+    ObjectAcl: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ObjectAclWrite'}}}}
+    VoiceRoomCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/VoiceRoomCreate'}}}}
+    MediaUploadCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MediaUploadCreate'}}}}
+    MediaComplete: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MediaComplete'}}}}
+    MediaAccess: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MediaAccessRequest'}}}}
+    PostWrite: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PostWrite'}}}}
+    PublicDocument: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PublicDocumentWrite'}}}}
+    Schedule: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Schedule'}}}}
+    Rejection: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Rejection'}}}}
+    FriendRequest: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/FriendRequestWrite'}}}}
+    RecoveryRequest: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecoveryRequestWrite'}}}}
+    RecoveryChunks: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecoveryChunks'}}}}
+    RecoveryDecline: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecoveryDecline'}}}}
+    RecoveryConfirm: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecoveryConfirm'}}}}
+    PhraseBackup: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PhraseBackupWrite'}}}}
+    CommentCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CommentCreate'}}}}
+    Emotion: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EmotionWrite'}}}}
+    Recommendation: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RecommendationWrite'}}}}
+    AttributeCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AttributeCreate'}}}}
+    Favorite: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/FavoriteWrite'}}}}
+    PrivateShelf: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PrivateShelfWrite'}}}}
+    ShelfAccessRequest: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ShelfAccessRequest'}}}}
+    ShelfAccessGrant: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ShelfAccessGrant'}}}}
+    ShelfAccessRevoke: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ShelfAccessRevoke'}}}}
+    CallCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CallCreate'}}}}
+    CallEnd: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CallEnd'}}}}
+    Report: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ReportWrite'}}}}
+    VirtualUserCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualUserCreate'}}}}
+    VirtualUserPatch: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualUserPatch'}}}}
+    OperatorGrant: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OperatorGrant'}}}}
+    KeyRotation: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/KeyRotationRequest'}}}}
+    VirtualTransfer: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/VirtualTransferWrite'}}}}
+    TransferAccept: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TransferAccept'}}}}
+    AppCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AppCreate'}}}}
+    AppPatch: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AppPatch'}}}}
+    AppToken: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AppTokenWrite'}}}}
+    InstallationCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/InstallationCreate'}}}}
+    InboxThreadPatch: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/InboxThreadPatch'}}}}
+    EventIds: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EventIds'}}}}
+    InboxPreferences: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/InboxPreferencesWrite'}}}}
+    Appeal: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AppealWrite'}}}}
+    EntityMessage: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/EntityMessageWrite'}}}}
+
+  schemas:
+    Uuid: {type: string, format: uuid}
+    DecimalInt64String:
+      type: string
+      pattern: '^[1-9][0-9]{0,18}$'
+      description: Positive PostgreSQL BIGINT serialized as a decimal string for JavaScript safety; values must not exceed 9223372036854775807.
+      x-tima-decimal-maximum: '9223372036854775807'
+    Timestamp: {type: string, format: date-time}
+    Base64: {type: string, contentEncoding: base64}
+    Region: {type: string, enum: [RU, EU]}
+    PublicTargetType: {type: string, enum: [post, comment, user, virtual_user, group, channel, community]}
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id]
+          properties:
+            code: {type: string, pattern: '^[A-Z][A-Z0-9_]+$'}
+            message: {type: string, minLength: 1}
+            details: {type: object, additionalProperties: true}
+            request_id: {$ref: '#/components/schemas/Uuid'}
+    RegisterStart:
+      type: object
+      additionalProperties: false
+      required: [phone, locale]
+      properties:
+        phone: {type: string, pattern: '^\+[1-9][0-9]{7,14}$'}
+        locale: {type: string, pattern: '^[a-z]{2}(-[A-Z]{2})?$'}
+    OtpChallenge:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, expires_at, resend_after]
+      properties:
+        challenge_id: {$ref: '#/components/schemas/Uuid'}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+        resend_after: {type: integer, minimum: 0}
+    RegisterVerify:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, otp, password, device]
+      properties:
+        challenge_id: {$ref: '#/components/schemas/Uuid'}
+        otp: {type: string, pattern: '^[0-9]{6}$'}
+        password: {type: string, minLength: 12, maxLength: 128}
+        display_name: {type: string, minLength: 1, maxLength: 100}
+        device: {$ref: '#/components/schemas/DeviceRegistration'}
+    Login:
+      type: object
+      additionalProperties: false
+      required: [phone, password, device]
+      properties:
+        phone: {type: string, pattern: '^\+[1-9][0-9]{7,14}$'}
+        password: {type: string, minLength: 1, maxLength: 128}
+        device: {$ref: '#/components/schemas/DeviceRegistration'}
+    Refresh:
+      type: object
+      additionalProperties: false
+      required: [refresh_token, device_id]
+      properties:
+        refresh_token: {type: string, minLength: 32}
+        device_id: {$ref: '#/components/schemas/Uuid'}
+    AuthSession:
+      type: object
+      additionalProperties: false
+      required: [access_token, refresh_token, token_type, expires_in, user, device]
+      properties:
+        access_token: {type: string, minLength: 32}
+        refresh_token: {type: string, minLength: 32}
+        token_type: {type: string, const: Bearer}
+        expires_in: {type: integer, minimum: 1}
+        user: {$ref: '#/components/schemas/User'}
+        device: {$ref: '#/components/schemas/Device'}
+    DeviceRegistration:
+      type: object
+      additionalProperties: false
+      required: [name, platform, public_key]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        platform: {type: string, enum: [ios, android, windows]}
+        app_version: {type: string, maxLength: 32}
+        public_key: {$ref: '#/components/schemas/Base64'}
+    IosAttestation:
+      type: object
+      additionalProperties: false
+      required: [key_id, assertion, challenge]
+      properties:
+        key_id: {type: string, minLength: 1}
+        assertion: {$ref: '#/components/schemas/Base64'}
+        challenge: {$ref: '#/components/schemas/Base64'}
+    AndroidIntegrity:
+      type: object
+      additionalProperties: false
+      required: [integrity_token, nonce]
+      properties:
+        integrity_token: {type: string, minLength: 32}
+        nonce: {$ref: '#/components/schemas/Base64'}
+    AttestationResult:
+      type: object
+      additionalProperties: false
+      required: [attestation_token, expires_at, verdict]
+      properties:
+        attestation_token: {type: string, minLength: 16}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+        verdict: {type: string, enum: [trusted, limited]}
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, account_type, display_name, account_home_region, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        account_type: {type: string, enum: [human, virtual]}
+        username: {type: string, pattern: '^[a-zA-Z0-9_]{3,32}$'}
+        display_name: {type: string, minLength: 1, maxLength: 100}
+        bio: {type: string, maxLength: 1000}
+        avatar_media_id: {$ref: '#/components/schemas/Uuid'}
+        account_home_region: {$ref: '#/components/schemas/Region'}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    UserPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        username: {type: string, pattern: '^[a-zA-Z0-9_]{3,32}$'}
+        display_name: {type: string, minLength: 1, maxLength: 100}
+        bio: {type: string, maxLength: 1000}
+        avatar_media_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+    Device:
+      type: object
+      additionalProperties: false
+      required: [id, name, platform, created_at, last_seen_at, current]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        name: {type: string}
+        platform: {type: string, enum: [ios, android, windows]}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+        last_seen_at: {$ref: '#/components/schemas/Timestamp'}
+        current: {type: boolean}
+        revoked_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+    DeviceList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Device'}}}
+    LinkSession:
+      type: object
+      additionalProperties: false
+      required: [desktop_public_key, desktop_name]
+      properties:
+        desktop_public_key: {$ref: '#/components/schemas/Base64'}
+        desktop_name: {type: string, minLength: 1, maxLength: 100}
+    LinkChallenge:
+      type: object
+      additionalProperties: false
+      required: [session_id, qr_payload, expires_at]
+      properties:
+        session_id: {$ref: '#/components/schemas/Uuid'}
+        qr_payload: {type: string, minLength: 16}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+    LinkConfirm:
+      type: object
+      additionalProperties: false
+      required: [session_id, confirmation, wrapped_device_secret]
+      properties:
+        session_id: {$ref: '#/components/schemas/Uuid'}
+        confirmation: {$ref: '#/components/schemas/Base64'}
+        wrapped_device_secret: {$ref: '#/components/schemas/Base64'}
+    SignedPrekey:
+      type: object
+      additionalProperties: false
+      required: [id, public_key, signature, expires_at]
+      properties:
+        id: {type: integer, minimum: 1}
+        public_key: {$ref: '#/components/schemas/Base64'}
+        signature: {$ref: '#/components/schemas/Base64'}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+    OneTimePrekey:
+      type: object
+      additionalProperties: false
+      required: [id, public_key]
+      properties:
+        id: {type: integer, minimum: 1}
+        public_key: {$ref: '#/components/schemas/Base64'}
+    KeyBundleWrite:
+      type: object
+      additionalProperties: false
+      required: [device_id, identity_key, signed_prekey]
+      properties:
+        device_id: {$ref: '#/components/schemas/Uuid'}
+        identity_key: {$ref: '#/components/schemas/Base64'}
+        signed_prekey: {$ref: '#/components/schemas/SignedPrekey'}
+        one_time_prekeys: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/OneTimePrekey'}}
+    KeyBundle:
+      allOf:
+        - {$ref: '#/components/schemas/KeyBundleWrite'}
+        - {type: object, required: [updated_at], properties: {updated_at: {$ref: '#/components/schemas/Timestamp'}}}
+    UserKeyBundles:
+      type: object
+      additionalProperties: false
+      required: [user_id, bundles]
+      properties:
+        user_id: {$ref: '#/components/schemas/Uuid'}
+        bundles: {type: array, items: {$ref: '#/components/schemas/KeyBundle'}}
+    PrekeyBatch:
+      type: object
+      additionalProperties: false
+      required: [device_id, prekeys]
+      properties:
+        device_id: {$ref: '#/components/schemas/Uuid'}
+        prekeys: {type: array, minItems: 1, maxItems: 100, items: {$ref: '#/components/schemas/OneTimePrekey'}}
+    PrekeyResult:
+      type: object
+      additionalProperties: false
+      required: [stored, available]
+      properties:
+        stored: {type: integer, minimum: 0}
+        available: {type: integer, minimum: 0}
+    EscrowPublicKeys:
+      type: object
+      additionalProperties: false
+      required: [x25519_threshold, mlkem768]
+      properties:
+        x25519_threshold: {$ref: '#/components/schemas/Base64'}
+        mlkem768: {$ref: '#/components/schemas/Base64'}
+    EscrowNextKeys:
+      allOf:
+        - {$ref: '#/components/schemas/EscrowPublicKeys'}
+        - type: object
+          required: [epoch_id, key_id]
+          properties:
+            epoch_id: {type: string, pattern: '^[0-9]{4}Q[1-4]$'}
+            key_id: {type: string}
+    EscrowConfig:
+      type: object
+      additionalProperties: false
+      required: [config_version, region, epoch_id, shard_id, key_id, valid_from, valid_until, current_public_keys, next_public_keys, signer_key_id, signature]
+      properties:
+        config_version: {type: integer, minimum: 1}
+        region: {$ref: '#/components/schemas/Region'}
+        epoch_id: {type: string, pattern: '^[0-9]{4}Q[1-4]$'}
+        shard_id: {type: integer, minimum: 0}
+        key_id: {type: string}
+        valid_from: {$ref: '#/components/schemas/Timestamp'}
+        valid_until: {$ref: '#/components/schemas/Timestamp'}
+        current_public_keys: {$ref: '#/components/schemas/EscrowPublicKeys'}
+        next_public_keys: {$ref: '#/components/schemas/EscrowNextKeys'}
+        signer_key_id: {type: string}
+        signature: {$ref: '#/components/schemas/Base64'}
+    ChatCreate:
+      type: object
+      additionalProperties: false
+      required: [peer_user_id]
+      properties: {peer_user_id: {$ref: '#/components/schemas/Uuid'}}
+    Chat:
+      type: object
+      additionalProperties: false
+      required: [id, peer, conversation_home_region, created_at, unread_count]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        peer: {$ref: '#/components/schemas/User'}
+        conversation_home_region: {$ref: '#/components/schemas/Region'}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+        last_message_at: {$ref: '#/components/schemas/Timestamp'}
+        unread_count: {type: integer, minimum: 0}
+    ChatList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Chat'}}
+        next_cursor: {type: string}
+    PrivateDocumentEnvelope:
+      $ref: ../json/private-document-envelope.schema.json
+    PublicDocument:
+      $ref: ../json/document-v2.schema.json#/$defs/publicDocument
+    WrappedKey:
+      type: object
+      additionalProperties: false
+      required: [device_id, wrapped_key, protocol_version, key_commitment]
+      properties:
+        device_id: {$ref: '#/components/schemas/Uuid'}
+        wrapped_key: {$ref: '#/components/schemas/Base64'}
+        protocol_version: {type: integer, const: 2}
+        key_commitment: {type: string, contentEncoding: base64, description: Exactly 32 decoded bytes.}
+    PrivateMessageWrite:
+      type: object
+      additionalProperties: false
+      required: [document, wrapped_keys]
+      properties:
+        sender_id: {$ref: '#/components/schemas/Uuid'}
+        document: {$ref: '#/components/schemas/PrivateDocumentEnvelope'}
+        wrapped_keys: {type: array, minItems: 1, items: {$ref: '#/components/schemas/WrappedKey'}}
+    GroupMessageWrite:
+      oneOf:
+        - {$ref: '#/components/schemas/PrivateMessageWrite'}
+        - {$ref: '#/components/schemas/PublicDocumentWrite'}
+    PublicDocumentWrite:
+      type: object
+      additionalProperties: false
+      required: [document]
+      properties:
+        author_user_id: {$ref: '#/components/schemas/Uuid'}
+        document: {$ref: '#/components/schemas/PublicDocument'}
+    RevisionBase:
+      type: object
+      required: [id, parent_revision_id, revision_number, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        parent_revision_id: {$ref: '#/components/schemas/Uuid'}
+        revision_number: {type: integer, minimum: 1}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    PrivateRevision:
+      allOf:
+        - {$ref: '#/components/schemas/RevisionBase'}
+        - type: object
+          required: [document]
+          properties: {document: {$ref: '#/components/schemas/PrivateDocumentEnvelope'}}
+      unevaluatedProperties: false
+    PublicRevision:
+      allOf:
+        - {$ref: '#/components/schemas/RevisionBase'}
+        - type: object
+          required: [document]
+          properties: {document: {$ref: '#/components/schemas/PublicDocument'}}
+      unevaluatedProperties: false
+    Revision:
+      oneOf:
+        - {$ref: '#/components/schemas/PrivateRevision'}
+        - {$ref: '#/components/schemas/PublicRevision'}
+    MessageBase:
+      type: object
+      required: [id, conversation_id, sender_id, current_revision_id, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/DecimalInt64String'}
+        conversation_id: {$ref: '#/components/schemas/Uuid'}
+        sender_id: {$ref: '#/components/schemas/Uuid'}
+        current_revision_id: {$ref: '#/components/schemas/Uuid'}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+        deleted_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+    PrivateMessage:
+      allOf:
+        - {$ref: '#/components/schemas/MessageBase'}
+        - type: object
+          required: [document, wrapped_keys]
+          properties:
+            document: {$ref: '#/components/schemas/PrivateDocumentEnvelope'}
+            wrapped_keys: {type: array, minItems: 1, items: {$ref: '#/components/schemas/WrappedKey'}}
+      unevaluatedProperties: false
+    PublicMessage:
+      allOf:
+        - {$ref: '#/components/schemas/MessageBase'}
+        - type: object
+          required: [document]
+          properties:
+            document: {$ref: '#/components/schemas/PublicDocument'}
+      unevaluatedProperties: false
+    Message:
+      oneOf:
+        - {$ref: '#/components/schemas/PrivateMessage'}
+        - {$ref: '#/components/schemas/PublicMessage'}
+    PrivateMessageList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/PrivateMessage'}}
+        next_cursor: {type: string}
+    MessageList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Message'}}
+        next_cursor: {type: string}
+    ReadCursor:
+      type: object
+      additionalProperties: false
+      required: [message_id]
+      properties: {message_id: {$ref: '#/components/schemas/DecimalInt64String'}}
+    ReadState:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, last_read_message_id, read_at]
+      properties:
+        conversation_id: {$ref: '#/components/schemas/Uuid'}
+        last_read_message_id: {$ref: '#/components/schemas/DecimalInt64String'}
+        read_at: {$ref: '#/components/schemas/Timestamp'}
+    GroupCreate:
+      type: object
+      additionalProperties: false
+      required: [title, kind, member_ids]
+      properties:
+        title: {type: string, minLength: 1, maxLength: 200}
+        kind: {type: string, enum: [private, public]}
+        description: {type: string, maxLength: 2000}
+        avatar_media_id: {$ref: '#/components/schemas/Uuid'}
+        member_ids: {type: array, uniqueItems: true, maxItems: 10000, items: {$ref: '#/components/schemas/Uuid'}}
+    Group:
+      type: object
+      additionalProperties: false
+      required: [id, title, kind, conversation_home_region, member_count, gk_version, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        title: {type: string}
+        kind: {type: string, enum: [private, public]}
+        description: {type: string}
+        avatar_media_id: {$ref: '#/components/schemas/Uuid'}
+        conversation_home_region: {$ref: '#/components/schemas/Region'}
+        member_count: {type: integer, minimum: 1}
+        gk_version: {type: integer, minimum: 1}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    GroupMemberAdd:
+      type: object
+      additionalProperties: false
+      required: [user_id, role]
+      properties:
+        user_id: {$ref: '#/components/schemas/Uuid'}
+        role: {type: string, enum: [member, moderator, admin]}
+    GroupMember:
+      allOf:
+        - {$ref: '#/components/schemas/GroupMemberAdd'}
+        - {type: object, required: [joined_at], properties: {joined_at: {$ref: '#/components/schemas/Timestamp'}}}
+    WrappedGroupKey:
+      type: object
+      additionalProperties: false
+      required: [group_id, version, device_id, protocol_version, key_commitment, wrapped_gk]
+      properties:
+        group_id: {$ref: '#/components/schemas/Uuid'}
+        version: {type: integer, minimum: 1}
+        device_id: {$ref: '#/components/schemas/Uuid'}
+        protocol_version: {type: integer, const: 2}
+        key_commitment: {type: string, contentEncoding: base64}
+        wrapped_gk: {$ref: '#/components/schemas/Base64'}
+    ChannelCreate:
+      type: object
+      additionalProperties: false
+      required: [community_id, title]
+      properties:
+        community_id: {$ref: '#/components/schemas/Uuid'}
+        title: {type: string, minLength: 1, maxLength: 200}
+        description: {type: string, maxLength: 4000}
+        avatar_media_id: {$ref: '#/components/schemas/Uuid'}
+        who_can_post: {type: string, enum: [admins, admins_authors, members]}
+    ChannelPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title: {type: string, minLength: 1, maxLength: 200}
+        description: {type: string, maxLength: 4000}
+        avatar_media_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+        who_can_post: {type: string, enum: [admins, admins_authors, members]}
+    Channel:
+      allOf:
+        - {$ref: '#/components/schemas/ChannelCreate'}
+        - type: object
+          required: [id, subscriber_count, subscribed, created_at]
+          properties:
+            id: {$ref: '#/components/schemas/Uuid'}
+            subscriber_count: {type: integer, minimum: 0}
+            subscribed: {type: boolean}
+            created_at: {$ref: '#/components/schemas/Timestamp'}
+    CommunityCreate:
+      type: object
+      additionalProperties: false
+      required: [title, visibility]
+      properties:
+        title: {type: string, minLength: 1, maxLength: 200}
+        description: {type: string, maxLength: 4000}
+        avatar_media_id: {$ref: '#/components/schemas/Uuid'}
+        visibility: {type: string, enum: [public, private]}
+    Community:
+      allOf:
+        - {$ref: '#/components/schemas/CommunityCreate'}
+        - type: object
+          required: [id, owner_user_id, subscriber_count, subscribed, objects, created_at]
+          properties:
+            id: {$ref: '#/components/schemas/Uuid'}
+            owner_user_id: {$ref: '#/components/schemas/Uuid'}
+            subscriber_count: {type: integer, minimum: 0}
+            subscribed: {type: boolean}
+            objects: {type: array, items: {$ref: '#/components/schemas/CommunityObject'}}
+            created_at: {$ref: '#/components/schemas/Timestamp'}
+    CommunityObjectWrite:
+      type: object
+      additionalProperties: false
+      required: [object_type]
+      properties:
+        object_type: {type: string, enum: [group, channel, voice_room]}
+        object_id: {$ref: '#/components/schemas/Uuid'}
+        create:
+          oneOf:
+            - {$ref: '#/components/schemas/GroupCreate'}
+            - {$ref: '#/components/schemas/ChannelCreate'}
+            - {$ref: '#/components/schemas/VoiceRoomCreate'}
+    CommunityObject:
+      type: object
+      additionalProperties: false
+      required: [object_type, object_id, acl]
+      properties:
+        object_type: {type: string, enum: [group, channel, voice_room]}
+        object_id: {$ref: '#/components/schemas/Uuid'}
+        acl: {$ref: '#/components/schemas/ObjectAcl'}
+    ObjectAclWrite:
+      type: object
+      additionalProperties: false
+      required: [visibility, join_policy, post_policy]
+      properties:
+        visibility: {type: string, enum: [public, members, admins]}
+        join_policy: {type: string, enum: [open, approval, invite]}
+        post_policy: {type: string, enum: [members, authors, admins]}
+    ObjectAcl:
+      allOf:
+        - {$ref: '#/components/schemas/ObjectAclWrite'}
+        - {type: object, required: [updated_at], properties: {updated_at: {$ref: '#/components/schemas/Timestamp'}}}
+    VoiceRoomCreate:
+      type: object
+      additionalProperties: false
+      required: [community_id, title]
+      properties:
+        community_id: {$ref: '#/components/schemas/Uuid'}
+        title: {type: string, minLength: 1, maxLength: 200}
+        attached_type: {type: string, enum: [group, channel]}
+        attached_id: {$ref: '#/components/schemas/Uuid'}
+    VoiceRoom:
+      allOf:
+        - {$ref: '#/components/schemas/VoiceRoomCreate'}
+        - {type: object, required: [id, status, participant_count, created_at], properties: {id: {$ref: '#/components/schemas/Uuid'}, status: {type: string, enum: [open, ended]}, participant_count: {type: integer, minimum: 0}, created_at: {$ref: '#/components/schemas/Timestamp'}}}
+    RtcGrant:
+      type: object
+      additionalProperties: false
+      required: [room_id, server_url, token, expires_at]
+      properties:
+        room_id: {$ref: '#/components/schemas/Uuid'}
+        server_url: {type: string, format: uri}
+        token: {type: string, minLength: 16}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+    MediaVariantInput:
+      type: object
+      additionalProperties: false
+      required: [name, content_type, size, sha256]
+      properties:
+        name: {type: string, enum: [original, thumbnail, preview, audio, video]}
+        content_type: {type: string, pattern: '^[a-z0-9.+-]+/[a-z0-9.+-]+$'}
+        size: {type: integer, minimum: 1}
+        sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+    MediaUploadCreate:
+      type: object
+      additionalProperties: false
+      required: [kind, variants]
+      properties:
+        kind: {type: string, enum: [image, video, audio, file]}
+        variants: {type: array, minItems: 1, maxItems: 10, items: {$ref: '#/components/schemas/MediaVariantInput'}}
+    UploadSlot:
+      type: object
+      additionalProperties: false
+      required: [variant, method, url, headers, expires_at]
+      properties:
+        variant: {type: string}
+        method: {type: string, const: PUT}
+        url: {type: string, format: uri}
+        headers: {type: object, additionalProperties: {type: string}}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+    MediaUpload:
+      type: object
+      additionalProperties: false
+      required: [media_id, content_mode, uploads, expires_at]
+      properties:
+        media_id: {$ref: '#/components/schemas/Uuid'}
+        content_mode: {type: string, enum: [private, public]}
+        uploads: {type: array, items: {$ref: '#/components/schemas/UploadSlot'}}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+    MediaComplete:
+      type: object
+      additionalProperties: false
+      required: [variants]
+      properties:
+        variants: {type: array, minItems: 1, maxItems: 10, items: {$ref: '#/components/schemas/MediaVariantInput'}}
+    Media:
+      type: object
+      additionalProperties: false
+      required: [id, kind, content_mode, status, variants, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        kind: {type: string, enum: [image, video, audio, file]}
+        content_mode: {type: string, enum: [private, public]}
+        status: {type: string, enum: [uploading, processing, ready, rejected]}
+        variants: {type: array, items: {$ref: '#/components/schemas/MediaVariantInput'}}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    MediaAccessRequest:
+      type: object
+      additionalProperties: false
+      required: [variant]
+      properties: {variant: {type: string, minLength: 1, maxLength: 50}}
+    MediaAccess:
+      type: object
+      additionalProperties: false
+      required: [media_id, variant, url, expires_at]
+      properties:
+        media_id: {$ref: '#/components/schemas/Uuid'}
+        variant: {type: string}
+        url: {type: string, format: uri}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+    AuthorContext:
+      type: object
+      additionalProperties: false
+      required: [type, id]
+      properties:
+        type: {type: string, enum: [channel, user, virtual_user]}
+        id: {$ref: '#/components/schemas/Uuid'}
+    PostWrite:
+      type: object
+      additionalProperties: false
+      required: [author_context, document, attribute_ids]
+      properties:
+        author_context: {$ref: '#/components/schemas/AuthorContext'}
+        document: {$ref: '#/components/schemas/PublicDocument'}
+        attribute_ids: {type: array, uniqueItems: true, maxItems: 20, items: {$ref: '#/components/schemas/Uuid'}}
+    PostDraft:
+      allOf:
+        - {$ref: '#/components/schemas/PostWrite'}
+        - {type: object, required: [id, status, updated_at], properties: {id: {$ref: '#/components/schemas/Uuid'}, status: {type: string, enum: [draft, scheduled]}, publish_at: {$ref: '#/components/schemas/Timestamp'}, updated_at: {$ref: '#/components/schemas/Timestamp'}}}
+    Post:
+      allOf:
+        - {$ref: '#/components/schemas/PostWrite'}
+        - {type: object, required: [id, current_revision_id, moderation_status, published_at], properties: {id: {$ref: '#/components/schemas/DecimalInt64String'}, current_revision_id: {$ref: '#/components/schemas/Uuid'}, moderation_status: {type: string, enum: [pending, approved, rejected]}, published_at: {$ref: '#/components/schemas/Timestamp'}, comment_count: {type: integer, minimum: 0}}}
+    PostList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Post'}}, next_cursor: {type: string}}
+    Schedule:
+      type: object
+      additionalProperties: false
+      required: [publish_at]
+      properties: {publish_at: {$ref: '#/components/schemas/Timestamp'}}
+    Rejection:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties: {reason: {type: string, minLength: 1, maxLength: 2000}}
+    FriendRequestWrite:
+      type: object
+      additionalProperties: false
+      required: [to_user_id]
+      properties: {to_user_id: {$ref: '#/components/schemas/Uuid'}}
+    FriendRequest:
+      type: object
+      additionalProperties: false
+      required: [from_user_id, to_user_id, status, created_at]
+      properties:
+        from_user_id: {$ref: '#/components/schemas/Uuid'}
+        to_user_id: {$ref: '#/components/schemas/Uuid'}
+        status: {type: string, enum: [pending, accepted, declined]}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    FriendRequestList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/FriendRequest'}}, next_cursor: {type: string}}
+    Friendship:
+      type: object
+      additionalProperties: false
+      required: [user, since]
+      properties: {user: {$ref: '#/components/schemas/User'}, since: {$ref: '#/components/schemas/Timestamp'}}
+    UserList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/User'}}, next_cursor: {type: string}}
+    Subscription:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, created_at]
+      properties: {target_type: {type: string, const: user}, target_id: {$ref: '#/components/schemas/Uuid'}, created_at: {$ref: '#/components/schemas/Timestamp'}}
+    SubscriptionList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Subscription'}}, next_cursor: {type: string}}
+    RecoveryRequestWrite:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [scope, chat_id, device_id, proof]
+          properties: {scope: {type: string, const: chat}, chat_id: {$ref: '#/components/schemas/Uuid'}, device_id: {$ref: '#/components/schemas/Uuid'}, proof: {$ref: '#/components/schemas/Base64'}}
+        - type: object
+          additionalProperties: false
+          required: [scope, group_id, device_id, proof]
+          properties: {scope: {type: string, const: group}, group_id: {$ref: '#/components/schemas/Uuid'}, device_id: {$ref: '#/components/schemas/Uuid'}, proof: {$ref: '#/components/schemas/Base64'}}
+    RecoverySession:
+      type: object
+      additionalProperties: false
+      required: [request_id, session_id, status, expires_at, proof_attempts_remaining]
+      properties:
+        request_id: {$ref: '#/components/schemas/Uuid'}
+        session_id: {$ref: '#/components/schemas/Uuid'}
+        status: {type: string, enum: [pending, chunks_available, declined, completed, expired]}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+        proof_attempts_remaining: {type: integer, minimum: 0, maximum: 5}
+        chunk_count: {type: integer, minimum: 0}
+    RecoveryChunk:
+      type: object
+      additionalProperties: false
+      required: [sequence, wrapped_chunk, recipient_device_id, checksum]
+      properties:
+        sequence: {type: integer, minimum: 0}
+        wrapped_chunk: {$ref: '#/components/schemas/Base64'}
+        recipient_device_id: {$ref: '#/components/schemas/Uuid'}
+        checksum: {type: string, pattern: '^[a-f0-9]{64}$'}
+    RecoveryChunks:
+      type: object
+      additionalProperties: false
+      required: [chunks, proof]
+      properties: {chunks: {type: array, minItems: 1, items: {$ref: '#/components/schemas/RecoveryChunk'}}, proof: {$ref: '#/components/schemas/Base64'}}
+    RecoveryDecline:
+      type: object
+      additionalProperties: false
+      properties: {reason: {type: string, maxLength: 500}}
+    RecoveryConfirm:
+      type: object
+      additionalProperties: false
+      required: [manifest_hash]
+      properties: {manifest_hash: {type: string, pattern: '^[a-f0-9]{64}$'}}
+    PhraseBackupWrite:
+      type: object
+      additionalProperties: false
+      required: [encrypted_blob, salt, kdf, version]
+      properties:
+        encrypted_blob: {$ref: '#/components/schemas/Base64'}
+        salt: {$ref: '#/components/schemas/Base64'}
+        kdf: {type: string, enum: [argon2id]}
+        version: {type: integer, minimum: 1}
+    PhraseBackup:
+      allOf:
+        - {$ref: '#/components/schemas/PhraseBackupWrite'}
+        - {type: object, required: [updated_at], properties: {updated_at: {$ref: '#/components/schemas/Timestamp'}}}
+    CommentCreate:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, document]
+      properties:
+        target_type: {type: string, enum: [post]}
+        target_id: {$ref: '#/components/schemas/DecimalInt64String'}
+        parent_comment_id: {$ref: '#/components/schemas/DecimalInt64String'}
+        author_user_id: {$ref: '#/components/schemas/Uuid'}
+        document: {$ref: '#/components/schemas/PublicDocument'}
+    Comment:
+      allOf:
+        - {$ref: '#/components/schemas/CommentCreate'}
+        - {type: object, required: [id, current_revision_id, created_at], properties: {id: {$ref: '#/components/schemas/DecimalInt64String'}, current_revision_id: {$ref: '#/components/schemas/Uuid'}, created_at: {$ref: '#/components/schemas/Timestamp'}, deleted_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}}}
+    CommentList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Comment'}}, next_cursor: {type: string}}
+    EmotionWrite:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, emotion]
+      properties:
+        target_type: {$ref: '#/components/schemas/PublicTargetType'}
+        target_id: {type: string, minLength: 1, maxLength: 255}
+        emotion: {type: integer, minimum: 1, maximum: 9}
+    EmotionCounters:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, counters]
+      properties:
+        target_type: {$ref: '#/components/schemas/PublicTargetType'}
+        target_id: {type: string}
+        current_emotion: {type: integer, minimum: 1, maximum: 9}
+        counters: {type: array, minItems: 9, maxItems: 9, items: {type: integer, minimum: 0}}
+    RecommendationWrite:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, value]
+      properties:
+        target_type: {$ref: '#/components/schemas/PublicTargetType'}
+        target_id: {type: string, minLength: 1, maxLength: 255}
+        value: {type: integer, enum: [-1, 1]}
+    Rating:
+      type: object
+      additionalProperties: false
+      required: [subject_type, subject_id, positive, negative]
+      properties:
+        subject_type: {$ref: '#/components/schemas/PublicTargetType'}
+        subject_id: {type: string}
+        positive: {type: integer, minimum: 0}
+        negative: {type: integer, minimum: 0}
+        current_value: {type: integer, enum: [-1, 1]}
+    AttributeCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        proposed_genre: {$ref: '#/components/schemas/Uuid'}
+    Attribute:
+      type: object
+      additionalProperties: false
+      required: [id, name, genre_id, post_count, follower_count, description]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        name: {type: string}
+        genre_id: {$ref: '#/components/schemas/Uuid'}
+        description: {type: string}
+        post_count: {type: integer, minimum: 0}
+        follower_count: {type: integer, minimum: 0}
+        followed: {type: boolean}
+    AttributeList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Attribute'}}, next_cursor: {type: string}}
+    AttributeCreateResult:
+      type: object
+      additionalProperties: false
+      required: [created, similar]
+      properties:
+        created: {oneOf: [{$ref: '#/components/schemas/Attribute'}, {type: 'null'}]}
+        similar: {type: array, items: {$ref: '#/components/schemas/Attribute'}}
+    Genre:
+      type: object
+      additionalProperties: false
+      required: [id, name, attribute_count]
+      properties: {id: {$ref: '#/components/schemas/Uuid'}, name: {type: string}, description: {type: string}, attribute_count: {type: integer, minimum: 0}}
+    GenreList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Genre'}}}
+    FeedItem:
+      type: object
+      additionalProperties: false
+      required: [post, reason]
+      properties:
+        post: {$ref: '#/components/schemas/Post'}
+        score: {type: number}
+        reason: {type: string, enum: [ranked, friend_favorite, friend_post, attribute, genre]}
+    FeedPage:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/FeedItem'}}, next_cursor: {type: string}}
+    FavoriteWrite:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id]
+      properties: {target_type: {$ref: '#/components/schemas/PublicTargetType'}, target_id: {type: string, minLength: 1, maxLength: 255}}
+    Favorite:
+      allOf:
+        - {$ref: '#/components/schemas/FavoriteWrite'}
+        - {type: object, required: [created_at], properties: {created_at: {$ref: '#/components/schemas/Timestamp'}}}
+    FavoriteList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Favorite'}}, next_cursor: {type: string}}
+    PrivateShelfWrite:
+      type: object
+      additionalProperties: false
+      required: [protocol_version, presence_bitmap, key_commitment, encrypted_payload, escrow_blob, key_version, wrapped_keys]
+      properties:
+        protocol_version: {type: integer, const: 2}
+        presence_bitmap: {type: integer, minimum: 0, maximum: 4294967295}
+        key_commitment: {type: string, contentEncoding: base64}
+        encrypted_payload: {$ref: '#/components/schemas/Base64'}
+        escrow_blob: {$ref: '#/components/schemas/Base64'}
+        key_version: {type: integer, minimum: 1}
+        wrapped_keys: {type: array, minItems: 1, items: {$ref: '#/components/schemas/WrappedKey'}}
+    PrivateShelf:
+      allOf:
+        - {$ref: '#/components/schemas/PrivateShelfWrite'}
+        - {type: object, required: [updated_at], properties: {updated_at: {$ref: '#/components/schemas/Timestamp'}}}
+    ShelfAccessRequest:
+      type: object
+      additionalProperties: false
+      required: [owner_user_id]
+      properties: {owner_user_id: {$ref: '#/components/schemas/Uuid'}}
+    ShelfAccessGrant:
+      type: object
+      additionalProperties: false
+      required: [request_id, grantee_user_id, key_version, wrapped_keys]
+      properties:
+        request_id: {$ref: '#/components/schemas/Uuid'}
+        grantee_user_id: {$ref: '#/components/schemas/Uuid'}
+        key_version: {type: integer, minimum: 1}
+        wrapped_keys: {type: array, minItems: 1, items: {$ref: '#/components/schemas/WrappedKey'}}
+    ShelfAccessRevoke:
+      type: object
+      additionalProperties: false
+      required: [grantee_user_id, new_key_version, remaining_wrapped_keys]
+      properties:
+        grantee_user_id: {$ref: '#/components/schemas/Uuid'}
+        new_key_version: {type: integer, minimum: 2}
+        remaining_wrapped_keys: {type: array, items: {$ref: '#/components/schemas/WrappedKey'}}
+    ShelfAccess:
+      type: object
+      additionalProperties: false
+      required: [id, owner_user_id, grantee_user_id, status, key_version, updated_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        owner_user_id: {$ref: '#/components/schemas/Uuid'}
+        grantee_user_id: {$ref: '#/components/schemas/Uuid'}
+        status: {type: string, enum: [pending, granted, revoked]}
+        key_version: {type: integer, minimum: 1}
+        updated_at: {$ref: '#/components/schemas/Timestamp'}
+    SearchResult:
+      type: object
+      additionalProperties: false
+      required: [type, id, title, rank]
+      properties:
+        type: {type: string, enum: [user, virtual_user, group, channel, community, post, attribute]}
+        id: {type: string}
+        title: {type: string}
+        snippet: {type: string}
+        rank: {type: number}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    SearchPage:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/SearchResult'}}, next_cursor: {type: string}}
+    CallCreate:
+      type: object
+      additionalProperties: false
+      required: [peer_user_id, media]
+      properties:
+        peer_user_id: {$ref: '#/components/schemas/Uuid'}
+        media: {type: string, enum: [audio, video]}
+    CallEnd:
+      type: object
+      additionalProperties: false
+      properties: {reason: {type: string, enum: [declined, busy, completed, failed]}}
+    Call:
+      type: object
+      additionalProperties: false
+      required: [id, caller_id, callee_id, media, status, started_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        caller_id: {$ref: '#/components/schemas/Uuid'}
+        callee_id: {$ref: '#/components/schemas/Uuid'}
+        media: {type: string, enum: [audio, video]}
+        status: {type: string, enum: [ringing, accepted, rejected, ended, missed]}
+        started_at: {$ref: '#/components/schemas/Timestamp'}
+        ended_at: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        duration_seconds: {type: integer, minimum: 0}
+    CallJoin:
+      type: object
+      additionalProperties: false
+      required: [call, rtc]
+      properties: {call: {$ref: '#/components/schemas/Call'}, rtc: {$ref: '#/components/schemas/RtcGrant'}}
+    CallList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Call'}}, next_cursor: {type: string}}
+    ReportWrite:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, reason]
+      properties:
+        target_type: {type: string, enum: [user, message, group]}
+        target_id: {type: string, minLength: 1, maxLength: 255}
+        reason: {type: string, enum: [spam, harassment, violence, illegal, impersonation, other]}
+        details: {type: string, maxLength: 2000}
+    Report:
+      allOf:
+        - {$ref: '#/components/schemas/ReportWrite'}
+        - {type: object, required: [id, status, created_at], properties: {id: {$ref: '#/components/schemas/Uuid'}, status: {type: string, enum: [received, reviewing, resolved]}, created_at: {$ref: '#/components/schemas/Timestamp'}}}
+    VirtualUserCreate:
+      type: object
+      additionalProperties: false
+      required: [display_name]
+      properties:
+        display_name: {type: string, minLength: 1, maxLength: 100}
+        bio: {type: string, maxLength: 1000}
+        avatar_media_id: {$ref: '#/components/schemas/Uuid'}
+    VirtualUserPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        display_name: {type: string, minLength: 1, maxLength: 100}
+        bio: {type: string, maxLength: 1000}
+        avatar_media_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+    VirtualUser:
+      allOf:
+        - {$ref: '#/components/schemas/VirtualUserCreate'}
+        - {type: object, required: [id, owner_user_id, operator_count, key_version, status, created_at], properties: {id: {$ref: '#/components/schemas/Uuid'}, owner_user_id: {$ref: '#/components/schemas/Uuid'}, operator_count: {type: integer, minimum: 0}, key_version: {type: integer, minimum: 1}, status: {type: string, enum: [active, blocked, deleted]}, created_at: {$ref: '#/components/schemas/Timestamp'}}}
+    VirtualUserList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/VirtualUser'}}, next_cursor: {type: string}}
+    OperatorGrant:
+      type: object
+      additionalProperties: false
+      required: [user_id, capabilities]
+      properties:
+        user_id: {$ref: '#/components/schemas/Uuid'}
+        capabilities: {type: array, uniqueItems: true, items: {type: string, enum: [profile, publish, message, moderate, manage_operators]}}
+    Operator:
+      allOf:
+        - {$ref: '#/components/schemas/OperatorGrant'}
+        - {type: object, required: [granted_at], properties: {granted_at: {$ref: '#/components/schemas/Timestamp'}}}
+    OperatorList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Operator'}}}
+    KeyRotationRequest:
+      type: object
+      additionalProperties: false
+      required: [reason, wraps]
+      properties:
+        reason: {type: string, enum: [manual, operator_revoked, ownership_transfer]}
+        wraps: {type: array, minItems: 1, items: {$ref: '#/components/schemas/WrappedKey'}}
+    KeyRotation:
+      type: object
+      additionalProperties: false
+      required: [rotation_id, from_version, to_version, status, created_at]
+      properties:
+        rotation_id: {$ref: '#/components/schemas/Uuid'}
+        from_version: {type: integer, minimum: 1}
+        to_version: {type: integer, minimum: 2}
+        status: {type: string, enum: [pending, completed, failed]}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    VirtualKeyWrap:
+      type: object
+      additionalProperties: false
+      required: [device_id, key_version, wrapped_private_key, algorithm]
+      properties:
+        device_id: {$ref: '#/components/schemas/Uuid'}
+        key_version: {type: integer, minimum: 1}
+        wrapped_private_key: {$ref: '#/components/schemas/Base64'}
+        algorithm: {type: string, enum: [x25519_xchacha20poly1305]}
+    VirtualKeyWrapList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/VirtualKeyWrap'}}}
+    VirtualTransferWrite:
+      type: object
+      additionalProperties: false
+      required: [new_owner_user_id, expires_at]
+      properties: {new_owner_user_id: {$ref: '#/components/schemas/Uuid'}, expires_at: {$ref: '#/components/schemas/Timestamp'}}
+    TransferAccept:
+      type: object
+      additionalProperties: false
+      required: [new_owner_key_wraps]
+      properties: {new_owner_key_wraps: {type: array, minItems: 1, items: {$ref: '#/components/schemas/WrappedKey'}}}
+    VirtualTransfer:
+      type: object
+      additionalProperties: false
+      required: [id, virtual_user_id, old_owner_user_id, new_owner_user_id, status, expires_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        virtual_user_id: {$ref: '#/components/schemas/Uuid'}
+        old_owner_user_id: {$ref: '#/components/schemas/Uuid'}
+        new_owner_user_id: {$ref: '#/components/schemas/Uuid'}
+        status: {type: string, enum: [pending, accepted, rejected, expired]}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+    AppCreate:
+      type: object
+      additionalProperties: false
+      required: [name, description, scopes]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        description: {type: string, maxLength: 2000}
+        avatar_media_id: {$ref: '#/components/schemas/Uuid'}
+        webhook_url: {type: string, format: uri, pattern: '^https://'}
+        scopes: {type: array, uniqueItems: true, items: {type: string, enum: [read_public, write_public, manage_appeals, send_entity_messages]}}
+    AppPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        description: {type: string, maxLength: 2000}
+        avatar_media_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+        webhook_url: {oneOf: [{type: string, format: uri, pattern: '^https://'}, {type: 'null'}]}
+        scopes: {type: array, uniqueItems: true, items: {type: string, enum: [read_public, write_public, manage_appeals, send_entity_messages]}}
+    App:
+      allOf:
+        - {$ref: '#/components/schemas/AppCreate'}
+        - {type: object, required: [id, owner_user_id, status, created_at], properties: {id: {$ref: '#/components/schemas/Uuid'}, owner_user_id: {$ref: '#/components/schemas/Uuid'}, status: {type: string, enum: [active, suspended, deleted]}, created_at: {$ref: '#/components/schemas/Timestamp'}}}
+    AppList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/App'}}, next_cursor: {type: string}}
+    AppTokenWrite:
+      type: object
+      additionalProperties: false
+      required: [name, scopes]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        scopes: {type: array, uniqueItems: true, items: {type: string, enum: [read_public, write_public, manage_appeals, send_entity_messages]}}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+    IssuedAppToken:
+      type: object
+      additionalProperties: false
+      required: [id, token, prefix, scopes, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        token: {type: string, minLength: 32, writeOnly: true}
+        prefix: {type: string}
+        scopes: {type: array, items: {type: string}}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
+    InstallationCreate:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, requested_scopes]
+      properties:
+        target_type: {type: string, enum: [group, channel, community]}
+        target_id: {$ref: '#/components/schemas/Uuid'}
+        requested_scopes: {type: array, uniqueItems: true, items: {type: string}}
+    Installation:
+      type: object
+      additionalProperties: false
+      required: [id, app_id, target_type, target_id, scopes, status, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        app_id: {$ref: '#/components/schemas/Uuid'}
+        target_type: {type: string, enum: [group, channel, community]}
+        target_id: {$ref: '#/components/schemas/Uuid'}
+        scopes: {type: array, items: {type: string}}
+        status: {type: string, enum: [pending, active, revoked]}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    InstallationList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Installation'}}, next_cursor: {type: string}}
+    ThreadStatus: {type: string, enum: [new, taken, snoozed, closed]}
+    InboxThreadPatch:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {$ref: '#/components/schemas/ThreadStatus'}
+        assignee_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+        snoozed_until: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+    InboxThread:
+      type: object
+      additionalProperties: false
+      required: [id, target_type, target_id, requester_user_id, status, priority, created_at, updated_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        target_type: {type: string, enum: [virtual_user, group, channel, community]}
+        target_id: {$ref: '#/components/schemas/Uuid'}
+        requester_user_id: {$ref: '#/components/schemas/Uuid'}
+        status: {$ref: '#/components/schemas/ThreadStatus'}
+        assignee_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+        priority: {type: string, enum: [low, normal, high, urgent]}
+        snoozed_until: {oneOf: [{$ref: '#/components/schemas/Timestamp'}, {type: 'null'}]}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+        updated_at: {$ref: '#/components/schemas/Timestamp'}
+    InboxThreadList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/InboxThread'}}, next_cursor: {type: string}}
+    EntityRef:
+      type: object
+      additionalProperties: false
+      required: [type, id]
+      properties:
+        type: {type: string, enum: [user, virtual_user, group, channel, community, post, comment, entity_message]}
+        id: {type: string, minLength: 1, maxLength: 255}
+    InboxEvent:
+      type: object
+      additionalProperties: false
+      required: [id, event_type, source, target_ref, read, hidden, created_at]
+      properties:
+        id: {$ref: '#/components/schemas/Uuid'}
+        event_type: {type: string, enum: [reaction, mention, reply, subscription, entity_message, appeal]}
+        source: {$ref: '#/components/schemas/EntityRef'}
+        target_ref: {$ref: '#/components/schemas/EntityRef'}
+        summary: {type: string, maxLength: 500}
+        read: {type: boolean}
+        hidden: {type: boolean}
+        created_at: {$ref: '#/components/schemas/Timestamp'}
+    InboxEventList:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/InboxEvent'}}, next_cursor: {type: string}}
+    EventIds:
+      type: object
+      additionalProperties: false
+      required: [event_ids]
+      properties: {event_ids: {type: array, minItems: 1, maxItems: 500, uniqueItems: true, items: {$ref: '#/components/schemas/Uuid'}}}
+    BatchResult:
+      type: object
+      additionalProperties: false
+      required: [updated]
+      properties: {updated: {type: integer, minimum: 0}}
+    InboxPreferenceRule:
+      type: object
+      additionalProperties: false
+      required: [source_type, event_type, destination, push, priority]
+      properties:
+        source_type: {type: string, enum: [user, virtual_user, group, channel, community, owner_api, bot]}
+        event_type: {type: string, enum: [reaction, mention, reply, subscription, entity_message, appeal]}
+        destination: {type: string, enum: [main, social, hidden]}
+        push: {type: boolean}
+        priority: {type: string, enum: [low, normal, high]}
+    InboxPreferencesWrite:
+      type: object
+      additionalProperties: false
+      required: [rules]
+      properties: {rules: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/InboxPreferenceRule'}}}
+    InboxPreferences:
+      allOf:
+        - {$ref: '#/components/schemas/InboxPreferencesWrite'}
+        - {type: object, required: [revision, updated_at], properties: {revision: {type: integer, minimum: 1}, updated_at: {$ref: '#/components/schemas/Timestamp'}}}
+    AppealWrite:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, text]
+      properties:
+        target_type: {type: string, enum: [virtual_user, group, channel, community]}
+        target_id: {$ref: '#/components/schemas/Uuid'}
+        text: {type: string, minLength: 1, maxLength: 4096}
+    Appeal:
+      allOf:
+        - {$ref: '#/components/schemas/AppealWrite'}
+        - {type: object, required: [id, thread_id, transport, created_at], properties: {id: {$ref: '#/components/schemas/Uuid'}, thread_id: {$ref: '#/components/schemas/Uuid'}, transport: {type: string, enum: [e2e_chat, public_thread]}, created_at: {$ref: '#/components/schemas/Timestamp'}}}
+    EntityMessageWrite:
+      type: object
+      additionalProperties: false
+      required: [source_entity, recipient_user_id, document]
+      properties:
+        source_entity: {$ref: '#/components/schemas/EntityRef'}
+        recipient_user_id: {$ref: '#/components/schemas/Uuid'}
+        document: {$ref: '#/components/schemas/PublicDocument'}
+    EntityMessage:
+      allOf:
+        - {$ref: '#/components/schemas/EntityMessageWrite'}
+        - type: object
+          required: [message_id, source_type, target_ref, created_at]
+          properties:
+            message_id: {$ref: '#/components/schemas/Uuid'}
+            source_type: {type: string, enum: [owner_api, bot]}
+            app_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+            installation_id: {oneOf: [{$ref: '#/components/schemas/Uuid'}, {type: 'null'}]}
+            target_ref: {$ref: '#/components/schemas/EntityRef'}
+            created_at: {$ref: '#/components/schemas/Timestamp'}

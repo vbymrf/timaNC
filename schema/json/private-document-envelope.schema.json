@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tima.example/json/private-document-envelope.schema.json",
+  "title": "Private DocumentV2 envelope projection",
+  "description": "Private logical DocumentV2 fields plus envelope-only cryptographic fields. Domain OpenAPI schemas may add message identifiers and routing headers.",
+  "type": "object",
+  "required": [
+    "metadata",
+    "protocol_version",
+    "presence_bitmap",
+    "key_commitment",
+    "escrow_blob",
+    "signature"
+  ],
+  "properties": {
+    "encrypted_nodes": {
+      "$ref": "document-v2.schema.json#/$defs/encryptedNodes"
+    },
+    "markup": {
+      "$ref": "markup.schema.json#/$defs/privateMarkup"
+    },
+    "encrypted_metadata": {
+      "$ref": "document-v2.schema.json#/$defs/base64Bytes"
+    },
+    "metadata": {
+      "$ref": "metadata.schema.json#/$defs/privateMetadata"
+    },
+    "protocol_version": {
+      "const": 2
+    },
+    "presence_bitmap": {
+      "$ref": "#/$defs/uint32"
+    },
+    "key_commitment": {
+      "$ref": "#/$defs/base64Bytes32"
+    },
+    "escrow_blob": {
+      "$ref": "document-v2.schema.json#/$defs/base64Bytes"
+    },
+    "ratchet_envelope": {
+      "$ref": "document-v2.schema.json#/$defs/base64Bytes"
+    },
+    "signature": {
+      "$ref": "document-v2.schema.json#/$defs/base64Bytes"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "document-v2.schema.json#/$defs/privateDocumentContent"
+    },
+    {
+      "not": {
+        "required": [
+          "nodes"
+        ]
+      }
+    },
+    {
+      "oneOf": [
+        {
+          "required": [
+            "encrypted_nodes"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "markup"
+                ]
+              },
+              {
+                "required": [
+                  "encrypted_metadata"
+                ]
+              }
+            ]
+          },
+          "properties": {
+            "presence_bitmap": {
+              "const": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "encrypted_nodes",
+            "markup"
+          ],
+          "not": {
+            "required": [
+              "encrypted_metadata"
+            ]
+          },
+          "properties": {
+            "presence_bitmap": {
+              "const": 5
+            }
+          }
+        },
+        {
+          "required": [
+            "encrypted_nodes",
+            "encrypted_metadata"
+          ],
+          "not": {
+            "required": [
+              "markup"
+            ]
+          },
+          "properties": {
+            "presence_bitmap": {
+              "const": 9
+            }
+          }
+        },
+        {
+          "required": [
+            "markup",
+            "encrypted_metadata"
+          ],
+          "not": {
+            "required": [
+              "encrypted_nodes"
+            ]
+          },
+          "properties": {
+            "presence_bitmap": {
+              "const": 12
+            }
+          }
+        },
+        {
+          "required": [
+            "encrypted_nodes",
+            "markup",
+            "encrypted_metadata"
+          ],
+          "properties": {
+            "presence_bitmap": {
+              "const": 13
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "uint32": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "base64Bytes32": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "pattern": "^[A-Za-z0-9+/]{42}[AQgw]=$"
+    }
+  }
+}

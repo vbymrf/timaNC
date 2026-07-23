@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+package tima.v1.crypto;
+
+import "tima/v1/common/types.proto";
+import "tima/v1/crypto/envelope.proto";
+import "tima/v1/crypto/key_delivery.proto";
+
+option csharp_namespace = "Tima.V1.Crypto";
+option go_package = "github.com/tima/messnc/gen/go/proto/tima/v1/crypto;cryptov1";
+option java_multiple_files = true;
+option java_package = "com.tima.v1.crypto";
+
+enum RecoveryDecision {
+  RECOVERY_DECISION_UNSPECIFIED = 0;
+  RECOVERY_DECISION_ACCEPTED = 1;
+  RECOVERY_DECISION_DECLINED = 2;
+}
+
+message RecoveryRequest {
+  tima.v1.common.Uuid request_id = 1;
+  tima.v1.common.Uuid chat_id = 2;
+  tima.v1.common.Uuid requester_id = 3;
+  tima.v1.common.Uuid requester_device_id = 4;
+  bytes requester_identity_public_key = 5;
+  bytes requester_proof = 6;
+  tima.v1.common.Timestamp expires_at = 7;
+}
+
+message RecoveryResponse {
+  tima.v1.common.Uuid request_id = 1;
+  tima.v1.common.Uuid responder_device_id = 2;
+  RecoveryDecision decision = 3;
+  bytes responder_signature = 4;
+}
+
+message RecoveryChunk {
+  SignedRevision original_revision = 1;
+  bytes rewrapped_payload = 2;
+  KeyCommitment key_commitment = 3;
+}
+
+message RecoveryTransfer {
+  tima.v1.common.Uuid request_id = 1;
+  tima.v1.common.Uuid chat_id = 2;
+  tima.v1.common.Uuid requester_device_id = 3;
+  tima.v1.common.Uuid responder_device_id = 4;
+  repeated RecoveryChunk chunks = 5;
+  bytes responder_signature = 6;
+  bytes requester_proof = 7;
+}

@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+package tima.v1.crypto;
+
+import "tima/v1/common/types.proto";
+
+option csharp_namespace = "Tima.V1.Crypto";
+option go_package = "github.com/tima/messnc/gen/go/proto/tima/v1/crypto;cryptov1";
+option java_multiple_files = true;
+option java_package = "com.tima.v1.crypto";
+
+enum ContentMode {
+  CONTENT_MODE_UNSPECIFIED = 0;
+  CONTENT_MODE_PRIVATE = 1;
+  CONTENT_MODE_PUBLIC = 2;
+}
+
+// Wrapper messages preserve presence for repeated fields. If present, values
+// MUST be non-empty and each item MUST be non-empty.
+message EncryptedNodeList {
+  repeated bytes values = 1;
+}
+
+message PlaintextNodeList {
+  repeated string values = 1;
+}
+
+message DocumentMetadata {
+  uint32 format_version = 1; // Current value: 2.
+  uint64 revision_number = 2; // Positive.
+  ContentMode content_mode = 3;
+  // Forward-compatible allowlisted metadata as RFC 8785 bytes.
+  optional tima.v1.common.CanonicalJson extensions = 4;
+}
+
+// DocumentV2 replaces body/entities offsets and media placeholders.
+message DocumentV2 {
+  optional EncryptedNodeList encrypted_nodes = 1;
+  optional PlaintextNodeList nodes = 2;
+  optional tima.v1.common.CanonicalJson markup = 3;
+  optional bytes encrypted_metadata = 4;
+  DocumentMetadata metadata = 5;
+  // Bits 0..3 are encrypted_nodes, nodes, markup, encrypted_metadata.
+  uint32 presence_bitmap = 6;
+}
+
+message RevisionRef {
+  tima.v1.common.Uuid revision_id = 1;
+  optional tima.v1.common.Uuid parent_revision_id = 2;
+  uint64 revision_number = 3;
+}
+
+enum MediaVariant {
+  MEDIA_VARIANT_UNSPECIFIED = 0;
+  MEDIA_VARIANT_THUMBNAIL = 1;
+  MEDIA_VARIANT_PREVIEW = 2;
+  MEDIA_VARIANT_FULL = 3;
+}
+
+message MediaBinding {
+  tima.v1.common.Uuid media_id = 1;
+  MediaVariant variant = 2;
+  bytes ciphertext_sha256 = 3;
+  uint64 ciphertext_size = 4;
+  string declared_mime_type = 5;
+}

@@ -1,0 +1,17 @@
+# Template input for envsubst; LiveKit does not expand ${...} in YAML itself.
+port: 7880
+bind_addresses:
+  - "${LIVEKIT_BIND_ADDRESS}"
+rtc:
+  tcp_port: 7881
+  port_range_start: ${LIVEKIT_UDP_PORT_START}
+  port_range_end: ${LIVEKIT_UDP_PORT_END}
+  use_external_ip: ${LIVEKIT_USE_EXTERNAL_IP}
+  enable_loopback_candidate: ${LIVEKIT_ENABLE_LOOPBACK_CANDIDATE}
+redis:
+  address: redis:6379
+  password: "${REDIS_PASSWORD}"
+keys:
+  "${LIVEKIT_API_KEY}": "${LIVEKIT_API_SECRET}"
+logging:
+  level: info

@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tima.example/json/entity.schema.json",
+  "title": "DocumentV2 entity",
+  "$ref": "#/$defs/entity",
+  "$defs": {
+    "nodeIndexes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "secretRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "inlineEntity": {
+      "type": "object",
+      "required": [
+        "type",
+        "nodes"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "bold",
+            "italic",
+            "underline",
+            "strikethrough",
+            "code",
+            "pre",
+            "text_mention",
+            "hashtag",
+            "spoiler",
+            "custom_emoji"
+          ]
+        },
+        "nodes": {
+          "$ref": "#/$defs/nodeIndexes"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "secret_ref"
+            ]
+          },
+          {
+            "required": [
+              "href"
+            ]
+          },
+          {
+            "required": [
+              "media_id"
+            ]
+          }
+        ]
+      },
+      "additionalProperties": true
+    },
+    "publicTextLink": {
+      "type": "object",
+      "required": [
+        "type",
+        "nodes",
+        "href"
+      ],
+      "properties": {
+        "type": {
+          "const": "text_link"
+        },
+        "nodes": {
+          "$ref": "#/$defs/nodeIndexes"
+        },
+        "href": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^(?![Jj][Aa][Vv][Aa][Ss][Cc][Rr][Ii][Pp][Tt]:).+$"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "secret_ref"
+            ]
+          },
+          {
+            "required": [
+              "file_name"
+            ]
+          },
+          {
+            "required": [
+              "media_key"
+            ]
+          },
+          {
+            "required": [
+              "caption"
+            ]
+          }
+        ]
+      },
+      "additionalProperties": true
+    },
+    "privateTextLink": {
+      "type": "object",
+      "required": [
+        "type",
+        "nodes",
+        "secret_ref"
+      ],
+      "properties": {
+        "type": {
+          "const": "text_link"
+        },
+        "nodes": {
+          "$ref": "#/$defs/nodeIndexes"
+        },
+        "secret_ref": {
+          "$ref": "#/$defs/secretRef"
+        }
+      },
+      "not": {
+        "required": [
+          "href"
+        ]
+      },
+      "additionalProperties": true
+    },
+    "publicMedia": {
+      "type": "object",
+      "required": [
+        "type",
+        "media_id"
+      ],
+      "properties": {
+        "type": {
+          "const": "media"
+        },
+        "media_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "secret_ref"
+            ]
+          },
+          {
+            "required": [
+              "href"
+            ]
+          },
+          {
+            "required": [
+              "file_name"
+            ]
+          },
+          {
+            "required": [
+              "media_key"
+            ]
+          },
+          {
+            "required": [
+              "caption"
+            ]
+          }
+        ]
+      },
+      "additionalProperties": true
+    },
+    "privateMedia": {
+      "type": "object",
+      "required": [
+        "type",
+        "media_id",
+        "secret_ref"
+      ],
+      "properties": {
+        "type": {
+          "const": "media"
+        },
+        "media_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "secret_ref": {
+          "$ref": "#/$defs/secretRef"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "href"
+            ]
+          },
+          {
+            "required": [
+              "file_name"
+            ]
+          },
+          {
+            "required": [
+              "media_key"
+            ]
+          },
+          {
+            "required": [
+              "caption"
+            ]
+          }
+        ]
+      },
+      "additionalProperties": true
+    },
+    "publicEntity": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/inlineEntity"
+        },
+        {
+          "$ref": "#/$defs/publicTextLink"
+        },
+        {
+          "$ref": "#/$defs/publicMedia"
+        }
+      ]
+    },
+    "privateEntity": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/inlineEntity"
+        },
+        {
+          "$ref": "#/$defs/privateTextLink"
+        },
+        {
+          "$ref": "#/$defs/privateMedia"
+        }
+      ]
+    },
+    "entity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/publicEntity"
+        },
+        {
+          "$ref": "#/$defs/privateEntity"
+        }
+      ]
+    }
+  }
+}

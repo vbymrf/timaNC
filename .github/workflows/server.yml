@@ -1,0 +1,105 @@
+name: Phase 0 Server
+
+on:
+  pull_request:
+    paths:
+      - "server/**"
+      - ".github/workflows/server.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - ".github/workflows/server.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Format, vet, test, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [[ -n "$unformatted" ]]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: go build ./...
+
+  migrations:
+    name: PostgreSQL 16 migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgres://tima:tima_ci@localhost:5432/tima?sslmode=disable
+      MIGRATE_VERSION: v4.18.3
+    services:
+      postgres:
+        image: postgres:16.14-alpine3.24
+        env:
+          POSTGRES_DB: tima
+          POSTGRES_USER: tima
+          POSTGRES_PASSWORD: tima_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tima -d tima"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache: false
+
+      - name: Install golang-migrate
+        run: go install github.com/golang-migrate/migrate/v4/cmd/migrate@${MIGRATE_VERSION}
+
+      - name: Apply migrations from a clean database
+        run: |
+          migrate -path server/migrations -database "${DATABASE_URL}" up
+          migrate -path server/migrations -database "${DATABASE_URL}" version
+
+      - name: Verify Phase 0 schema invariants
+        run: psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f server/migrations/verify_phase0.sql
+
+      - name: Clean migration database
+        if: always()
+        run: migrate -path server/migrations -database "${DATABASE_URL}" drop -f

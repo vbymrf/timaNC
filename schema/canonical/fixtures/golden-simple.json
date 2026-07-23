@@ -1,0 +1,22 @@
+{
+  "description": "Independently computable canonical primitive and HKDF-SHA256 vector",
+  "canonical_record": {
+    "domain_ascii": "tima/test/simple/v1",
+    "fields_in_order": [
+      {"type": "U32", "value": 2},
+      {"type": "U64", "value": 1},
+      {"type": "B", "value_utf8": "abc"},
+      {"type": "OPTIONAL", "present": false},
+      {"type": "OPTIONAL_B", "present": true, "value_hex": "ff"},
+      {"type": "U32", "name": "presence_bitmap", "value": 5}
+    ],
+    "expected_hex": "74696d612f746573742f73696d706c652f76310000000002000000000000000100000003616263000100000001ff00000005"
+  },
+  "key_commitment": {
+    "ikm_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "salt_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+    "info_ascii": "tima/commit/v1",
+    "length": 32,
+    "expected_hex": "2cf82a0464d9889d4ba37dad796d3de9eac2d865b5d9f3456aeaaf4a5ad34d65"
+  }
+}

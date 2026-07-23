@@ -1,0 +1,13 @@
+{
+	admin 0.0.0.0:2019
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+	reverse_proxy tima-server:8080 {
+		health_uri /healthz
+		health_interval 10s
+		health_timeout 3s
+	}
+}

@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+package tima.v1.crypto;
+
+import "tima/v1/common/types.proto";
+import "tima/v1/crypto/document.proto";
+import "tima/v1/crypto/key_delivery.proto";
+
+option csharp_namespace = "Tima.V1.Crypto";
+option go_package = "github.com/tima/messnc/gen/go/proto/tima/v1/crypto;cryptov1";
+option java_multiple_files = true;
+option java_package = "com.tima.v1.crypto";
+
+message PersonalMessageEnvelope {
+  uint64 message_id = 1;
+  RevisionRef revision = 2;
+  tima.v1.common.Uuid chat_id = 3;
+  tima.v1.common.Uuid sender_id = 4;
+  tima.v1.common.Uuid sender_device_id = 5;
+  uint32 protocol_version = 6; // Current value 2; lockstep with format_version.
+  DocumentV2 document = 7;
+  uint32 message_key_id = 8;
+  KeyCommitment key_commitment = 9;
+  EscrowBlob escrow_blob = 10;
+  optional bytes ratchet_envelope = 11;
+  repeated MediaBinding media_bindings = 12;
+  bytes signature = 13;
+}
+
+message GroupMessageEnvelope {
+  tima.v1.common.Uuid group_id = 1;
+  uint64 message_id = 2;
+  RevisionRef revision = 3;
+  tima.v1.common.Uuid sender_id = 4;
+  tima.v1.common.Uuid sender_device_id = 5;
+  uint32 protocol_version = 6;
+  uint32 group_key_version = 7;
+  DocumentV2 document = 8;
+  KeyCommitment key_commitment = 9;
+  EscrowBlob escrow_blob = 10;
+  repeated MediaBinding media_bindings = 11;
+  bytes signature = 12;
+}
+
+message TombstoneRevision {
+  tima.v1.common.Uuid owner_id = 1;
+  uint64 object_id = 2;
+  RevisionRef revision = 3;
+  tima.v1.common.Timestamp deleted_at = 4;
+  bytes signature = 5;
+}
+
+message SignedRevision {
+  oneof revision {
+    PersonalMessageEnvelope personal_message = 1;
+    GroupMessageEnvelope group_message = 2;
+    TombstoneRevision tombstone = 3;
+  }
+}

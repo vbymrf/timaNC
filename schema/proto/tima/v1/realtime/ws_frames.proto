@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+package tima.v1.realtime;
+
+import "tima/v1/realtime/events.proto";
+
+option csharp_namespace = "Tima.V1.Realtime";
+option go_package = "github.com/tima/messnc/gen/go/proto/tima/v1/realtime;realtimev1";
+option java_multiple_files = true;
+option java_package = "com.tima.v1.realtime";
+
+// WebSocket subprotocol is exactly "tima.pb.v1". Every WebSocket data frame
+// MUST be binary and contain one serialized top-level protobuf message.
+// Text frames and JSON fallback MUST be rejected with close code 1003.
+message ClientFrame {
+  uint64 request_id = 1;
+  oneof event {
+    SubscribeChats subscribe = 10;
+    SubscribeInbox subscribe_inbox = 11;
+    SubscribeCommunities subscribe_communities = 12;
+    SubscribeChannels subscribe_channels = 13;
+    UnsubscribeChats unsubscribe = 14;
+    UnsubscribeCommunities unsubscribe_communities = 15;
+    UnsubscribeChannels unsubscribe_channels = 16;
+    TypingStart typing_start = 17;
+    TypingStop typing_stop = 18;
+    PresenceUpdate presence_update = 19;
+  }
+}
+
+message Ack {
+  uint64 request_id = 1;
+}
+
+message Error {
+  uint64 request_id = 1;
+  string code = 2;
+  string message = 3;
+  bool retryable = 4;
+}
+
+message ServerEvent {
+  oneof event {
+    MessageCreated message_created = 10;
+    MessageEdited message_edited = 11;
+    MessageDeleted message_deleted = 12;
+    MessageRead message_read = 13;
+    ChatUpdate chat_update = 14;
+    GroupKeyRotate gk_rotate = 15;
+    CallIncoming call_incoming = 16;
+    CallEnded call_ended = 17;
+    CommunityMemberJoined community_member_joined = 18;
+    CommunityMemberLeft community_member_left = 19;
+    CommunityChildAdded community_child_added = 20;
+    CommunityObjectAclChanged community_object_acl_changed = 21;
+    VoiceRoomParticipantJoined voice_room_participant_joined = 22;
+    VoiceRoomParticipantLeft voice_room_participant_left = 23;
+    PostPublished post_published = 24;
+    PostEdited post_edited = 25;
+    PostFailed post_failed = 26;
+    MediaProcessing media_processing = 27;
+    MediaReady media_ready = 28;
+    MediaFailed media_failed = 29;
+    CommentCreated comment_created = 30;
+    CommentEdited comment_edited = 31;
+    CommentDeleted comment_deleted = 32;
+    EmotionAdded emotion_added = 33;
+    EmotionRemoved emotion_removed = 34;
+    EmotionCounters emotion_counters = 35;
+    RatingUpdated rating_updated = 36;
+    RecommendationAdded recommendation_added = 37;
+    RecommendationRemoved recommendation_removed = 38;
+    FeedNew feed_new = 39;
+    ShelfItemAdded shelf_item_added = 40;
+    ShelfItemRemoved shelf_item_removed = 41;
+    ShelfAccessRequested shelf_access_requested = 42;
+    ShelfAccessGranted shelf_access_granted = 43;
+    ShelfAccessRevoked shelf_access_revoked = 44;
+    VirtualUserCreated virtual_user_created = 45;
+    VirtualUserOperatorChanged virtual_user_operator_changed = 46;
+    VirtualUserKeysRotated virtual_user_keys_rotated = 47;
+    VirtualUserTransferUpdated virtual_user_transfer_updated = 48;
+    InboxThread inbox_thread = 49;
+    InboxEvent inbox_event = 50;
+    DeviceRevoked device_revoked = 51;
+    SyncRequired sync_required = 52;
+    RecoveryRequested recovery_requested = 53;
+    RecoveryResponded recovery_responded = 54;
+    RecoveryCompleted recovery_completed = 55;
+  }
+}
+
+message ServerFrame {
+  uint64 seq = 1;
+  oneof body {
+    ServerEvent event = 10;
+    Ack ack = 11;
+    Error error = 12;
+  }
+}

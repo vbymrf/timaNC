@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tima.example/json/document-v2.schema.json",
+  "title": "DocumentV2 logical document",
+  "description": "Pure logical content. Private envelope fields are defined in private-document-envelope.schema.json.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/publicDocument"
+    },
+    {
+      "$ref": "#/$defs/privateDocument"
+    }
+  ],
+  "$defs": {
+    "base64Bytes": {
+      "type": "string",
+      "minLength": 4,
+      "contentEncoding": "base64",
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?$"
+    },
+    "textNodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      }
+    },
+    "encryptedNodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/base64Bytes"
+      }
+    },
+    "publicDocument": {
+      "type": "object",
+      "required": [
+        "metadata"
+      ],
+      "properties": {
+        "nodes": {
+          "$ref": "#/$defs/textNodes"
+        },
+        "markup": {
+          "$ref": "markup.schema.json#/$defs/publicMarkup"
+        },
+        "metadata": {
+          "$ref": "metadata.schema.json#/$defs/publicMetadata"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "nodes"
+          ]
+        },
+        {
+          "required": [
+            "markup"
+          ],
+          "properties": {
+            "markup": {
+              "$ref": "markup.schema.json#/$defs/publicContentMarkup"
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "privateDocumentContent": {
+      "type": "object",
+      "required": [
+        "metadata"
+      ],
+      "properties": {
+        "encrypted_nodes": {
+          "$ref": "#/$defs/encryptedNodes"
+        },
+        "markup": {
+          "$ref": "markup.schema.json#/$defs/privateMarkup"
+        },
+        "encrypted_metadata": {
+          "$ref": "#/$defs/base64Bytes"
+        },
+        "metadata": {
+          "$ref": "metadata.schema.json#/$defs/privateMetadata"
+        }
+      },
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "required": [
+                "encrypted_nodes"
+              ]
+            },
+            {
+              "required": [
+                "markup"
+              ],
+              "properties": {
+                "markup": {
+                  "$ref": "markup.schema.json#/$defs/privateContentMarkup"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "required": [
+                "markup",
+                "encrypted_metadata"
+              ],
+              "properties": {
+                "markup": {
+                  "$ref": "markup.schema.json#/$defs/privateMarkupWithSecrets"
+                }
+              }
+            },
+            {
+              "not": {
+                "required": [
+                  "encrypted_metadata"
+                ]
+              },
+              "properties": {
+                "markup": {
+                  "$ref": "markup.schema.json#/$defs/privateMarkupWithoutSecrets"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "privateDocument": {
+      "$ref": "#/$defs/privateDocumentContent",
+      "unevaluatedProperties": false
+    }
+  }
+}

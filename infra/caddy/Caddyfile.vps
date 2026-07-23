@@ -1,0 +1,21 @@
+{
+	admin 0.0.0.0:2019
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy tima-server:8080 {
+		health_uri /healthz
+		health_interval 10s
+		health_timeout 3s
+	}
+}
+
+{$MINIO_DOMAIN} {
+	reverse_proxy minio:9000
+}
+
+{$LIVEKIT_DOMAIN} {
+	reverse_proxy livekit:7880
+}

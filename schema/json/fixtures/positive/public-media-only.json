@@ -1,0 +1,18 @@
+{
+  "markup": {
+    "layout": {
+      "type": "document",
+      "children": [
+        {
+          "type": "media",
+          "media_id": "123e4567-e89b-12d3-a456-426614174000"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "format_version": 2,
+    "revision_number": 2,
+    "content_mode": "public"
+  }
+}

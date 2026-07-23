@@ -1,0 +1,6 @@
+# tima/test/simple/v1\0 || U32(2) || U64(1) || B("abc")
+# || ABSENT || PRESENT(B(ff)) || U32(bitmap=5)
+74696d612f746573742f73696d706c652f76310000000002000000000000000100000003616263000100000001ff00000005
+
+# HKDF-SHA256 commitment for IKM 00..1f, zero salt, info tima/commit/v1
+2cf82a0464d9889d4ba37dad796d3de9eac2d865b5d9f3456aeaaf4a5ad34d65

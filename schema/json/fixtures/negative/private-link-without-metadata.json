@@ -1,0 +1,21 @@
+{
+  "encrypted_nodes": [
+    "Y2lwaGVydGV4dA=="
+  ],
+  "markup": {
+    "entities": [
+      {
+        "type": "text_link",
+        "nodes": [
+          0
+        ],
+        "secret_ref": "link-1"
+      }
+    ]
+  },
+  "metadata": {
+    "format_version": 2,
+    "revision_number": 1,
+    "content_mode": "private"
+  }
+}

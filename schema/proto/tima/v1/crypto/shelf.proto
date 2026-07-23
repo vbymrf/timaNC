@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+package tima.v1.crypto;
+
+import "tima/v1/common/types.proto";
+import "tima/v1/crypto/key_delivery.proto";
+
+option csharp_namespace = "Tima.V1.Crypto";
+option go_package = "github.com/tima/messnc/gen/go/proto/tima/v1/crypto;cryptov1";
+option java_multiple_files = true;
+option java_package = "com.tima.v1.crypto";
+
+message PrivateShelfBlob {
+  tima.v1.common.Uuid owner_id = 1;
+  uint32 key_version = 2;
+  bytes encrypted_payload = 3;
+  EscrowBlob escrow_blob = 4;
+  KeyCommitment key_commitment = 5;
+  bytes signature = 6;
+}
+
+message ShelfKeyWrap {
+  tima.v1.common.Uuid owner_id = 1;
+  tima.v1.common.Uuid grantee_id = 2;
+  tima.v1.common.Uuid grantee_device_id = 3;
+  uint32 key_version = 4;
+  bytes wrapped_shelf_key = 5;
+  KeyCommitment key_commitment = 6;
+  bytes owner_signature = 7;
+}

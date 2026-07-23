@@ -1,0 +1,18 @@
+generatorName: kotlin
+library: multiplatform
+globalProperties:
+  models: ""
+  modelDocs: "false"
+  modelTests: "false"
+  apis: "false"
+  supportingFiles: "false"
+typeMappings:
+  AnyType: JsonElement
+importMappings:
+  JsonElement: kotlinx.serialization.json.JsonElement
+additionalProperties:
+  packageName: com.tima.client.api
+  artifactId: tima-client-api-models
+  artifactVersion: 0.0.0
+  dateLibrary: string
+  enumPropertyNaming: UPPERCASE

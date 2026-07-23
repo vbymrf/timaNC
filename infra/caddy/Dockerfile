@@ -1,0 +1,5 @@
+ARG CADDY_VERSION=2.11.4-alpine
+FROM caddy:${CADDY_VERSION}
+
+ARG CADDYFILE
+COPY ${CADDYFILE} /etc/caddy/Caddyfile

@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+package tima.v1.crypto;
+
+import "tima/v1/common/types.proto";
+
+option csharp_namespace = "Tima.V1.Crypto";
+option go_package = "github.com/tima/messnc/gen/go/proto/tima/v1/crypto;cryptov1";
+option java_multiple_files = true;
+option java_package = "com.tima.v1.crypto";
+
+message KeyCommitment {
+  // Exactly 32 bytes: HKDF-SHA256(key, info="tima/commit/v1", L=32).
+  bytes value = 1;
+}
+
+message EscrowPublicKeys {
+  bytes x25519_threshold_public_key = 1; // Exactly 32 bytes.
+  bytes mlkem768_public_key = 2;
+}
+
+message EscrowKeySet {
+  string key_id = 1;
+  EscrowPublicKeys public_keys = 2;
+}
+
+message EscrowConfigBundle {
+  uint32 config_version = 1;
+  tima.v1.common.Region region = 2;
+  string epoch_id = 3; // YYYYQn.
+  uint32 shard_id = 4;
+  tima.v1.common.Timestamp valid_from = 5;
+  tima.v1.common.Timestamp valid_until = 6;
+  EscrowKeySet current = 7;
+  optional EscrowKeySet next = 8;
+  string signing_key_id = 9;
+  // Ed25519 over the canonical config input; canonical S is required.
+  bytes signature = 10;
+}
+
+// Logical fields of the mandatory hybrid escrow blob. Binary encoders MUST
+// serialize the canonical blob header/order defined in schema/canonical.
+message EscrowBlob {
+  tima.v1.common.Region region = 1;
+  string epoch_id = 2;
+  uint32 shard_id = 3;
+  string key_id = 4;
+  KeyCommitment key_commitment = 5;
+  bytes ephemeral_x25519_public_key = 6; // Exactly 32 bytes.
+  bytes mlkem768_ciphertext = 7;
+  bytes symmetric_key_wrap = 8;
+}
+
+message WrappedKeyRecord {
+  uint64 message_id = 1;
+  tima.v1.common.Uuid chat_id = 2;
+  tima.v1.common.Uuid device_id = 3;
+  bytes wrapped_key = 4;
+  KeyCommitment key_commitment = 5;
+}
+
+message GroupKeyWrap {
+  tima.v1.common.Uuid group_id = 1;
+  uint32 group_key_version = 2;
+  tima.v1.common.Uuid device_id = 3;
+  bytes wrapped_group_key = 4;
+  KeyCommitment key_commitment = 5;
+}
+
+message RatchetPayload {
+  bytes message_key = 1;
+  KeyCommitment key_commitment = 2;
+  optional bytes encrypted_nodes_bundle = 3;
+  optional bytes encrypted_metadata = 4;
+  uint32 presence_bitmap = 5;
+}
+
+message PhraseBackupKey {
+  tima.v1.common.Uuid chat_id = 1;
+  uint64 message_id = 2;
+  bytes phrase_wrapped_key = 3;
+  KeyCommitment key_commitment = 4;
+}
+
+message PhraseBackup {
+  tima.v1.common.Uuid owner_id = 1;
+  uint32 backup_version = 2;
+  repeated PhraseBackupKey keys = 3;
+  bytes signature = 4;
+}

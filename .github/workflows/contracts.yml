@@ -1,0 +1,57 @@
+name: Phase 0 Contracts
+
+on:
+  pull_request:
+    paths:
+      - "schema/**"
+      - "gen/**"
+      - ".github/workflows/contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "schema/**"
+      - "gen/**"
+      - ".github/workflows/contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-generate-compile:
+    name: Validate, generate, and compile
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate contracts
+        shell: powershell
+        run: .\schema\codegen\validate.ps1
+
+      - name: Generate committed models
+        shell: powershell
+        run: .\schema\codegen\generate.ps1
+
+      - name: Compile generated models
+        shell: powershell
+        run: .\schema\codegen\compile.ps1
+
+      - name: Verify generated models are committed
+        shell: powershell
+        run: |
+          $changes = @(git status --porcelain --untracked-files=all -- gen)
+          if ($LASTEXITCODE -ne 0) {
+            throw "Unable to inspect generated files."
+          }
+          if ($changes.Count -ne 0) {
+            $changes | ForEach-Object { Write-Host $_ }
+            throw "Generation changed committed files. Run .\schema\codegen\generate.ps1 and commit gen/."
+          }

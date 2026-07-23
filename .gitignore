@@ -1,0 +1,39 @@
+# Local reference snapshots (never part of the application repository).
+/livekit-master git/
+/kodium-main git/
+/aiogram-dev-3.x/
+
+# Reproducible tool downloads and build caches.
+.tools/
+schema/.tools/
+.gradle/
+**/.gradle/
+**/build/
+**/bin/
+**/dist/
+**/.cache/
+*.class
+*.jar
+*.exe
+*.test
+coverage.out
+
+# Runtime data and local configuration.
+.env
+.env.*
+!.env.example
+**/volumes/
+**/*.pem
+**/*.key
+**/*.p8
+**/secrets/
+
+# Editors and operating systems.
+/.claude/
+/.cursor/
+.idea/
+.vscode/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini

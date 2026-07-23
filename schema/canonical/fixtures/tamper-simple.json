@@ -1,0 +1,15 @@
+{
+  "description": "Negative vectors; neither value may validate against golden-simple",
+  "canonical_record_tamper": {
+    "mutation": "presence_bitmap 0x00000005 -> 0x00000004",
+    "tampered_hex": "74696d612f746573742f73696d706c652f76310000000002000000000000000100000003616263000100000001ff00000004",
+    "expected_result": "signature_input_mismatch"
+  },
+  "key_commitment_tamper": {
+    "mutation": "IKM byte 0 changed from 00 to ff",
+    "ikm_hex": "ff0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "recomputed_hex": "73936db4f7f1c55709e970a157e5042e1737510737b43167fe923e5fa50ea7db",
+    "golden_expected_hex": "2cf82a0464d9889d4ba37dad796d3de9eac2d865b5d9f3456aeaaf4a5ad34d65",
+    "expected_result": "commitment_mismatch"
+  }
+}
