@@ -150,7 +150,11 @@ class CanonicalEncodingGoldenTest {
         )
         val envelope = PersonalMessageEnvelope(
             badHeader,
-            EncryptedDocumentV2(listOf(byteArrayOf(1)), metadata, 1u),
+            EncryptedDocumentV2(
+                encryptedNodes = listOf(byteArrayOf(1)),
+                metadata = metadata,
+                presenceBitmap = 1u,
+            ),
             commitment,
             escrowBlob,
             null,

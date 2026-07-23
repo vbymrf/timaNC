@@ -1,18 +1,21 @@
 package com.tima.client.crypto
 
 import com.tima.client.domain.DocumentMetadata
+import com.tima.client.domain.DocumentV2Policy
 import com.tima.client.domain.EncryptedDocumentV2
 import com.tima.client.domain.EnvelopeHeader
 import com.tima.client.domain.EscrowBlob
 import com.tima.client.domain.PersonalMessageEnvelope
 import com.tima.client.domain.Region
 import com.tima.client.domain.SignedEscrowConfig
+import kotlinx.serialization.json.JsonObject
 
 object CanonicalEncoding {
     private const val PERSONAL_SIGNATURE_DOMAIN = "tima/personal-envelope/signature/v2"
     private const val ESCROW_BLOB_DOMAIN = "tima/escrow-blob/v1"
     private const val ESCROW_CONFIG_DOMAIN = "tima/escrow-config/signature/v1"
     private const val DOCUMENT_AAD_DOMAIN = "tima/document-aad/v2"
+    private const val DOCUMENT_METADATA_AAD_DOMAIN = "tima/document-metadata-aad/v2"
 
     fun documentAad(
         header: EnvelopeHeader,
@@ -20,14 +23,30 @@ object CanonicalEncoding {
         commitment: ByteArray,
         presenceBitmap: UInt,
         nodeIndex: UInt,
+        markup: JsonObject? = null,
     ): ByteArray = Writer()
         .domain(DOCUMENT_AAD_DOMAIN)
         .u32(header.protocolVersion)
         .fixed32(commitment)
         .u32(presenceBitmap)
-        .absent() // text-only markup
+        .optionalJson(markup)
         .json(metadataJcs(metadata))
         .u32(nodeIndex)
+        .result()
+
+    fun metadataAad(
+        header: EnvelopeHeader,
+        metadata: DocumentMetadata,
+        commitment: ByteArray,
+        presenceBitmap: UInt,
+        markup: JsonObject?,
+    ): ByteArray = Writer()
+        .domain(DOCUMENT_METADATA_AAD_DOMAIN)
+        .u32(header.protocolVersion)
+        .fixed32(commitment)
+        .u32(presenceBitmap)
+        .optionalJson(markup)
+        .json(metadataJcs(metadata))
         .result()
 
     fun metadataJcs(metadata: DocumentMetadata): ByteArray {
@@ -151,6 +170,15 @@ object CanonicalEncoding {
 
         fun json(jcs: ByteArray): Writer = bytes(jcs)
 
+        fun optionalJson(value: JsonObject?): Writer = apply {
+            if (value == null) {
+                absent()
+            } else {
+                byte(1)
+                json(DocumentV2Policy.canonicalJson(value))
+            }
+        }
+
         fun absent(): Writer = byte(0)
 
         fun optionalBytes(value: ByteArray?): Writer = apply {
@@ -191,17 +219,24 @@ object CanonicalEncoding {
         }
 
         fun document(value: EncryptedDocumentV2): Writer = apply {
-            require(value.presenceBitmap == 1u) { "text-only encrypted document bitmap must equal 1" }
-            require(value.encryptedNodes.isNotEmpty()) { "encrypted_nodes must be present and non-empty" }
             require(value.encryptedNodes.all { it.isNotEmpty() }) { "encrypted node must not be empty" }
+            val expectedBitmap =
+                (if (value.encryptedNodes.isNotEmpty()) 1u else 0u) or
+                    (if (value.markup != null) 4u else 0u) or
+                    (if (value.encryptedMetadata != null) 8u else 0u)
+            require(value.presenceBitmap == expectedBitmap) { "non-canonical presence bitmap" }
             u32(value.presenceBitmap)
-            byte(1)
-            u32(value.encryptedNodes.size.toUInt())
-            value.encryptedNodes.forEach(::bytes)
+            if (value.encryptedNodes.isEmpty()) {
+                absent()
+            } else {
+                byte(1)
+                u32(value.encryptedNodes.size.toUInt())
+                value.encryptedNodes.forEach(::bytes)
+            }
             absent() // plaintext nodes
-            absent() // markup
+            optionalJson(value.markup)
             json(metadataJcs(value.metadata))
-            absent() // encrypted metadata
+            optionalBytes(value.encryptedMetadata)
         }
 
         fun raw(value: ByteArray): Writer = apply { output.addAll(value.asList()) }

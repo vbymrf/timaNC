@@ -30,6 +30,7 @@ type WrappedKey struct {
 
 type PrivateDocument struct {
 	EncryptedNodes    []string        `json:"encrypted_nodes"`
+	Markup            json.RawMessage `json:"markup,omitempty"`
 	EncryptedMetadata string          `json:"encrypted_metadata,omitempty"`
 	Metadata          json.RawMessage `json:"metadata"`
 	ProtocolVersion   int             `json:"protocol_version"`
@@ -240,6 +241,7 @@ func (s *Service) SendMessage(ctx context.Context, p Principal, chatID, idemKey 
 		return PrivateMessage{}, 0, ErrForbidden
 	}
 	nodes, _ := decodeNodes(in.Document.EncryptedNodes)
+	markup, _, _ := validateAndCanonicalizeMarkup(in.Document.Markup, len(nodes))
 	metadata, _, _ := canonicalMetadata(in.Document.Metadata)
 	commitment, _ := decodeExact(in.Document.KeyCommitment, 32)
 	escrow, _ := decodeNonEmpty(in.Document.EscrowBlob, 1<<20)
@@ -247,19 +249,20 @@ func (s *Service) SendMessage(ctx context.Context, p Principal, chatID, idemKey 
 	ratchet, _ := decodeOptional(in.Document.RatchetEnvelope, 1<<20)
 	signature, _ := decodeExact(in.Document.Signature, ed25519.SignatureSize)
 	if _, err = tx.Exec(ctx, `INSERT INTO personal_messages
-		(message_id,chat_id,sender_id,sender_device,message_key_id,encrypted_nodes,encrypted_metadata,metadata,
+		(message_id,chat_id,sender_id,sender_device,message_key_id,encrypted_nodes,markup,encrypted_metadata,metadata,
 		 presence_bitmap,key_commitment,current_revision_id,escrow_blob,ratchet_envelope,signature)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-		messageID, chatID, p.UserID, p.DeviceID, in.MessageKeyID, nodes, nullableBytes(encryptedMetadata), metadata,
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+		messageID, chatID, p.UserID, p.DeviceID, in.MessageKeyID, nullableNodes(nodes),
+		nullableJSON(markup), nullableBytes(encryptedMetadata), metadata,
 		in.Document.PresenceBitmap, commitment, in.RevisionID, escrow, nullableBytes(ratchet), signature); err != nil {
 		return PrivateMessage{}, 0, err
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO personal_message_revisions
-		(chat_id,message_id,revision_id,revision_number,message_key_id,encrypted_nodes,encrypted_metadata,metadata,
+		(chat_id,message_id,revision_id,revision_number,message_key_id,encrypted_nodes,markup,encrypted_metadata,metadata,
 		 presence_bitmap,key_commitment,escrow_blob,signature)
-		VALUES($1,$2,$3,1,$4,$5,$6,$7,$8,$9,$10,$11)`,
-		chatID, messageID, in.RevisionID, in.MessageKeyID, nodes, nullableBytes(encryptedMetadata),
-		metadata, in.Document.PresenceBitmap, commitment, escrow, signature); err != nil {
+		VALUES($1,$2,$3,1,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		chatID, messageID, in.RevisionID, in.MessageKeyID, nullableNodes(nodes), nullableJSON(markup),
+		nullableBytes(encryptedMetadata), metadata, in.Document.PresenceBitmap, commitment, escrow, signature); err != nil {
 		return PrivateMessage{}, 0, err
 	}
 	for _, wrap := range in.WrappedKeys {
@@ -314,14 +317,29 @@ func (s *Service) validateMessage(
 		return ErrInvalid
 	}
 	if in.SenderID != "" && in.SenderID != p.UserID || d.ProtocolVersion != 2 ||
-		len(d.EncryptedNodes) == 0 || len(in.WrappedKeys) == 0 {
+		len(in.WrappedKeys) == 0 {
 		return ErrInvalid
 	}
-	expectedBitmap := uint32(1)
+	nodes, err := decodeNodes(d.EncryptedNodes)
+	if err != nil {
+		return err
+	}
+	markup, markupInfo, err := validateAndCanonicalizeMarkup(d.Markup, len(nodes))
+	if err != nil || len(nodes) == 0 && !markupInfo.HasMedia {
+		return ErrInvalid
+	}
+	expectedBitmap := uint32(0)
+	if len(nodes) > 0 {
+		expectedBitmap |= 1
+	}
+	if len(markup) > 0 {
+		expectedBitmap |= 4
+	}
 	if d.EncryptedMetadata != "" {
 		expectedBitmap |= 8
 	}
-	if d.PresenceBitmap != expectedBitmap {
+	if d.PresenceBitmap != expectedBitmap ||
+		markupInfo.HasSecrets != (d.EncryptedMetadata != "") {
 		return ErrInvalid
 	}
 	if _, metadata, err := canonicalMetadata(d.Metadata); err != nil || metadata.Revision != expectedRevision {
@@ -365,8 +383,11 @@ func (s *Service) validateMessage(
 	}
 	var public []byte
 	if err = s.DB.QueryRow(ctx, `SELECT signing_pubkey FROM devices WHERE device_id=$1 AND user_id=$2 AND revoked_at IS NULL`,
-		p.DeviceID, p.UserID).Scan(&public); err != nil || !ed25519.Verify(ed25519.PublicKey(public), input, signature) {
-		return ErrInvalid
+		p.DeviceID, p.UserID).Scan(&public); err != nil {
+		return fmt.Errorf("signing key lookup: %w", ErrInvalid)
+	}
+	if !ed25519.Verify(ed25519.PublicKey(public), input, signature) {
+		return fmt.Errorf("signature verification: %w", ErrInvalid)
 	}
 	rows, err := s.DB.Query(ctx, `SELECT d.device_id FROM chats c JOIN devices d
 		ON d.user_id IN(c.user_a,c.user_b) AND d.revoked_at IS NULL WHERE c.chat_id=$1
@@ -412,7 +433,7 @@ func (s *Service) ListMessages(ctx context.Context, p Principal, chatID string, 
 	}
 	rows, err := s.DB.Query(ctx, `SELECT m.message_id,m.sender_id,m.sender_device,m.current_revision_id,
 		m.message_key_id,r.parent_revision_id,m.created_at,
-		m.encrypted_nodes,m.encrypted_metadata,m.metadata,m.presence_bitmap,
+		m.encrypted_nodes,m.markup,m.encrypted_metadata,m.metadata,m.presence_bitmap,
 		m.key_commitment,m.escrow_blob,m.ratchet_envelope,m.signature,k.wrapped_key
 		FROM chats c JOIN personal_messages m ON m.chat_id=c.chat_id
 		JOIN personal_message_revisions r ON r.chat_id=m.chat_id AND r.message_id=m.message_id
@@ -430,10 +451,10 @@ func (s *Service) ListMessages(ctx context.Context, p Principal, chatID string, 
 		var m PrivateMessage
 		var id int64
 		var nodes [][]byte
-		var encryptedMetadata, metadata, commitment, escrow, ratchet, signature, wrapped []byte
+		var encryptedMetadata, markup, metadata, commitment, escrow, ratchet, signature, wrapped []byte
 		if err = rows.Scan(&id, &m.SenderID, &m.SenderDeviceID, &m.CurrentRevisionID,
 			&m.MessageKeyID, &m.ParentRevisionID, &m.CreatedAt,
-			&nodes, &encryptedMetadata, &metadata, &m.Document.PresenceBitmap,
+			&nodes, &markup, &encryptedMetadata, &metadata, &m.Document.PresenceBitmap,
 			&commitment, &escrow, &ratchet, &signature, &wrapped); err != nil {
 			return nil, err
 		}
@@ -444,6 +465,9 @@ func (s *Service) ListMessages(ctx context.Context, p Principal, chatID string, 
 		m.Document.Signature = base64.StdEncoding.EncodeToString(signature)
 		for _, node := range nodes {
 			m.Document.EncryptedNodes = append(m.Document.EncryptedNodes, base64.StdEncoding.EncodeToString(node))
+		}
+		if len(markup) > 0 {
+			m.Document.Markup = json.RawMessage(markup)
 		}
 		if len(encryptedMetadata) > 0 {
 			m.Document.EncryptedMetadata = base64.StdEncoding.EncodeToString(encryptedMetadata)
@@ -538,6 +562,20 @@ func decodeNodes(values []string) ([][]byte, error) {
 }
 
 func nullableBytes(v []byte) any {
+	if len(v) == 0 {
+		return nil
+	}
+	return v
+}
+
+func nullableNodes(v [][]byte) any {
+	if len(v) == 0 {
+		return nil
+	}
+	return v
+}
+
+func nullableJSON(v []byte) any {
 	if len(v) == 0 {
 		return nil
 	}

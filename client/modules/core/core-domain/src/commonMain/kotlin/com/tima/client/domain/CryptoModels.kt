@@ -1,5 +1,7 @@
 package com.tima.client.domain
 
+import kotlinx.serialization.json.JsonObject
+
 const val CURRENT_PROTOCOL_VERSION: UInt = 2u
 const val PRIVATE_CONTENT_MODE: String = "private"
 
@@ -15,18 +17,22 @@ data class DocumentMetadata(
 )
 
 data class PlainTextDocumentV2(
-    val textNodes: List<String>,
+    val textNodes: List<String> = emptyList(),
+    val markup: JsonObject? = null,
+    val secretMetadata: JsonObject? = null,
     val metadata: DocumentMetadata,
 ) {
     init {
-        require(textNodes.isNotEmpty()) { "text-only DocumentV2 requires at least one node" }
         require(textNodes.all(String::isNotEmpty)) { "text nodes must not be empty" }
         require(textNodes.sumOf { it.length } <= 4096) { "document exceeds the text limit" }
+        DocumentV2Policy.validate(textNodes.size, markup, secretMetadata)
     }
 }
 
 data class EncryptedDocumentV2(
     val encryptedNodes: List<ByteArray>,
+    val markup: JsonObject? = null,
+    val encryptedMetadata: ByteArray? = null,
     val metadata: DocumentMetadata,
     val presenceBitmap: UInt,
 )

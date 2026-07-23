@@ -9,6 +9,7 @@ import com.tima.client.domain.PersonalMessageEnvelope
 import com.tima.client.domain.WrappedMessageKey
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlinx.serialization.json.JsonObject
 
 interface CryptoTransportAdapter<TransportEnvelope> {
     fun toTransport(value: PersonalMessageEnvelope): TransportEnvelope
@@ -25,6 +26,8 @@ data class PrivateMessageWriteDto(
 
 data class PrivateDocumentEnvelopeDto(
     val encrypted_nodes: List<String>,
+    val markup: JsonObject? = null,
+    val encrypted_metadata: String? = null,
     val metadata: PrivateMetadataDto,
     val protocol_version: Int,
     val presence_bitmap: UInt,
@@ -99,8 +102,6 @@ object RestCryptoTransportAdapter : CryptoTransportAdapter<PrivateMessageWriteDt
         require(header.messageKeyId <= Int.MAX_VALUE.toUInt()) {
             "message_key_id exceeds REST integer range"
         }
-        require(value.document.presenceBitmap == 1u) { "only strict text-only documents are supported" }
-        require(value.document.encryptedNodes.isNotEmpty()) { "encrypted_nodes must not be empty" }
         require(value.document.encryptedNodes.all { it.isNotEmpty() }) {
             "encrypted_nodes must not contain empty ciphertext"
         }
@@ -115,6 +116,8 @@ object RestCryptoTransportAdapter : CryptoTransportAdapter<PrivateMessageWriteDt
             message_key_id = header.messageKeyId.toInt(),
             document = PrivateDocumentEnvelopeDto(
                 encrypted_nodes = value.document.encryptedNodes.map(::encodeBase64),
+                markup = value.document.markup,
+                encrypted_metadata = value.document.encryptedMetadata?.let(::encodeBase64),
                 metadata = value.document.metadata.toTransport(),
                 protocol_version = header.protocolVersion.toRestProtocolVersion(),
                 presence_bitmap = value.document.presenceBitmap,
@@ -136,10 +139,13 @@ object RestCryptoTransportAdapter : CryptoTransportAdapter<PrivateMessageWriteDt
         require(value.message_key_id >= 0) { "message_key_id must not be negative" }
         val document = value.document
         require(document.protocol_version == PROTOCOL_VERSION) { "unsupported protocol_version" }
-        require(document.presence_bitmap == 1u) { "only strict text-only documents are supported" }
-        require(document.encrypted_nodes.isNotEmpty()) { "encrypted_nodes must not be empty" }
         val encryptedNodes = document.encrypted_nodes.map(::decodeCanonicalBase64)
         require(encryptedNodes.all { it.isNotEmpty() }) { "encrypted_nodes contains empty ciphertext" }
+        val expectedBitmap =
+            (if (encryptedNodes.isNotEmpty()) 1u else 0u) or
+                (if (document.markup != null) 4u else 0u) or
+                (if (document.encrypted_metadata != null) 8u else 0u)
+        require(document.presence_bitmap == expectedBitmap) { "non-canonical presence_bitmap" }
         val keyCommitment = decodeFixed32(document.key_commitment, "key_commitment")
         val canonicalEscrowBlob = decodeCanonicalBase64(document.escrow_blob)
         val escrowBlob = CanonicalEncoding.decodeEscrowBlob(canonicalEscrowBlob)
@@ -166,6 +172,8 @@ object RestCryptoTransportAdapter : CryptoTransportAdapter<PrivateMessageWriteDt
             ),
             document = EncryptedDocumentV2(
                 encryptedNodes = encryptedNodes,
+                markup = document.markup,
+                encryptedMetadata = document.encrypted_metadata?.let(::decodeCanonicalBase64),
                 metadata = document.metadata.toDomain(),
                 presenceBitmap = document.presence_bitmap,
             ),

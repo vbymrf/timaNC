@@ -76,6 +76,7 @@ func (s *Service) ReviseMessage(
 	}
 
 	nodes, _ := decodeNodes(in.Document.EncryptedNodes)
+	markup, _, _ := validateAndCanonicalizeMarkup(in.Document.Markup, len(nodes))
 	metadata, _, _ := canonicalMetadata(in.Document.Metadata)
 	commitment, _ := decodeExact(in.Document.KeyCommitment, 32)
 	escrow, _ := decodeNonEmpty(in.Document.EscrowBlob, 1<<20)
@@ -85,21 +86,22 @@ func (s *Service) ReviseMessage(
 	var createdAt time.Time
 	err = tx.QueryRow(ctx, `INSERT INTO personal_message_revisions
 		(chat_id,message_id,revision_id,parent_revision_id,revision_number,message_key_id,
-		 encrypted_nodes,encrypted_metadata,metadata,presence_bitmap,key_commitment,escrow_blob,signature)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		 encrypted_nodes,markup,encrypted_metadata,metadata,presence_bitmap,key_commitment,escrow_blob,signature)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		RETURNING created_at`,
 		chatID, messageID, in.RevisionID, currentRevisionID, currentRevisionNumber+1,
-		in.MessageKeyID, nodes, nullableBytes(encryptedMetadata), metadata,
+		in.MessageKeyID, nullableNodes(nodes), nullableJSON(markup), nullableBytes(encryptedMetadata), metadata,
 		in.Document.PresenceBitmap, commitment, escrow, signature).Scan(&createdAt)
 	if err != nil {
 		return PrivateRevision{}, 0, err
 	}
 	if _, err = tx.Exec(ctx, `UPDATE personal_messages SET
-		message_key_id=$3,encrypted_nodes=$4,encrypted_metadata=$5,metadata=$6,
-		presence_bitmap=$7,key_commitment=$8,current_revision_id=$9,escrow_blob=$10,
-		ratchet_envelope=$11,signature=$12
+		message_key_id=$3,encrypted_nodes=$4,markup=$5,encrypted_metadata=$6,metadata=$7,
+		presence_bitmap=$8,key_commitment=$9,current_revision_id=$10,escrow_blob=$11,
+		ratchet_envelope=$12,signature=$13
 		WHERE chat_id=$1 AND message_id=$2`,
-		chatID, messageID, in.MessageKeyID, nodes, nullableBytes(encryptedMetadata), metadata,
+		chatID, messageID, in.MessageKeyID, nullableNodes(nodes), nullableJSON(markup),
+		nullableBytes(encryptedMetadata), metadata,
 		in.Document.PresenceBitmap, commitment, in.RevisionID, escrow,
 		nullableBytes(ratchet), signature); err != nil {
 		return PrivateRevision{}, 0, err

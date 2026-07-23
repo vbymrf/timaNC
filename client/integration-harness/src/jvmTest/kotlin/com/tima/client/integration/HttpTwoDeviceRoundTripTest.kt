@@ -212,6 +212,24 @@ class HttpTwoDeviceRoundTripTest {
 
         val revisedPlaintext = PlainTextDocumentV2(
             textNodes = listOf("black-box edited by Alice"),
+            markup = buildJsonObject {
+                putJsonArray("entities") {
+                    add(buildJsonObject {
+                        put("type", "text_link")
+                        putJsonArray("nodes") { add(JsonPrimitive(0)) }
+                        put("secret_ref", "link.target")
+                    })
+                    add(buildJsonObject {
+                        put("type", "media")
+                        put("media_id", "00000000-0000-0000-0000-000000000099")
+                        put("secret_ref", "media.key")
+                    })
+                }
+            },
+            secretMetadata = buildJsonObject {
+                put("link.target", "https://example.test/private")
+                put("media.key", "test-media-key")
+            },
             metadata = DocumentMetadata(revisionNumber = 2uL),
         )
         val revisedEnvelope = MessengerCrypto(HybridKodiumEscrowBlobBuilder()).encryptTextMessage(
@@ -247,6 +265,7 @@ class HttpTwoDeviceRoundTripTest {
         assertEquals(revisedEnvelope.header.revisionId, edited.string("id"))
         assertEquals(reservation.revisionId, edited.string("parent_revision_id"))
         assertEquals(2, edited.int("revision_number"))
+        assertEquals(13, edited.getValue("document").jsonObject.int("presence_bitmap"))
         assertEquals(chatId, editSignal.chatId)
         assertEquals(reservation.messageId, editSignal.messageId)
 
@@ -390,7 +409,10 @@ class HttpTwoDeviceRoundTripTest {
             parent_revision_id = getValue("parent_revision_id").jsonPrimitive.contentOrNull,
             created_at = string("created_at"),
             document = PrivateDocumentEnvelopeDto(
-                encrypted_nodes = document.getValue("encrypted_nodes").jsonArray.map { it.jsonPrimitive.content },
+                encrypted_nodes = document["encrypted_nodes"]?.jsonArray
+                    ?.map { it.jsonPrimitive.content }.orEmpty(),
+                markup = document["markup"]?.jsonObject,
+                encrypted_metadata = document["encrypted_metadata"]?.jsonPrimitive?.contentOrNull,
                 metadata = PrivateMetadataDto(
                     content_mode = metadata.string("content_mode"),
                     format_version = metadata.int("format_version").toUInt(),
@@ -429,7 +451,11 @@ class HttpTwoDeviceRoundTripTest {
     }
 
     private fun PrivateDocumentEnvelopeDto.toJson(): JsonObject = buildJsonObject {
-        putJsonArray("encrypted_nodes") { encrypted_nodes.forEach { add(JsonPrimitive(it)) } }
+        if (encrypted_nodes.isNotEmpty()) {
+            putJsonArray("encrypted_nodes") { encrypted_nodes.forEach { add(JsonPrimitive(it)) } }
+        }
+        markup?.let { put("markup", it) }
+        encrypted_metadata?.let { put("encrypted_metadata", it) }
         putJsonObject("metadata") {
             put("content_mode", metadata.content_mode)
             put("format_version", metadata.format_version.toInt())

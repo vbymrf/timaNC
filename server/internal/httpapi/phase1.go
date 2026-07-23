@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -240,6 +241,8 @@ func (h *Handler) respond(w http.ResponseWriter, r *http.Request, status int, va
 }
 
 func (h *Handler) problem(w http.ResponseWriter, r *http.Request, err error) {
+	log.Printf("request_id=%s method=%s path=%s error=%v",
+		w.Header().Get("X-Request-Id"), r.Method, r.URL.Path, err)
 	status, code, message := http.StatusInternalServerError, "INTERNAL_ERROR", "request could not be completed"
 	switch {
 	case errors.Is(err, phase1.ErrInvalid):

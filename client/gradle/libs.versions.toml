@@ -1,9 +1,11 @@
 [versions]
 kotlin = "2.3.10"
 kodium = "1.0.0"
+serialization = "1.8.1"
 
 [libraries]
 kodium = { module = "eu.livotov.labs:kodium", version.ref = "kodium" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

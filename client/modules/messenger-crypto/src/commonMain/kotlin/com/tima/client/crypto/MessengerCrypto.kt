@@ -2,6 +2,7 @@ package com.tima.client.crypto
 
 import com.tima.client.domain.CURRENT_PROTOCOL_VERSION
 import com.tima.client.domain.DevicePublicKeys
+import com.tima.client.domain.DocumentV2Policy
 import com.tima.client.domain.EncryptedDocumentV2
 import com.tima.client.domain.EnvelopeHeader
 import com.tima.client.domain.PRIVATE_CONTENT_MODE
@@ -13,6 +14,8 @@ import io.kodium.Kodium
 import io.kodium.KodiumPrivateKey
 import io.kodium.KodiumPublicKey
 import io.kodium.ratchet.HKDF
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 
 class DeviceIdentity private constructor(internal val privateKey: KodiumPrivateKey) {
     val publicKeys: DevicePublicKeys
@@ -89,10 +92,14 @@ class MessengerCrypto(
         val messageKey = Kodium.generateHighEntropyKey()
         try {
             val commitment = KeyCommitments.derive(messageKey)
-            val presenceBitmap = 0b0001u
+            val presenceBitmap =
+                (if (document.textNodes.isNotEmpty()) 0b0001u else 0u) or
+                    (if (document.markup != null) 0b0100u else 0u) or
+                    (if (document.secretMetadata != null) 0b1000u else 0u)
             val encryptedNodes = document.textNodes.mapIndexed { index, node ->
                 val aad = CanonicalEncoding.documentAad(
                     header, document.metadata, commitment, presenceBitmap, index.toUInt(),
+                    document.markup,
                 )
                 val nodeKey = deriveNodeKey(messageKey, aad)
                 try {
@@ -101,8 +108,24 @@ class MessengerCrypto(
                     nodeKey.fill(0)
                 }
             }
+            val encryptedMetadata = document.secretMetadata?.let {
+                val aad = CanonicalEncoding.metadataAad(
+                    header, document.metadata, commitment, presenceBitmap, document.markup,
+                )
+                val metadataKey = deriveMetadataKey(messageKey, aad)
+                try {
+                    Kodium.encryptSymmetric(
+                        metadataKey,
+                        DocumentV2Policy.canonicalJson(it),
+                    ).getOrThrow()
+                } finally {
+                    metadataKey.fill(0)
+                }
+            }
             val encryptedDocument = EncryptedDocumentV2(
                 encryptedNodes = encryptedNodes,
+                markup = document.markup,
+                encryptedMetadata = encryptedMetadata,
                 metadata = document.metadata,
                 presenceBitmap = presenceBitmap,
             )
@@ -164,6 +187,7 @@ class MessengerCrypto(
                     envelope.keyCommitment,
                     envelope.document.presenceBitmap,
                     index.toUInt(),
+                    envelope.document.markup,
                 )
                 val nodeKey = deriveNodeKey(messageKey, aad)
                 try {
@@ -172,7 +196,29 @@ class MessengerCrypto(
                     nodeKey.fill(0)
                 }
             }
-            return PlainTextDocumentV2(nodes, metadata)
+            val secretMetadata = envelope.document.encryptedMetadata?.let { cipher ->
+                val aad = CanonicalEncoding.metadataAad(
+                    envelope.header,
+                    metadata,
+                    envelope.keyCommitment,
+                    envelope.document.presenceBitmap,
+                    envelope.document.markup,
+                )
+                val metadataKey = deriveMetadataKey(messageKey, aad)
+                try {
+                    Json.parseToJsonElement(
+                        Kodium.decryptSymmetric(metadataKey, cipher).getOrThrow().decodeToString(),
+                    ).jsonObject
+                } finally {
+                    metadataKey.fill(0)
+                }
+            }
+            return PlainTextDocumentV2(
+                textNodes = nodes,
+                markup = envelope.document.markup,
+                secretMetadata = secretMetadata,
+                metadata = metadata,
+            )
         } finally {
             messageKey.fill(0)
         }
@@ -206,6 +252,14 @@ class MessengerCrypto(
             length = 32,
         )
 
+    private fun deriveMetadataKey(messageKey: ByteArray, aad: ByteArray): ByteArray =
+        HKDF.deriveSecrets(
+            salt = null,
+            ikm = messageKey,
+            info = "tima/document-v2/metadata-key/v1".encodeToByteArray() + aad,
+            length = 32,
+        )
+
     private fun validate(header: EnvelopeHeader, document: PlainTextDocumentV2) {
         require(header.protocolVersion == CURRENT_PROTOCOL_VERSION) { "unsupported protocol version" }
         require(document.metadata.formatVersion == CURRENT_PROTOCOL_VERSION) { "unsupported document version" }
@@ -221,8 +275,11 @@ class MessengerCrypto(
         require(envelope.header.protocolVersion == document.metadata.formatVersion)
         require(document.metadata.contentMode == PRIVATE_CONTENT_MODE)
         require(document.metadata.revisionNumber > 0u)
-        require(document.presenceBitmap == 0b0001u) { "non-canonical text-only presence bitmap" }
-        require(document.encryptedNodes.isNotEmpty()) { "missing encrypted text" }
+        val expectedBitmap =
+            (if (document.encryptedNodes.isNotEmpty()) 0b0001u else 0u) or
+                (if (document.markup != null) 0b0100u else 0u) or
+                (if (document.encryptedMetadata != null) 0b1000u else 0u)
+        require(document.presenceBitmap == expectedBitmap) { "non-canonical presence bitmap" }
         require(envelope.keyCommitment.size == 32) { "missing key commitment" }
         require(envelope.escrowBlob.keyCommitment.contentEquals(envelope.keyCommitment)) {
             "escrow commitment differs from envelope"

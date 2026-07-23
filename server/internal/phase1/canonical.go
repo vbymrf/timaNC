@@ -166,17 +166,30 @@ func personalSignatureInput(
 	w.Write(sender)
 	w.Write(device)
 	w.u32(d.PresenceBitmap)
-	w.WriteByte(1) // encrypted nodes present
-	w.u32(uint32(len(d.EncryptedNodes)))
-	for _, encoded := range d.EncryptedNodes {
-		node, err := decodeNonEmpty(encoded, 1<<20)
-		if err != nil {
-			return nil, err
+	if len(d.EncryptedNodes) == 0 {
+		w.WriteByte(0)
+	} else {
+		w.WriteByte(1)
+		w.u32(uint32(len(d.EncryptedNodes)))
+		for _, encoded := range d.EncryptedNodes {
+			node, err := decodeNonEmpty(encoded, 1<<20)
+			if err != nil {
+				return nil, err
+			}
+			w.blob(node)
 		}
-		w.blob(node)
 	}
 	w.WriteByte(0) // plaintext nodes absent
-	w.WriteByte(0) // markup absent (text-only slice)
+	markup, _, err := validateAndCanonicalizeMarkup(d.Markup, len(d.EncryptedNodes))
+	if err != nil {
+		return nil, err
+	}
+	if len(markup) == 0 {
+		w.WriteByte(0)
+	} else {
+		w.WriteByte(1)
+		w.blob(markup)
+	}
 	w.blob(metadata)
 	if d.EncryptedMetadata == "" {
 		w.WriteByte(0)
