@@ -144,7 +144,7 @@
       ]
     }
   ],
-  "additionalProperties": true,
+  "unevaluatedProperties": false,
   "$defs": {
     "uint32": {
       "type": "integer",

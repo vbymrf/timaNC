@@ -99,6 +99,7 @@ model_media_variant_input.go
 model_message.go
 model_message_base.go
 model_message_list.go
+model_message_reservation.go
 model_object_acl.go
 model_object_acl_write.go
 model_one_time_prekey.go

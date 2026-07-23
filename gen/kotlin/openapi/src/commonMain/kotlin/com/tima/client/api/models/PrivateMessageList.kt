@@ -22,15 +22,16 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
- * 
+ * History projection for the authenticated device. Every wrapped_keys array contains only the key authorized for the current X-Device-Id.
  *
- * @param items 
+ * @param items Messages projected to the authenticated device; wrapped_keys never exposes entries for another device.
  * @param nextCursor 
  */
 @Serializable
 
 data class PrivateMessageList (
 
+    /* Messages projected to the authenticated device; wrapped_keys never exposes entries for another device. */
     @SerialName(value = "items") @Required val items: kotlin.collections.List<PrivateMessage>,
 
     @SerialName(value = "next_cursor") val nextCursor: kotlin.String? = null

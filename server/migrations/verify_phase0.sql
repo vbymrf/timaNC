@@ -114,13 +114,15 @@ BEGIN
   INSERT INTO devices (
     device_id, user_id, platform, identity_pubkey, signing_pubkey
   ) VALUES (
-    v_device_id, v_user_a_id, 'android', decode('01', 'hex'), decode('02', 'hex')
+    v_device_id, v_user_a_id, 'android',
+    decode(repeat('01', 32), 'hex'), decode(repeat('02', 32), 'hex')
   );
 
   INSERT INTO chats (
     chat_id, user_a, user_b, conversation_home_region
   ) VALUES (
-    v_chat_id, v_user_a_id, v_user_b_id, 'RU'
+    v_chat_id, least(v_user_a_id::TEXT, v_user_b_id::TEXT)::UUID,
+    greatest(v_user_a_id::TEXT, v_user_b_id::TEXT)::UUID, 'RU'
   );
 
   INSERT INTO personal_messages (

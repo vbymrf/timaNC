@@ -25,7 +25,8 @@ import kotlinx.serialization.encoding.*
  *
  * @param name 
  * @param platform 
- * @param publicKey 
+ * @param identityPublicKey X25519 public key used for device key agreement.
+ * @param signingPublicKey Ed25519 public key used to verify device signatures.
  * @param appVersion 
  */
 @Serializable
@@ -36,7 +37,11 @@ data class DeviceRegistration (
 
     @SerialName(value = "platform") @Required val platform: DeviceRegistration.Platform,
 
-    @SerialName(value = "public_key") @Required val publicKey: kotlin.String,
+    /* X25519 public key used for device key agreement. */
+    @SerialName(value = "identity_public_key") @Required val identityPublicKey: kotlin.String,
+
+    /* Ed25519 public key used to verify device signatures. */
+    @SerialName(value = "signing_public_key") @Required val signingPublicKey: kotlin.String,
 
     @SerialName(value = "app_version") val appVersion: kotlin.String? = null
 

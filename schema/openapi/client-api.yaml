@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Tima Client API
-  version: 1.0.0-phase0
+  version: 1.0.0-phase1-slice1
   description: |
     User-facing REST contract. Bot runtime, WebSocket, operations, internal and legal APIs are excluded.
     All timestamps are RFC 3339 UTC. All IDs are UUIDs unless a schema says otherwise.
@@ -226,7 +226,7 @@ paths:
       x-tima-implementation-phase: phase-1
       parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/Limit'}]
       responses:
-        '200': {description: Private message history, content: {application/json: {schema: {$ref: '#/components/schemas/PrivateMessageList'}}}}
+        '200': {description: Private message history. Each message includes only the wrapped key authorized for the authenticated X-Device-Id; wrapped keys for other devices are never returned., content: {application/json: {schema: {$ref: '#/components/schemas/PrivateMessageList'}}}}
         default: {$ref: '#/components/responses/Error'}
     post:
       tags: [Chats]
@@ -236,6 +236,18 @@ paths:
       requestBody: {$ref: '#/components/requestBodies/PrivateMessage'}
       responses:
         '201': {description: Private message accepted, content: {application/json: {schema: {$ref: '#/components/schemas/PrivateMessage'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /chats/{id}/message-reservations:
+    post:
+      tags: [Chats]
+      operationId: reserveChatMessage
+      security:
+        - bearerAuth: []
+          deviceId: []
+      x-tima-implementation-phase: phase-1
+      parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      responses:
+        '201': {description: Server-assigned identifiers reserved for canonical message signing., content: {application/json: {schema: {$ref: '#/components/schemas/MessageReservation'}}}}
         default: {$ref: '#/components/responses/Error'}
   /chats/{id}/messages/{msg_id}:
     delete:
@@ -1613,12 +1625,13 @@ components:
     DeviceRegistration:
       type: object
       additionalProperties: false
-      required: [name, platform, public_key]
+      required: [name, platform, identity_public_key, signing_public_key]
       properties:
         name: {type: string, minLength: 1, maxLength: 100}
         platform: {type: string, enum: [ios, android, windows]}
         app_version: {type: string, maxLength: 32}
-        public_key: {$ref: '#/components/schemas/Base64'}
+        identity_public_key: {type: string, contentEncoding: base64, description: X25519 public key used for device key agreement.}
+        signing_public_key: {type: string, contentEncoding: base64, description: Ed25519 public key used to verify device signatures.}
     IosAttestation:
       type: object
       additionalProperties: false
@@ -1722,11 +1735,11 @@ components:
     KeyBundleWrite:
       type: object
       additionalProperties: false
-      required: [device_id, identity_key, signed_prekey]
+      required: [device_id, identity_key]
       properties:
         device_id: {$ref: '#/components/schemas/Uuid'}
-        identity_key: {$ref: '#/components/schemas/Base64'}
-        signed_prekey: {$ref: '#/components/schemas/SignedPrekey'}
+        identity_key: {$ref: '#/components/schemas/Base64', description: Required X25519 identity public key.}
+        signed_prekey: {$ref: '#/components/schemas/SignedPrekey', description: Optional Signed PreKey for clients using a prekey handshake; envelope-only alpha clients omit it.}
         one_time_prekeys: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/OneTimePrekey'}}
     KeyBundle:
       allOf:
@@ -1806,6 +1819,14 @@ components:
       properties:
         items: {type: array, items: {$ref: '#/components/schemas/Chat'}}
         next_cursor: {type: string}
+    MessageReservation:
+      type: object
+      additionalProperties: false
+      required: [message_id, revision_id, expires_at]
+      properties:
+        message_id: {$ref: '#/components/schemas/DecimalInt64String'}
+        revision_id: {$ref: '#/components/schemas/Uuid'}
+        expires_at: {$ref: '#/components/schemas/Timestamp'}
     PrivateDocumentEnvelope:
       $ref: ../json/private-document-envelope.schema.json
     PublicDocument:
@@ -1822,9 +1843,13 @@ components:
     PrivateMessageWrite:
       type: object
       additionalProperties: false
-      required: [document, wrapped_keys]
+      description: Private message submission using server-assigned reservation identifiers in canonical signing. For an initial message, document.metadata.revision_number remains 1.
+      required: [message_id, revision_id, message_key_id, document, wrapped_keys]
       properties:
         sender_id: {$ref: '#/components/schemas/Uuid'}
+        message_id: {$ref: '#/components/schemas/DecimalInt64String'}
+        revision_id: {type: string, format: uuid, description: Server-assigned revision identifier returned by reserveChatMessage and included in canonical signing.}
+        message_key_id: {type: integer, minimum: 0, description: Message-key identifier included in canonical signing.}
         document: {$ref: '#/components/schemas/PrivateDocumentEnvelope'}
         wrapped_keys: {type: array, minItems: 1, items: {$ref: '#/components/schemas/WrappedKey'}}
     GroupMessageWrite:
@@ -1898,8 +1923,9 @@ components:
     PrivateMessageList:
       type: object
       required: [items]
+      description: History projection for the authenticated device. Every wrapped_keys array contains only the key authorized for the current X-Device-Id.
       properties:
-        items: {type: array, items: {$ref: '#/components/schemas/PrivateMessage'}}
+        items: {type: array, items: {$ref: '#/components/schemas/PrivateMessage'}, description: Messages projected to the authenticated device; wrapped_keys never exposes entries for another device.}
         next_cursor: {type: string}
     MessageList:
       type: object

@@ -1,4 +1,4 @@
-name: Phase 0 Server
+name: Phase 1 Server
 
 on:
   pull_request:
@@ -97,8 +97,14 @@ jobs:
           migrate -path server/migrations -database "${DATABASE_URL}" up
           migrate -path server/migrations -database "${DATABASE_URL}" version
 
-      - name: Verify Phase 0 schema invariants
-        run: psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f server/migrations/verify_phase0.sql
+      - name: Verify schema invariants
+        run: |
+          psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f server/migrations/verify_phase0.sql
+          psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f server/migrations/verify_phase1.sql
+
+      - name: Run Phase 1 database integration
+        working-directory: server
+        run: go test -tags=integration ./internal/phase1
 
       - name: Clean migration database
         if: always()

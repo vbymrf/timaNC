@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"tima-server/internal/phase1"
 	"tima-server/internal/readiness"
 )
 
@@ -21,15 +22,22 @@ type Handler struct {
 	requests atomic.Uint64
 	ready    atomic.Bool
 	started  time.Time
+	phase1   *phase1.Service
 }
 
-func New(checker ReadinessChecker) *Handler {
+func New(checker ReadinessChecker, services ...*phase1.Service) *Handler {
 	h := &Handler{started: time.Now()}
+	if len(services) > 0 {
+		h.phase1 = services[0]
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", h.health)
 	mux.HandleFunc("GET /readyz", h.readiness(checker))
 	mux.HandleFunc("GET /metrics", h.metrics)
-	h.mux = mux
+	if h.phase1 != nil {
+		h.registerPhase1(mux)
+	}
+	h.mux = h.requestID(mux)
 	return h
 }
 
@@ -77,7 +85,9 @@ func (h *Handler) metrics(w http.ResponseWriter, _ *http.Request) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }

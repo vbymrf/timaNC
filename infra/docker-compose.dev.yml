@@ -88,6 +88,10 @@ services:
       dockerfile: Dockerfile
     environment:
       HTTP_ADDR: :8080
+      APP_ENV: development
+      DEV_OTP: ${DEV_OTP:-000000}
+      TOKEN_PEPPER: ${TOKEN_PEPPER:-development-token-pepper}
+      OTP_PEPPER: ${OTP_PEPPER:-development-otp-pepper}
       DATABASE_URL: postgres://${POSTGRES_USER:-tima}:${POSTGRES_PASSWORD:-dev_postgres_change_me}@postgres:5432/${POSTGRES_DB:-tima}?sslmode=disable
       REDIS_URL: redis://:${REDIS_PASSWORD:-dev_redis_change_me}@redis:6379/0
       MINIO_ENDPOINT: http://minio:9000

@@ -1,0 +1,16 @@
+{
+  "encrypted_nodes": [
+    "Y2lwaGVydGV4dA=="
+  ],
+  "metadata": {
+    "format_version": 2,
+    "revision_number": 1,
+    "content_mode": "private"
+  },
+  "protocol_version": 2,
+  "presence_bitmap": 1,
+  "key_commitment": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "escrow_blob": "ZXNjcm93",
+  "signature": "c2lnbmF0dXJl",
+  "unexpected_field": true
+}

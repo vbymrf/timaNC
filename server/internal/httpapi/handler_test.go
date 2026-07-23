@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"tima-server/internal/phase1"
 	"tima-server/internal/readiness"
 )
 
@@ -66,5 +67,23 @@ func TestMetrics(t *testing.T) {
 		if !strings.Contains(response.Body.String(), metric) {
 			t.Errorf("metrics do not contain %q:\n%s", metric, response.Body.String())
 		}
+	}
+}
+
+func TestReservationRouteMatchesContract(t *testing.T) {
+	handler := New(readinessStub{ready: true}, &phase1.Service{})
+
+	exact := httptest.NewRecorder()
+	handler.ServeHTTP(exact, httptest.NewRequest(http.MethodPost,
+		"/v1/chats/00000000-0000-4000-8000-000000000000/message-reservations", nil))
+	if exact.Code != http.StatusUnauthorized {
+		t.Fatalf("contract route status = %d, want authentication challenge", exact.Code)
+	}
+
+	old := httptest.NewRecorder()
+	handler.ServeHTTP(old, httptest.NewRequest(http.MethodPost,
+		"/v1/chats/00000000-0000-4000-8000-000000000000/messages/reservations", nil))
+	if old.Code != http.StatusNotFound {
+		t.Fatalf("obsolete route status = %d, want 404", old.Code)
 	}
 }

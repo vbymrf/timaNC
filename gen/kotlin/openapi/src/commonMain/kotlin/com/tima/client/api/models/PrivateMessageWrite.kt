@@ -22,8 +22,11 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
- * 
+ * Private message submission using server-assigned reservation identifiers in canonical signing. For an initial message, document.metadata.revision_number remains 1.
  *
+ * @param messageId Positive PostgreSQL BIGINT serialized as a decimal string for JavaScript safety; values must not exceed 9223372036854775807.
+ * @param revisionId Server-assigned revision identifier returned by reserveChatMessage and included in canonical signing.
+ * @param messageKeyId Message-key identifier included in canonical signing.
  * @param document 
  * @param wrappedKeys 
  * @param senderId 
@@ -31,6 +34,15 @@ import kotlinx.serialization.encoding.*
 @Serializable
 
 data class PrivateMessageWrite (
+
+    /* Positive PostgreSQL BIGINT serialized as a decimal string for JavaScript safety; values must not exceed 9223372036854775807. */
+    @SerialName(value = "message_id") @Required val messageId: kotlin.String,
+
+    /* Server-assigned revision identifier returned by reserveChatMessage and included in canonical signing. */
+    @SerialName(value = "revision_id") @Required val revisionId: kotlin.String,
+
+    /* Message-key identifier included in canonical signing. */
+    @SerialName(value = "message_key_id") @Required val messageKeyId: kotlin.Int,
 
     @SerialName(value = "document") @Required val document: kotlin.collections.Map<kotlin.String, kotlinx.serialization.json.JsonElement>,
 

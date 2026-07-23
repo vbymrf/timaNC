@@ -99,6 +99,7 @@ src/commonMain/kotlin/com/tima/client/api/models/MediaVariantInput.kt
 src/commonMain/kotlin/com/tima/client/api/models/Message.kt
 src/commonMain/kotlin/com/tima/client/api/models/MessageBase.kt
 src/commonMain/kotlin/com/tima/client/api/models/MessageList.kt
+src/commonMain/kotlin/com/tima/client/api/models/MessageReservation.kt
 src/commonMain/kotlin/com/tima/client/api/models/ObjectAcl.kt
 src/commonMain/kotlin/com/tima/client/api/models/ObjectAclWrite.kt
 src/commonMain/kotlin/com/tima/client/api/models/OneTimePrekey.kt

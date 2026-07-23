@@ -13,6 +13,7 @@ import (
 
 	"tima-server/internal/config"
 	"tima-server/internal/httpapi"
+	"tima-server/internal/phase1"
 	"tima-server/internal/readiness"
 )
 
@@ -48,10 +49,14 @@ func run() error {
 		"redis":      redisCheck,
 		"minio":      minioCheck,
 	})
+	phase1Service, err := phase1.New(pool, cfg)
+	if err != nil {
+		return err
+	}
 
 	server := &http.Server{
 		Addr:         cfg.HTTPAddr,
-		Handler:      httpapi.New(checker),
+		Handler:      httpapi.New(checker, phase1Service),
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
 		IdleTimeout:  cfg.IdleTimeout,

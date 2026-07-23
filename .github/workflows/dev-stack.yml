@@ -1,4 +1,4 @@
-name: Phase 0 Dev Stack
+name: Phase 1 Dev Stack
 
 on:
   pull_request:
@@ -56,6 +56,34 @@ jobs:
 
       - name: Check readiness
         run: curl --fail --show-error --silent --retry 30 --retry-delay 2 --retry-all-errors http://localhost:8080/readyz
+
+      - name: Exercise authentication rotation
+        shell: bash
+        run: |
+          challenge="$(
+            curl --fail --show-error --silent \
+              -H 'Content-Type: application/json' \
+              -d '{"phone":"+15550001001","locale":"en"}' \
+              http://localhost:8080/v1/auth/register | jq -r .challenge_id
+          )"
+          session="$(
+            curl --fail --show-error --silent \
+              -H 'Content-Type: application/json' \
+              -d '{"challenge_id":"'"${challenge}"'","otp":"000000","password":"phase1-test-password","display_name":"CI user","device":{"name":"CI device","platform":"android","identity_public_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","signing_public_key":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="}}' \
+              http://localhost:8080/v1/auth/verify
+          )"
+          device="$(jq -r .device.id <<<"${session}")"
+          refreshed="$(
+            curl --fail --show-error --silent \
+              -H 'Content-Type: application/json' \
+              -d '{"refresh_token":"'"$(jq -r .refresh_token <<<"${session}")"'","device_id":"'"${device}"'"}' \
+              http://localhost:8080/v1/auth/refresh
+          )"
+          curl --fail --show-error --silent -o /dev/null \
+            -X POST \
+            -H "Authorization: Bearer $(jq -r .access_token <<<"${refreshed}")" \
+            -H "X-Device-Id: ${device}" \
+            http://localhost:8080/v1/auth/logout
 
       - name: Show service state
         if: always()

@@ -14,6 +14,14 @@ type Config struct {
 	DatabaseURL      string
 	RedisURL         string
 	MinIOEndpoint    string
+	Environment      string
+	TokenPepper      string
+	OTPPepper        string
+	DevOTP           string
+	EscrowSigningKey string
+	EscrowKeyID      string
+	EscrowX25519Key  string
+	EscrowMLKEMKey   string
 	ReadTimeout      time.Duration
 	WriteTimeout     time.Duration
 	IdleTimeout      time.Duration
@@ -27,6 +35,14 @@ func Load() (Config, error) {
 		DatabaseURL:      firstNonEmpty(os.Getenv("DATABASE_URL"), os.Getenv("POSTGRES_DSN")),
 		RedisURL:         env("REDIS_URL", "redis://localhost:6379"),
 		MinIOEndpoint:    env("MINIO_ENDPOINT", "http://localhost:9000"),
+		Environment:      env("APP_ENV", "development"),
+		TokenPepper:      os.Getenv("TOKEN_PEPPER"),
+		OTPPepper:        os.Getenv("OTP_PEPPER"),
+		DevOTP:           env("DEV_OTP", "000000"),
+		EscrowSigningKey: os.Getenv("ESCROW_SIGNING_PRIVATE_KEY"),
+		EscrowKeyID:      env("ESCROW_SIGNING_KEY_ID", "dev-ed25519-1"),
+		EscrowX25519Key:  os.Getenv("ESCROW_X25519_PUBLIC_KEY"),
+		EscrowMLKEMKey:   os.Getenv("ESCROW_MLKEM768_PUBLIC_KEY"),
 		ReadTimeout:      duration("HTTP_READ_TIMEOUT", 5*time.Second),
 		WriteTimeout:     duration("HTTP_WRITE_TIMEOUT", 10*time.Second),
 		IdleTimeout:      duration("HTTP_IDLE_TIMEOUT", 60*time.Second),
@@ -37,6 +53,19 @@ func Load() (Config, error) {
 	var errs []error
 	if strings.TrimSpace(cfg.DatabaseURL) == "" {
 		errs = append(errs, errors.New("DATABASE_URL (or POSTGRES_DSN) is required"))
+	}
+	dev := cfg.Environment == "development" || cfg.Environment == "test"
+	if !dev && (cfg.TokenPepper == "" || cfg.OTPPepper == "" || cfg.EscrowSigningKey == "" ||
+		cfg.EscrowX25519Key == "" || cfg.EscrowMLKEMKey == "") {
+		errs = append(errs, errors.New("token, OTP, and escrow keys are required outside development/test"))
+	}
+	if dev {
+		if cfg.TokenPepper == "" {
+			cfg.TokenPepper = "development-token-pepper"
+		}
+		if cfg.OTPPepper == "" {
+			cfg.OTPPepper = "development-otp-pepper"
+		}
 	}
 	if u, err := url.ParseRequestURI(cfg.RedisURL); err != nil ||
 		(u.Scheme != "redis" && u.Scheme != "rediss") || u.Host == "" {
