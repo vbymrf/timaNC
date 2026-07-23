@@ -251,7 +251,10 @@ class HttpTwoDeviceRoundTripTest {
         val privateMediaId = upload.string("media_id")
         assertEquals("private", upload.string("content_mode"))
         val uploadTTL = Duration.between(Instant.now(), Instant.parse(upload.string("expires_at")))
-        assertTrue(!uploadTTL.isNegative && uploadTTL <= Duration.ofMinutes(15))
+        assertTrue(
+            !uploadTTL.isNegative && uploadTTL <= Duration.ofMinutes(15).plusSeconds(1),
+            "private media upload TTL must be within (0, 15m] allowing 1s clock jitter, got $uploadTTL",
+        )
         val uploadSlots = upload.getValue("uploads").jsonArray
         assertEquals(3, uploadSlots.size)
         uploadSlots.forEach { rawSlot ->
@@ -274,7 +277,10 @@ class HttpTwoDeviceRoundTripTest {
             buildJsonObject { put("variant", "preview") },
         )
         val accessTTL = Duration.between(Instant.now(), Instant.parse(access.string("expires_at")))
-        assertTrue(!accessTTL.isNegative && accessTTL <= Duration.ofMinutes(15))
+        assertTrue(
+            !accessTTL.isNegative && accessTTL <= Duration.ofMinutes(15).plusSeconds(1),
+            "private media access TTL must be within (0, 15m] allowing 1s clock jitter, got $accessTTL",
+        )
         assertEquals(
             privateMedia.getValue("preview").toList(),
             http.getAbsolute(access.string("url")).toList(),

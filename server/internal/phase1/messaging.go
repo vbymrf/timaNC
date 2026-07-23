@@ -507,6 +507,7 @@ func (s *Service) ListMessages(ctx context.Context, p Principal, chatID string, 
 		if !member {
 			return nil, ErrForbidden
 		}
+		out = []PrivateMessage{}
 	}
 	return out, nil
 }

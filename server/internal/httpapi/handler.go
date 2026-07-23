@@ -79,7 +79,7 @@ func (w *statusWriter) WriteHeader(status int) {
 
 func isMessageSendPath(path string) bool {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	return len(parts) == 5 && parts[0] == "v1" && parts[1] == "chats" &&
+	return len(parts) == 4 && parts[0] == "v1" && parts[1] == "chats" &&
 		parts[3] == "messages"
 }
 
