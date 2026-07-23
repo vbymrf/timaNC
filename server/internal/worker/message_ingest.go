@@ -13,12 +13,15 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"tima-server/internal/eventbus"
+	"tima-server/internal/push"
 )
 
 type MessageConsumer struct {
 	DB           *pgxpool.Pool
 	Redis        *redis.Client
 	ConsumerName string
+	PushSender   push.Sender
+	PushTokenKey []byte
 }
 
 type outboxPayload struct {
@@ -155,8 +158,9 @@ func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) er
 	rows, err := c.DB.Query(ctx, `SELECT d.device_id,
 		EXISTS(SELECT 1 FROM personal_message_keys k
 		  WHERE k.chat_id=$1 AND k.message_id=$2 AND k.recipient_key=d.device_id
-		    AND k.revision_id=$4)
+		    AND k.revision_id=$4),p.provider,p.token_ciphertext
 		FROM chats c JOIN devices d ON d.user_id IN(c.user_a,c.user_b)
+		LEFT JOIN device_push_registrations p ON p.device_id=d.device_id
 		WHERE c.chat_id=$1 AND d.revoked_at IS NULL AND d.device_id<>$3`,
 		payload.ChatID, int64(messageID), payload.SenderDeviceID, notification.RevisionID)
 	if err != nil {
@@ -165,7 +169,9 @@ func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) er
 	defer rows.Close()
 	for rows.Next() {
 		var deviceID string
-		if err = rows.Scan(&deviceID, &notification.HasWrappedKey); err != nil {
+		var provider *string
+		var tokenCiphertext []byte
+		if err = rows.Scan(&deviceID, &notification.HasWrappedKey, &provider, &tokenCiphertext); err != nil {
 			return err
 		}
 		encoded, marshalErr := json.Marshal(notification)
@@ -174,6 +180,24 @@ func (c *MessageConsumer) handle(ctx context.Context, message redis.XMessage) er
 		}
 		if err = c.Redis.Publish(ctx, eventbus.NotifyChannel(deviceID), encoded).Err(); err != nil {
 			return err
+		}
+		if c.PushSender != nil && provider != nil && len(tokenCiphertext) > 0 {
+			online, presenceErr := c.Redis.Exists(ctx, eventbus.PresenceKey(deviceID)).Result()
+			if presenceErr != nil {
+				return presenceErr
+			}
+			if online == 0 {
+				token, decryptErr := push.DecryptToken(c.PushTokenKey, tokenCiphertext)
+				if decryptErr != nil {
+					return decryptErr
+				}
+				if err = c.PushSender.Send(ctx, *provider, token, push.Message{
+					Type: "message", ChatID: payload.ChatID, Preview: "Новое сообщение",
+					Encrypted: true, CollapseKey: "chat:" + payload.ChatID,
+				}); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return rows.Err()

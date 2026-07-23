@@ -21,11 +21,12 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
- * 
  *
- * @param sessionId 
- * @param qrPayload 
- * @param expiresAt 
+ *
+ * @param sessionId
+ * @param qrPayload
+ * @param claimToken
+ * @param expiresAt
  */
 @Serializable
 
@@ -34,6 +35,8 @@ data class LinkChallenge (
     @SerialName(value = "session_id") @Required val sessionId: kotlin.String,
 
     @SerialName(value = "qr_payload") @Required val qrPayload: kotlin.String,
+
+    @SerialName(value = "claim_token") @Required val claimToken: kotlin.String,
 
     @SerialName(value = "expires_at") @Required val expiresAt: kotlin.String
 

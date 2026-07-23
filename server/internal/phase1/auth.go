@@ -39,10 +39,19 @@ func (s *Service) StartRegistration(ctx context.Context, phone, locale string) (
 	return OTPChallenge{ChallengeID: id, ExpiresAt: expires, ResendAfter: 30}, nil
 }
 
-func (s *Service) VerifyRegistration(ctx context.Context, challengeID, otp, password, displayName string, in DeviceInput) (AuthSession, error) {
+func (s *Service) VerifyRegistration(
+	ctx context.Context,
+	challengeID, otp, password, displayName string,
+	in DeviceInput,
+	attestationToken string,
+	requestBody []byte,
+) (AuthSession, error) {
 	identityKey, signingKey, err := validDevice(in)
 	if err != nil || len(password) < 12 || len(password) > 128 || len(otp) != 6 {
 		return AuthSession{}, ErrInvalid
+	}
+	if err = s.requireAttestation(ctx, attestationToken, in.Platform, requestBody); err != nil {
+		return AuthSession{}, err
 	}
 	if displayName == "" {
 		displayName = "Tima user"
@@ -90,8 +99,8 @@ func (s *Service) VerifyRegistration(ctx context.Context, challengeID, otp, pass
 		return AuthSession{}, err
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO devices
-		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,app_version,last_seen,created_at)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$8)`,
+		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,app_version,attestation_ok,is_trust_anchor,last_seen,created_at)
+		VALUES($1,$2,$3,$4,$5,$6,$7,true,true,$8,$8)`,
 		deviceID, userID, in.Platform, identityKey, signingKey, in.Name, in.AppVersion, now); err != nil {
 		return AuthSession{}, err
 	}
@@ -110,10 +119,19 @@ func (s *Service) VerifyRegistration(ctx context.Context, challengeID, otp, pass
 	return session, nil
 }
 
-func (s *Service) Login(ctx context.Context, phone, password string, in DeviceInput) (AuthSession, error) {
+func (s *Service) Login(
+	ctx context.Context,
+	phone, password string,
+	in DeviceInput,
+	attestationToken string,
+	requestBody []byte,
+) (AuthSession, error) {
 	identityKey, signingKey, err := validDevice(in)
 	if err != nil || !validPhone(phone) {
 		return AuthSession{}, ErrInvalid
+	}
+	if err = s.requireAttestation(ctx, attestationToken, in.Platform, requestBody); err != nil {
+		return AuthSession{}, err
 	}
 	var user User
 	var encoded []byte
@@ -132,8 +150,8 @@ func (s *Service) Login(ctx context.Context, phone, password string, in DeviceIn
 	deviceID, _ := NewUUID()
 	now := s.Now().UTC()
 	if _, err = tx.Exec(ctx, `INSERT INTO devices
-		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,app_version,last_seen,created_at)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$8)`, deviceID, user.ID, in.Platform,
+		(device_id,user_id,platform,identity_pubkey,signing_pubkey,name,app_version,attestation_ok,is_trust_anchor,last_seen,created_at)
+		VALUES($1,$2,$3,$4,$5,$6,$7,true,true,$8,$8)`, deviceID, user.ID, in.Platform,
 		identityKey, signingKey, in.Name, in.AppVersion, now); err != nil {
 		return AuthSession{}, err
 	}

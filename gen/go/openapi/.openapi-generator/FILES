@@ -86,8 +86,10 @@ model_key_bundle_write.go
 model_key_rotation.go
 model_key_rotation_request.go
 model_link_challenge.go
+model_link_claim.go
 model_link_confirm.go
 model_link_session.go
+model_linked_auth_session.go
 model_login.go
 model_media.go
 model_media_access.go
@@ -125,6 +127,7 @@ model_public_document_write.go
 model_public_message.go
 model_public_revision.go
 model_public_target_type.go
+model_push_registration.go
 model_rating.go
 model_read_cursor.go
 model_read_state.go

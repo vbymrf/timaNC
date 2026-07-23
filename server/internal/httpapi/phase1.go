@@ -21,7 +21,14 @@ func (h *Handler) registerPhase1(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/auth/verify", h.verifyRegistration)
 	mux.HandleFunc("POST /v1/auth/login", h.login)
 	mux.HandleFunc("POST /v1/auth/refresh", h.refresh)
+	mux.HandleFunc("POST /v1/verify/attestation/ios", h.verifyIOSAttestation)
+	mux.HandleFunc("POST /v1/verify/integrity/android", h.verifyAndroidIntegrity)
 	mux.Handle("POST /v1/auth/logout", h.auth(http.HandlerFunc(h.logout)))
+	mux.HandleFunc("POST /v1/link/session", h.startDeviceLink)
+	mux.Handle("POST /v1/link/confirm", h.auth(http.HandlerFunc(h.confirmDeviceLink)))
+	mux.HandleFunc("POST /v1/link/claim", h.claimDeviceLink)
+	mux.Handle("PUT /v1/devices/push", h.auth(http.HandlerFunc(h.registerPush)))
+	mux.Handle("DELETE /v1/devices/push", h.auth(http.HandlerFunc(h.deletePush)))
 	mux.Handle("PUT /v1/keys/bundle", h.auth(http.HandlerFunc(h.putKeyBundle)))
 	mux.Handle("GET /v1/keys/bundle/{user_id}", h.auth(http.HandlerFunc(h.getKeyBundles)))
 	mux.Handle("GET /v1/escrow/config", h.auth(http.HandlerFunc(h.getEscrowConfig)))
@@ -91,11 +98,13 @@ func (h *Handler) verifyRegistration(w http.ResponseWriter, r *http.Request) {
 		DisplayName string             `json:"display_name,omitempty"`
 		Device      phase1.DeviceInput `json:"device"`
 	}
-	if _, err := decodeStrict(r, &in); err != nil {
+	body, err := decodeStrict(r, &in)
+	if err != nil {
 		h.problem(w, r, phase1.ErrInvalid)
 		return
 	}
-	out, err := h.phase1.VerifyRegistration(r.Context(), in.ChallengeID, in.OTP, in.Password, in.DisplayName, in.Device)
+	out, err := h.phase1.VerifyRegistration(r.Context(), in.ChallengeID, in.OTP, in.Password,
+		in.DisplayName, in.Device, r.Header.Get("X-Attestation-Token"), body)
 	h.respond(w, r, http.StatusCreated, out, err)
 }
 
@@ -105,11 +114,33 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		Password string             `json:"password"`
 		Device   phase1.DeviceInput `json:"device"`
 	}
+	body, err := decodeStrict(r, &in)
+	if err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, err := h.phase1.Login(r.Context(), in.Phone, in.Password, in.Device,
+		r.Header.Get("X-Attestation-Token"), body)
+	h.respond(w, r, http.StatusOK, out, err)
+}
+
+func (h *Handler) verifyIOSAttestation(w http.ResponseWriter, r *http.Request) {
+	var in phase1.IOSAttestation
 	if _, err := decodeStrict(r, &in); err != nil {
 		h.problem(w, r, phase1.ErrInvalid)
 		return
 	}
-	out, err := h.phase1.Login(r.Context(), in.Phone, in.Password, in.Device)
+	out, err := h.phase1.VerifyIOSAttestation(r.Context(), in)
+	h.respond(w, r, http.StatusOK, out, err)
+}
+
+func (h *Handler) verifyAndroidIntegrity(w http.ResponseWriter, r *http.Request) {
+	var in phase1.AndroidIntegrity
+	if _, err := decodeStrict(r, &in); err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, err := h.phase1.VerifyAndroidAttestation(r.Context(), in)
 	h.respond(w, r, http.StatusOK, out, err)
 }
 
@@ -128,6 +159,57 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	if err := h.phase1.Logout(r.Context(), principal(r)); err != nil {
+		h.problem(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) startDeviceLink(w http.ResponseWriter, r *http.Request) {
+	var in phase1.LinkSession
+	if _, err := decodeStrict(r, &in); err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, err := h.phase1.StartDeviceLink(r.Context(), in)
+	h.respond(w, r, http.StatusCreated, out, err)
+}
+
+func (h *Handler) confirmDeviceLink(w http.ResponseWriter, r *http.Request) {
+	var in phase1.LinkConfirm
+	if _, err := decodeStrict(r, &in); err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, err := h.phase1.ConfirmDeviceLink(r.Context(), principal(r), in)
+	h.respond(w, r, http.StatusOK, out, err)
+}
+
+func (h *Handler) claimDeviceLink(w http.ResponseWriter, r *http.Request) {
+	var in phase1.LinkClaim
+	if _, err := decodeStrict(r, &in); err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, err := h.phase1.ClaimDeviceLink(r.Context(), in)
+	h.respond(w, r, http.StatusOK, out, err)
+}
+
+func (h *Handler) registerPush(w http.ResponseWriter, r *http.Request) {
+	var in phase1.PushRegistration
+	if _, err := decodeStrict(r, &in); err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	if err := h.phase1.RegisterPush(r.Context(), principal(r), in); err != nil {
+		h.problem(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) deletePush(w http.ResponseWriter, r *http.Request) {
+	if err := h.phase1.DeletePush(r.Context(), principal(r)); err != nil {
 		h.problem(w, r, err)
 		return
 	}
@@ -316,6 +398,8 @@ func (h *Handler) problem(w http.ResponseWriter, r *http.Request, err error) {
 		status, code, message = 404, "NOT_FOUND", "resource was not found"
 	case errors.Is(err, phase1.ErrConflict):
 		status, code, message = 409, "CONFLICT", "request conflicts with existing state"
+	case errors.Is(err, phase1.ErrUnavailable):
+		status, code, message = 503, "SERVICE_UNAVAILABLE", "required external verifier is unavailable"
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	writeJSON(w, status, map[string]any{"error": map[string]any{

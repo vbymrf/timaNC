@@ -21,24 +21,32 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
+ * 
  *
- *
- * @param desktopPublicKey
- * @param signingPublicKey
- * @param desktopName
+ * @param provider 
+ * @param token 
  */
 @Serializable
 
-data class LinkSession (
+data class PushRegistration (
 
-    @SerialName(value = "desktop_public_key") @Required val desktopPublicKey: kotlin.String,
+    @SerialName(value = "provider") @Required val provider: PushRegistration.Provider,
 
-    @SerialName(value = "signing_public_key") @Required val signingPublicKey: kotlin.String,
-
-    @SerialName(value = "desktop_name") @Required val desktopName: kotlin.String
+    @SerialName(value = "token") @Required val token: kotlin.String
 
 ) : kotlin.collections.HashMap<String, kotlinx.serialization.json.JsonElement>() {
 
+    /**
+     * 
+     *
+     * Values: FCM,APNS,WNS
+     */
+    @Serializable
+    enum class Provider(val value: kotlin.String) {
+        @SerialName(value = "fcm") FCM("fcm"),
+        @SerialName(value = "apns") APNS("apns"),
+        @SerialName(value = "wns") WNS("wns");
+    }
 
 }
 

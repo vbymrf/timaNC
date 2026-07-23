@@ -21,17 +21,20 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
- * 
  *
- * @param sessionId 
- * @param confirmation 
- * @param wrappedDeviceSecret 
+ *
+ * @param sessionId
+ * @param qrSecret
+ * @param confirmation
+ * @param wrappedDeviceSecret
  */
 @Serializable
 
 data class LinkConfirm (
 
     @SerialName(value = "session_id") @Required val sessionId: kotlin.String,
+
+    @SerialName(value = "qr_secret") @Required val qrSecret: kotlin.String,
 
     @SerialName(value = "confirmation") @Required val confirmation: kotlin.String,
 

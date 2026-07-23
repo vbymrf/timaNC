@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,6 +15,7 @@ import (
 	"tima-server/internal/config"
 	"tima-server/internal/eventbus"
 	"tima-server/internal/outbox"
+	"tima-server/internal/push"
 	"tima-server/internal/worker"
 )
 
@@ -37,6 +39,17 @@ func main() {
 	if err = redisClient.Ping(ctx).Err(); err != nil {
 		log.Fatal(err)
 	}
+	pushTokenKey, err := push.DecodeKey(cfg.PushTokenKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var pushSender push.Sender
+	if cfg.PushGatewayURL != "" {
+		pushSender = &push.HTTPSender{
+			URL: cfg.PushGatewayURL, BearerToken: cfg.PushGatewayToken,
+			Client: &http.Client{Timeout: 5 * time.Second},
+		}
+	}
 
 	failures := make(chan error, 2)
 	go func() {
@@ -47,6 +60,7 @@ func main() {
 	go func() {
 		failures <- (&worker.MessageConsumer{
 			DB: pool, Redis: redisClient, ConsumerName: hostname(),
+			PushSender: pushSender, PushTokenKey: pushTokenKey,
 		}).Run(ctx)
 	}()
 	select {

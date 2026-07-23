@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"tima-server/internal/push"
 )
 
 type Config struct {
@@ -25,6 +27,10 @@ type Config struct {
 	TokenPepper        string
 	OTPPepper          string
 	DevOTP             string
+	DevAttestationKey  string
+	PushTokenKey       string
+	PushGatewayURL     string
+	PushGatewayToken   string
 	EscrowSigningKey   string
 	EscrowKeyID        string
 	EscrowX25519Key    string
@@ -53,6 +59,10 @@ func Load() (Config, error) {
 		TokenPepper:        os.Getenv("TOKEN_PEPPER"),
 		OTPPepper:          os.Getenv("OTP_PEPPER"),
 		DevOTP:             env("DEV_OTP", "000000"),
+		DevAttestationKey:  os.Getenv("DEV_ATTESTATION_KEY"),
+		PushTokenKey:       os.Getenv("PUSH_TOKEN_ENCRYPTION_KEY"),
+		PushGatewayURL:     os.Getenv("PUSH_GATEWAY_URL"),
+		PushGatewayToken:   os.Getenv("PUSH_GATEWAY_TOKEN"),
 		EscrowSigningKey:   os.Getenv("ESCROW_SIGNING_PRIVATE_KEY"),
 		EscrowKeyID:        env("ESCROW_SIGNING_KEY_ID", "dev-ed25519-1"),
 		EscrowX25519Key:    os.Getenv("ESCROW_X25519_PUBLIC_KEY"),
@@ -71,7 +81,8 @@ func Load() (Config, error) {
 	dev := cfg.Environment == "development" || cfg.Environment == "test"
 	if !dev && (cfg.TokenPepper == "" || cfg.OTPPepper == "" || cfg.EscrowSigningKey == "" ||
 		cfg.EscrowX25519Key == "" || cfg.EscrowMLKEMKey == "" ||
-		cfg.MinIOAccessKey == "" || cfg.MinIOSecretKey == "") {
+		cfg.MinIOAccessKey == "" || cfg.MinIOSecretKey == "" || cfg.PushTokenKey == "" ||
+		cfg.PushGatewayURL == "" || cfg.PushGatewayToken == "") {
 		errs = append(errs, errors.New("token, OTP, and escrow keys are required outside development/test"))
 	}
 	if dev {
@@ -87,6 +98,12 @@ func Load() (Config, error) {
 		if cfg.MinIOSecretKey == "" {
 			cfg.MinIOSecretKey = "dev_minio_change_me"
 		}
+		if cfg.DevAttestationKey == "" {
+			cfg.DevAttestationKey = "development-attestation-key"
+		}
+		if cfg.PushTokenKey == "" {
+			cfg.PushTokenKey = "ZGV2LXB1c2gtdG9rZW4ta2V5LTMyLWJ5dGVzISEhISE="
+		}
 	}
 	if u, err := url.ParseRequestURI(cfg.RedisURL); err != nil ||
 		(u.Scheme != "redis" && u.Scheme != "rediss") || u.Host == "" {
@@ -99,6 +116,15 @@ func Load() (Config, error) {
 	if u, err := url.ParseRequestURI(cfg.MinIOPublicURL); err != nil ||
 		(u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		errs = append(errs, errors.New("MINIO_PUBLIC_ENDPOINT must be an absolute HTTP URL"))
+	}
+	if cfg.PushGatewayURL != "" {
+		if u, err := url.ParseRequestURI(cfg.PushGatewayURL); err != nil ||
+			u.Scheme != "https" || u.Host == "" {
+			errs = append(errs, errors.New("PUSH_GATEWAY_URL must be an absolute HTTPS URL"))
+		}
+	}
+	if _, err := push.DecodeKey(cfg.PushTokenKey); err != nil {
+		errs = append(errs, fmt.Errorf("PUSH_TOKEN_ENCRYPTION_KEY: %w", err))
 	}
 	for name, value := range map[string]time.Duration{
 		"HTTP_READ_TIMEOUT":  cfg.ReadTimeout,

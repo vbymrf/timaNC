@@ -20,6 +20,7 @@ import (
 
 	"tima-server/internal/config"
 	"tima-server/internal/media"
+	"tima-server/internal/push"
 )
 
 // devMLKEM768PublicKey is a public-only FIPS 203 ML-KEM-768 fixture generated
@@ -45,26 +46,30 @@ var (
 	ErrForbidden    = errors.New("forbidden")
 	ErrNotFound     = errors.New("not found")
 	ErrConflict     = errors.New("conflict")
+	ErrUnavailable  = errors.New("service unavailable")
 )
 
 type Service struct {
-	DB                 *pgxpool.Pool
-	Environment        string
-	TokenPepper        []byte
-	OTPPepper          []byte
-	DevOTP             string
-	EscrowSigner       ed25519.PrivateKey
-	EscrowKeyID        string
-	EscrowX25519       []byte
-	EscrowMLKEM768     []byte
-	MediaStore         *media.Store
-	MediaPrivateBucket string
-	MediaPublicBucket  string
-	MediaStagingBucket string
-	Now                func() time.Time
+	DB                  *pgxpool.Pool
+	Environment         string
+	TokenPepper         []byte
+	OTPPepper           []byte
+	DevOTP              string
+	EscrowSigner        ed25519.PrivateKey
+	EscrowKeyID         string
+	EscrowX25519        []byte
+	EscrowMLKEM768      []byte
+	MediaStore          *media.Store
+	MediaPrivateBucket  string
+	MediaPublicBucket   string
+	MediaStagingBucket  string
+	AttestationVerifier AttestationVerifier
+	PushTokenKey        []byte
+	Now                 func() time.Time
 }
 
 func New(db *pgxpool.Pool, cfg config.Config) (*Service, error) {
+	var err error
 	s := &Service{
 		DB: db, Environment: cfg.Environment, TokenPepper: []byte(cfg.TokenPepper),
 		OTPPepper: []byte(cfg.OTPPepper), DevOTP: cfg.DevOTP, EscrowKeyID: cfg.EscrowKeyID,
@@ -73,7 +78,16 @@ func New(db *pgxpool.Pool, cfg config.Config) (*Service, error) {
 		MediaStagingBucket: cfg.MediaStagingBucket,
 		Now:                time.Now,
 	}
-	var err error
+	if cfg.Environment == "development" || cfg.Environment == "test" {
+		s.AttestationVerifier = NewDevelopmentAttestationVerifier(cfg.DevAttestationKey)
+		if cfg.PushTokenKey == "" {
+			cfg.PushTokenKey = "ZGV2LXB1c2gtdG9rZW4ta2V5LTMyLWJ5dGVzISEhISE="
+		}
+	}
+	s.PushTokenKey, err = push.DecodeKey(cfg.PushTokenKey)
+	if err != nil {
+		return nil, fmt.Errorf("PUSH_TOKEN_ENCRYPTION_KEY: %w", err)
+	}
 	if cfg.EscrowSigningKey != "" {
 		s.EscrowSigner, err = decodeEd25519Private(cfg.EscrowSigningKey)
 		if err != nil {

@@ -141,10 +141,27 @@ paths:
       responses:
         '204': {description: Device revoked}
         default: {$ref: '#/components/responses/Error'}
+  /devices/push:
+    put:
+      tags: [Users]
+      operationId: registerDevicePush
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/PushRegistration'}
+      responses:
+        '204': {description: Push registration stored}
+        default: {$ref: '#/components/responses/Error'}
+    delete:
+      tags: [Users]
+      operationId: deleteDevicePush
+      x-tima-implementation-phase: phase-1
+      responses:
+        '204': {description: Push registration removed}
+        default: {$ref: '#/components/responses/Error'}
   /link/session:
     post:
       tags: [Users]
       operationId: startDeviceLink
+      security: []
       x-tima-implementation-phase: phase-1
       requestBody: {$ref: '#/components/requestBodies/LinkSession'}
       responses:
@@ -158,6 +175,16 @@ paths:
       requestBody: {$ref: '#/components/requestBodies/LinkConfirm'}
       responses:
         '200': {description: Linked device, content: {application/json: {schema: {$ref: '#/components/schemas/Device'}}}}
+        default: {$ref: '#/components/responses/Error'}
+  /link/claim:
+    post:
+      tags: [Users]
+      operationId: claimDeviceLink
+      security: []
+      x-tima-implementation-phase: phase-1
+      requestBody: {$ref: '#/components/requestBodies/LinkClaim'}
+      responses:
+        '200': {description: Desktop session and wrapped device secret, content: {application/json: {schema: {$ref: '#/components/schemas/LinkedAuthSession'}}}}
         default: {$ref: '#/components/responses/Error'}
 
   /keys/bundle:
@@ -1491,6 +1518,8 @@ components:
     UserPatch: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UserPatch'}}}}
     LinkSession: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LinkSession'}}}}
     LinkConfirm: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LinkConfirm'}}}}
+    LinkClaim: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LinkClaim'}}}}
+    PushRegistration: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PushRegistration'}}}}
     KeyBundle: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/KeyBundleWrite'}}}}
     Prekeys: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PrekeyBatch'}}}}
     ChatCreate: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ChatCreate'}}}}
@@ -1696,26 +1725,50 @@ components:
     LinkSession:
       type: object
       additionalProperties: false
-      required: [desktop_public_key, desktop_name]
+      required: [desktop_public_key, signing_public_key, desktop_name]
       properties:
         desktop_public_key: {$ref: '#/components/schemas/Base64'}
+        signing_public_key: {$ref: '#/components/schemas/Base64'}
         desktop_name: {type: string, minLength: 1, maxLength: 100}
     LinkChallenge:
       type: object
       additionalProperties: false
-      required: [session_id, qr_payload, expires_at]
+      required: [session_id, qr_payload, claim_token, expires_at]
       properties:
         session_id: {$ref: '#/components/schemas/Uuid'}
         qr_payload: {type: string, minLength: 16}
+        claim_token: {type: string, minLength: 32}
         expires_at: {$ref: '#/components/schemas/Timestamp'}
     LinkConfirm:
       type: object
       additionalProperties: false
-      required: [session_id, confirmation, wrapped_device_secret]
+      required: [session_id, qr_secret, confirmation, wrapped_device_secret]
       properties:
         session_id: {$ref: '#/components/schemas/Uuid'}
+        qr_secret: {type: string, minLength: 32}
         confirmation: {$ref: '#/components/schemas/Base64'}
         wrapped_device_secret: {$ref: '#/components/schemas/Base64'}
+    LinkClaim:
+      type: object
+      additionalProperties: false
+      required: [session_id, claim_token]
+      properties:
+        session_id: {$ref: '#/components/schemas/Uuid'}
+        claim_token: {type: string, minLength: 32}
+    LinkedAuthSession:
+      allOf:
+        - {$ref: '#/components/schemas/AuthSession'}
+        - type: object
+          required: [wrapped_device_secret]
+          properties:
+            wrapped_device_secret: {$ref: '#/components/schemas/Base64'}
+    PushRegistration:
+      type: object
+      additionalProperties: false
+      required: [provider, token]
+      properties:
+        provider: {type: string, enum: [fcm, apns, wns]}
+        token: {type: string, minLength: 16, maxLength: 4096}
     SignedPrekey:
       type: object
       additionalProperties: false

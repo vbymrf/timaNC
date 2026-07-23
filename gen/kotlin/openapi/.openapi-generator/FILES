@@ -86,8 +86,10 @@ src/commonMain/kotlin/com/tima/client/api/models/KeyBundleWrite.kt
 src/commonMain/kotlin/com/tima/client/api/models/KeyRotation.kt
 src/commonMain/kotlin/com/tima/client/api/models/KeyRotationRequest.kt
 src/commonMain/kotlin/com/tima/client/api/models/LinkChallenge.kt
+src/commonMain/kotlin/com/tima/client/api/models/LinkClaim.kt
 src/commonMain/kotlin/com/tima/client/api/models/LinkConfirm.kt
 src/commonMain/kotlin/com/tima/client/api/models/LinkSession.kt
+src/commonMain/kotlin/com/tima/client/api/models/LinkedAuthSession.kt
 src/commonMain/kotlin/com/tima/client/api/models/Login.kt
 src/commonMain/kotlin/com/tima/client/api/models/Media.kt
 src/commonMain/kotlin/com/tima/client/api/models/MediaAccess.kt
@@ -125,6 +127,7 @@ src/commonMain/kotlin/com/tima/client/api/models/PublicDocumentWrite.kt
 src/commonMain/kotlin/com/tima/client/api/models/PublicMessage.kt
 src/commonMain/kotlin/com/tima/client/api/models/PublicRevision.kt
 src/commonMain/kotlin/com/tima/client/api/models/PublicTargetType.kt
+src/commonMain/kotlin/com/tima/client/api/models/PushRegistration.kt
 src/commonMain/kotlin/com/tima/client/api/models/Rating.kt
 src/commonMain/kotlin/com/tima/client/api/models/ReadCursor.kt
 src/commonMain/kotlin/com/tima/client/api/models/ReadState.kt

@@ -21,6 +21,7 @@ var _ MappedNullable = &LinkSession{}
 // LinkSession struct for LinkSession
 type LinkSession struct {
 	DesktopPublicKey string `json:"desktop_public_key"`
+	SigningPublicKey string `json:"signing_public_key"`
 	DesktopName string `json:"desktop_name"`
 	AdditionalProperties map[string]interface{}
 }
@@ -31,9 +32,10 @@ type _LinkSession LinkSession
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewLinkSession(desktopPublicKey string, desktopName string) *LinkSession {
+func NewLinkSession(desktopPublicKey string, signingPublicKey string, desktopName string) *LinkSession {
 	this := LinkSession{}
 	this.DesktopPublicKey = desktopPublicKey
+	this.SigningPublicKey = signingPublicKey
 	this.DesktopName = desktopName
 	return &this
 }
@@ -68,6 +70,30 @@ func (o *LinkSession) GetDesktopPublicKeyOk() (*string, bool) {
 // SetDesktopPublicKey sets field value
 func (o *LinkSession) SetDesktopPublicKey(v string) {
 	o.DesktopPublicKey = v
+}
+
+// GetSigningPublicKey returns the SigningPublicKey field value
+func (o *LinkSession) GetSigningPublicKey() string {
+	if o == nil {
+		var ret string
+		return ret
+	}
+
+	return o.SigningPublicKey
+}
+
+// GetSigningPublicKeyOk returns a tuple with the SigningPublicKey field value
+// and a boolean to check if the value has been set.
+func (o *LinkSession) GetSigningPublicKeyOk() (*string, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.SigningPublicKey, true
+}
+
+// SetSigningPublicKey sets field value
+func (o *LinkSession) SetSigningPublicKey(v string) {
+	o.SigningPublicKey = v
 }
 
 // GetDesktopName returns the DesktopName field value
@@ -105,6 +131,7 @@ func (o LinkSession) MarshalJSON() ([]byte, error) {
 func (o LinkSession) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["desktop_public_key"] = o.DesktopPublicKey
+	toSerialize["signing_public_key"] = o.SigningPublicKey
 	toSerialize["desktop_name"] = o.DesktopName
 
 	for key, value := range o.AdditionalProperties {
@@ -120,6 +147,7 @@ func (o *LinkSession) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"desktop_public_key",
+		"signing_public_key",
 		"desktop_name",
 	}
 
@@ -151,6 +179,7 @@ func (o *LinkSession) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "desktop_public_key")
+		delete(additionalProperties, "signing_public_key")
 		delete(additionalProperties, "desktop_name")
 		o.AdditionalProperties = additionalProperties
 	}

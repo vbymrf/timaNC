@@ -12,47 +12,42 @@ package clientapi
 
 import (
 	"encoding/json"
-	"time"
 	"fmt"
 )
 
-// checks if the LinkChallenge type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &LinkChallenge{}
+// checks if the LinkClaim type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &LinkClaim{}
 
-// LinkChallenge struct for LinkChallenge
-type LinkChallenge struct {
+// LinkClaim struct for LinkClaim
+type LinkClaim struct {
 	SessionId string `json:"session_id"`
-	QrPayload string `json:"qr_payload"`
 	ClaimToken string `json:"claim_token"`
-	ExpiresAt time.Time `json:"expires_at"`
 	AdditionalProperties map[string]interface{}
 }
 
-type _LinkChallenge LinkChallenge
+type _LinkClaim LinkClaim
 
-// NewLinkChallenge instantiates a new LinkChallenge object
+// NewLinkClaim instantiates a new LinkClaim object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewLinkChallenge(sessionId string, qrPayload string, claimToken string, expiresAt time.Time) *LinkChallenge {
-	this := LinkChallenge{}
+func NewLinkClaim(sessionId string, claimToken string) *LinkClaim {
+	this := LinkClaim{}
 	this.SessionId = sessionId
-	this.QrPayload = qrPayload
 	this.ClaimToken = claimToken
-	this.ExpiresAt = expiresAt
 	return &this
 }
 
-// NewLinkChallengeWithDefaults instantiates a new LinkChallenge object
+// NewLinkClaimWithDefaults instantiates a new LinkClaim object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewLinkChallengeWithDefaults() *LinkChallenge {
-	this := LinkChallenge{}
+func NewLinkClaimWithDefaults() *LinkClaim {
+	this := LinkClaim{}
 	return &this
 }
 
 // GetSessionId returns the SessionId field value
-func (o *LinkChallenge) GetSessionId() string {
+func (o *LinkClaim) GetSessionId() string {
 	if o == nil {
 		var ret string
 		return ret
@@ -63,7 +58,7 @@ func (o *LinkChallenge) GetSessionId() string {
 
 // GetSessionIdOk returns a tuple with the SessionId field value
 // and a boolean to check if the value has been set.
-func (o *LinkChallenge) GetSessionIdOk() (*string, bool) {
+func (o *LinkClaim) GetSessionIdOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -71,36 +66,12 @@ func (o *LinkChallenge) GetSessionIdOk() (*string, bool) {
 }
 
 // SetSessionId sets field value
-func (o *LinkChallenge) SetSessionId(v string) {
+func (o *LinkClaim) SetSessionId(v string) {
 	o.SessionId = v
 }
 
-// GetQrPayload returns the QrPayload field value
-func (o *LinkChallenge) GetQrPayload() string {
-	if o == nil {
-		var ret string
-		return ret
-	}
-
-	return o.QrPayload
-}
-
-// GetQrPayloadOk returns a tuple with the QrPayload field value
-// and a boolean to check if the value has been set.
-func (o *LinkChallenge) GetQrPayloadOk() (*string, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.QrPayload, true
-}
-
-// SetQrPayload sets field value
-func (o *LinkChallenge) SetQrPayload(v string) {
-	o.QrPayload = v
-}
-
 // GetClaimToken returns the ClaimToken field value
-func (o *LinkChallenge) GetClaimToken() string {
+func (o *LinkClaim) GetClaimToken() string {
 	if o == nil {
 		var ret string
 		return ret
@@ -111,7 +82,7 @@ func (o *LinkChallenge) GetClaimToken() string {
 
 // GetClaimTokenOk returns a tuple with the ClaimToken field value
 // and a boolean to check if the value has been set.
-func (o *LinkChallenge) GetClaimTokenOk() (*string, bool) {
+func (o *LinkClaim) GetClaimTokenOk() (*string, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -119,35 +90,11 @@ func (o *LinkChallenge) GetClaimTokenOk() (*string, bool) {
 }
 
 // SetClaimToken sets field value
-func (o *LinkChallenge) SetClaimToken(v string) {
+func (o *LinkClaim) SetClaimToken(v string) {
 	o.ClaimToken = v
 }
 
-// GetExpiresAt returns the ExpiresAt field value
-func (o *LinkChallenge) GetExpiresAt() time.Time {
-	if o == nil {
-		var ret time.Time
-		return ret
-	}
-
-	return o.ExpiresAt
-}
-
-// GetExpiresAtOk returns a tuple with the ExpiresAt field value
-// and a boolean to check if the value has been set.
-func (o *LinkChallenge) GetExpiresAtOk() (*time.Time, bool) {
-	if o == nil {
-		return nil, false
-	}
-	return &o.ExpiresAt, true
-}
-
-// SetExpiresAt sets field value
-func (o *LinkChallenge) SetExpiresAt(v time.Time) {
-	o.ExpiresAt = v
-}
-
-func (o LinkChallenge) MarshalJSON() ([]byte, error) {
+func (o LinkClaim) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -155,12 +102,10 @@ func (o LinkChallenge) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o LinkChallenge) ToMap() (map[string]interface{}, error) {
+func (o LinkClaim) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["session_id"] = o.SessionId
-	toSerialize["qr_payload"] = o.QrPayload
 	toSerialize["claim_token"] = o.ClaimToken
-	toSerialize["expires_at"] = o.ExpiresAt
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -169,15 +114,13 @@ func (o LinkChallenge) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-func (o *LinkChallenge) UnmarshalJSON(data []byte) (err error) {
+func (o *LinkClaim) UnmarshalJSON(data []byte) (err error) {
 	// This validates that all required properties are included in the JSON object
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"session_id",
-		"qr_payload",
 		"claim_token",
-		"expires_at",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -194,61 +137,59 @@ func (o *LinkChallenge) UnmarshalJSON(data []byte) (err error) {
 		}
 	}
 
-	varLinkChallenge := _LinkChallenge{}
+	varLinkClaim := _LinkClaim{}
 
-	err = json.Unmarshal(data, &varLinkChallenge)
+	err = json.Unmarshal(data, &varLinkClaim)
 
 	if err != nil {
 		return err
 	}
 
-	*o = LinkChallenge(varLinkChallenge)
+	*o = LinkClaim(varLinkClaim)
 
 	additionalProperties := make(map[string]interface{})
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "session_id")
-		delete(additionalProperties, "qr_payload")
 		delete(additionalProperties, "claim_token")
-		delete(additionalProperties, "expires_at")
 		o.AdditionalProperties = additionalProperties
 	}
 
 	return err
 }
 
-type NullableLinkChallenge struct {
-	value *LinkChallenge
+type NullableLinkClaim struct {
+	value *LinkClaim
 	isSet bool
 }
 
-func (v NullableLinkChallenge) Get() *LinkChallenge {
+func (v NullableLinkClaim) Get() *LinkClaim {
 	return v.value
 }
 
-func (v *NullableLinkChallenge) Set(val *LinkChallenge) {
+func (v *NullableLinkClaim) Set(val *LinkClaim) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableLinkChallenge) IsSet() bool {
+func (v NullableLinkClaim) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableLinkChallenge) Unset() {
+func (v *NullableLinkClaim) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableLinkChallenge(val *LinkChallenge) *NullableLinkChallenge {
-	return &NullableLinkChallenge{value: val, isSet: true}
+func NewNullableLinkClaim(val *LinkClaim) *NullableLinkClaim {
+	return &NullableLinkClaim{value: val, isSet: true}
 }
 
-func (v NullableLinkChallenge) MarshalJSON() ([]byte, error) {
+func (v NullableLinkClaim) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableLinkChallenge) UnmarshalJSON(src []byte) error {
+func (v *NullableLinkClaim) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

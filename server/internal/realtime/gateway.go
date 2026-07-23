@@ -105,6 +105,12 @@ func (g *Gateway) serveWebSocket(w http.ResponseWriter, r *http.Request) {
 	if err = connection.WriteMessage(websocket.BinaryMessage, ack); err != nil {
 		return
 	}
+	presenceKey := eventbus.PresenceKey(principal.DeviceID)
+	if err = g.Redis.Set(r.Context(), presenceKey, "online", 90*time.Second).Err(); err != nil {
+		return
+	}
+	presenceTicker := time.NewTicker(30 * time.Second)
+	defer presenceTicker.Stop()
 
 	disconnected := make(chan struct{})
 	go func() {
@@ -124,6 +130,10 @@ func (g *Gateway) serveWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-disconnected:
 			return
+		case <-presenceTicker.C:
+			if err = g.Redis.Set(r.Context(), presenceKey, "online", 90*time.Second).Err(); err != nil {
+				return
+			}
 		case message, ok := <-pubsub.Channel():
 			if !ok {
 				return

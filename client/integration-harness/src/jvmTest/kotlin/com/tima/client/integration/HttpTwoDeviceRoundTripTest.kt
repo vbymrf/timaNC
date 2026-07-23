@@ -38,6 +38,8 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonArray
@@ -424,22 +426,24 @@ class HttpTwoDeviceRoundTripTest {
             publicKeys = identity.publicKeys,
             appVersion = "0.1.0-e2e",
         )
+        val verifyBody = buildJsonObject {
+            put("challenge_id", challenge.string("challenge_id"))
+            put("otp", "000000")
+            put("password", TEST_PASSWORD)
+            put("display_name", displayName)
+            putJsonObject("device") {
+                put("name", registration.name)
+                put("platform", registration.platform.wireValue)
+                put("identity_public_key", registration.identity_public_key)
+                put("signing_public_key", registration.signing_public_key)
+                registration.app_version?.let { put("app_version", it) }
+            }
+        }
         val auth = http.post(
             "/v1/auth/verify",
             session = null,
-            body = buildJsonObject {
-                put("challenge_id", challenge.string("challenge_id"))
-                put("otp", "000000")
-                put("password", TEST_PASSWORD)
-                put("display_name", displayName)
-                putJsonObject("device") {
-                    put("name", registration.name)
-                    put("platform", registration.platform.wireValue)
-                    put("identity_public_key", registration.identity_public_key)
-                    put("signing_public_key", registration.signing_public_key)
-                    registration.app_version?.let { put("app_version", it) }
-                }
-            },
+            body = verifyBody,
+            headers = mapOf("X-Attestation-Token" to http.attestAndroid(verifyBody)),
         )
         return Session(
             accessToken = auth.string("access_token"),
@@ -461,20 +465,22 @@ class HttpTwoDeviceRoundTripTest {
             publicKeys = identity.publicKeys,
             appVersion = "0.1.0-e2e",
         )
+        val loginBody = buildJsonObject {
+            put("phone", phone)
+            put("password", TEST_PASSWORD)
+            putJsonObject("device") {
+                put("name", registration.name)
+                put("platform", registration.platform.wireValue)
+                put("identity_public_key", registration.identity_public_key)
+                put("signing_public_key", registration.signing_public_key)
+                registration.app_version?.let { put("app_version", it) }
+            }
+        }
         val auth = http.post(
             "/v1/auth/login",
             session = null,
-            body = buildJsonObject {
-                put("phone", phone)
-                put("password", TEST_PASSWORD)
-                putJsonObject("device") {
-                    put("name", registration.name)
-                    put("platform", registration.platform.wireValue)
-                    put("identity_public_key", registration.identity_public_key)
-                    put("signing_public_key", registration.signing_public_key)
-                    registration.app_version?.let { put("app_version", it) }
-                }
-            },
+            body = loginBody,
+            headers = mapOf("X-Attestation-Token" to http.attestAndroid(loginBody)),
         )
         return Session(
             accessToken = auth.string("access_token"),
@@ -641,21 +647,43 @@ class HttpTwoDeviceRoundTripTest {
         private val client = HttpClient.newBuilder().build()
 
         fun get(path: String, session: Session): JsonObject =
-            execute("GET", path, session, null, null)
+            execute("GET", path, session, null, null, emptyMap())
 
         fun post(
             path: String,
             session: Session?,
             body: JsonObject?,
             idempotencyKey: String? = null,
-        ): JsonObject = execute("POST", path, session, body, idempotencyKey)
+            headers: Map<String, String> = emptyMap(),
+        ): JsonObject = execute("POST", path, session, body, idempotencyKey, headers)
 
         fun postStatus(
             path: String,
             session: Session?,
             body: JsonObject,
             idempotencyKey: String? = null,
-        ): Int = request("POST", path, session, body, idempotencyKey).statusCode()
+        ): Int = request("POST", path, session, body, idempotencyKey, emptyMap()).statusCode()
+
+        fun attestAndroid(requestBody: JsonObject): String {
+            val challenge = MessageDigest.getInstance("SHA-256")
+                .digest(requestBody.toString().toByteArray(Charsets.UTF_8))
+            val mac = Mac.getInstance("HmacSHA256")
+            mac.init(SecretKeySpec("development-attestation-key".toByteArray(), "HmacSHA256"))
+            mac.update("android".toByteArray())
+            mac.update(byteArrayOf(0))
+            mac.update(byteArrayOf(0))
+            mac.update(challenge)
+            val result = post(
+                "/v1/verify/integrity/android",
+                session = null,
+                body = buildJsonObject {
+                    put("integrity_token", Base64.getEncoder().encodeToString(mac.doFinal()))
+                    put("nonce", Base64.getEncoder().encodeToString(challenge))
+                },
+            )
+            val token = result.getValue("attestation_token").jsonPrimitive.content
+            return token
+        }
 
         fun putAbsolute(url: String, value: ByteArray, contentType: String) {
             val response = client.send(
@@ -683,8 +711,9 @@ class HttpTwoDeviceRoundTripTest {
             session: Session?,
             body: JsonObject?,
             idempotencyKey: String?,
+            headers: Map<String, String>,
         ): JsonObject {
-            val response = request(method, path, session, body, idempotencyKey)
+            val response = request(method, path, session, body, idempotencyKey, headers)
             check(response.statusCode() in 200..299) {
                 "$method $path failed with ${response.statusCode()}: ${response.body()}"
             }
@@ -698,6 +727,7 @@ class HttpTwoDeviceRoundTripTest {
             session: Session?,
             body: JsonObject?,
             idempotencyKey: String?,
+            headers: Map<String, String>,
         ): HttpResponse<String> {
             val builder = HttpRequest.newBuilder(URI.create(baseUrl + path))
                 .header("Accept", "application/json")
@@ -706,6 +736,7 @@ class HttpTwoDeviceRoundTripTest {
                 builder.header("X-Device-Id", it.deviceId)
             }
             idempotencyKey?.let { builder.header("Idempotency-Key", it) }
+            headers.forEach(builder::header)
             if (body == null) {
                 builder.method(method, HttpRequest.BodyPublishers.noBody())
             } else {

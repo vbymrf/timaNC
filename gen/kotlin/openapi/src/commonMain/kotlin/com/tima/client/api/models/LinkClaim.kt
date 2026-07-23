@@ -21,21 +21,18 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 
 /**
+ * 
  *
- *
- * @param desktopPublicKey
- * @param signingPublicKey
- * @param desktopName
+ * @param sessionId 
+ * @param claimToken 
  */
 @Serializable
 
-data class LinkSession (
+data class LinkClaim (
 
-    @SerialName(value = "desktop_public_key") @Required val desktopPublicKey: kotlin.String,
+    @SerialName(value = "session_id") @Required val sessionId: kotlin.String,
 
-    @SerialName(value = "signing_public_key") @Required val signingPublicKey: kotlin.String,
-
-    @SerialName(value = "desktop_name") @Required val desktopName: kotlin.String
+    @SerialName(value = "claim_token") @Required val claimToken: kotlin.String
 
 ) : kotlin.collections.HashMap<String, kotlinx.serialization.json.JsonElement>() {
 

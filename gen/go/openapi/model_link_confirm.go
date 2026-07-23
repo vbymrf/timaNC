@@ -21,6 +21,7 @@ var _ MappedNullable = &LinkConfirm{}
 // LinkConfirm struct for LinkConfirm
 type LinkConfirm struct {
 	SessionId string `json:"session_id"`
+	QrSecret string `json:"qr_secret"`
 	Confirmation string `json:"confirmation"`
 	WrappedDeviceSecret string `json:"wrapped_device_secret"`
 	AdditionalProperties map[string]interface{}
@@ -32,9 +33,10 @@ type _LinkConfirm LinkConfirm
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewLinkConfirm(sessionId string, confirmation string, wrappedDeviceSecret string) *LinkConfirm {
+func NewLinkConfirm(sessionId string, qrSecret string, confirmation string, wrappedDeviceSecret string) *LinkConfirm {
 	this := LinkConfirm{}
 	this.SessionId = sessionId
+	this.QrSecret = qrSecret
 	this.Confirmation = confirmation
 	this.WrappedDeviceSecret = wrappedDeviceSecret
 	return &this
@@ -70,6 +72,30 @@ func (o *LinkConfirm) GetSessionIdOk() (*string, bool) {
 // SetSessionId sets field value
 func (o *LinkConfirm) SetSessionId(v string) {
 	o.SessionId = v
+}
+
+// GetQrSecret returns the QrSecret field value
+func (o *LinkConfirm) GetQrSecret() string {
+	if o == nil {
+		var ret string
+		return ret
+	}
+
+	return o.QrSecret
+}
+
+// GetQrSecretOk returns a tuple with the QrSecret field value
+// and a boolean to check if the value has been set.
+func (o *LinkConfirm) GetQrSecretOk() (*string, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.QrSecret, true
+}
+
+// SetQrSecret sets field value
+func (o *LinkConfirm) SetQrSecret(v string) {
+	o.QrSecret = v
 }
 
 // GetConfirmation returns the Confirmation field value
@@ -131,6 +157,7 @@ func (o LinkConfirm) MarshalJSON() ([]byte, error) {
 func (o LinkConfirm) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["session_id"] = o.SessionId
+	toSerialize["qr_secret"] = o.QrSecret
 	toSerialize["confirmation"] = o.Confirmation
 	toSerialize["wrapped_device_secret"] = o.WrappedDeviceSecret
 
@@ -147,6 +174,7 @@ func (o *LinkConfirm) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"session_id",
+		"qr_secret",
 		"confirmation",
 		"wrapped_device_secret",
 	}
@@ -179,6 +207,7 @@ func (o *LinkConfirm) UnmarshalJSON(data []byte) (err error) {
 
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "session_id")
+		delete(additionalProperties, "qr_secret")
 		delete(additionalProperties, "confirmation")
 		delete(additionalProperties, "wrapped_device_secret")
 		o.AdditionalProperties = additionalProperties

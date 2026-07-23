@@ -48,3 +48,7 @@ func NewRedisClient(rawURL string) (*redis.Client, error) {
 func NotifyChannel(deviceID string) string {
 	return NotifyChannelPrefix + deviceID
 }
+
+func PresenceKey(deviceID string) string {
+	return "presence:device:" + deviceID
+}
