@@ -31,6 +31,10 @@ func (h *Handler) registerPhase1(mux *http.ServeMux) {
 	mux.Handle("GET /v1/chats/{id}/messages", h.auth(http.HandlerFunc(h.listMessages)))
 	mux.Handle("POST /v1/chats/{id}/messages", h.auth(http.HandlerFunc(h.sendMessage)))
 	mux.Handle("POST /v1/chats/{id}/messages/{msg_id}/revisions", h.auth(http.HandlerFunc(h.reviseMessage)))
+	mux.Handle("POST /v1/chats/{chat_id}/media/uploads", h.auth(http.HandlerFunc(h.createChatMediaUpload)))
+	mux.Handle("POST /v1/posts/assets", h.auth(http.HandlerFunc(h.createPublicMediaUpload)))
+	mux.Handle("POST /v1/media/uploads/{media_id}/complete", h.auth(http.HandlerFunc(h.completeMediaUpload)))
+	mux.Handle("POST /v1/media/{media_id}/access", h.auth(http.HandlerFunc(h.accessMedia)))
 }
 
 func (h *Handler) requestID(next http.Handler) http.Handler {
@@ -213,6 +217,63 @@ func (h *Handler) reviseMessage(w http.ResponseWriter, r *http.Request) {
 		r.Header.Get("Idempotency-Key"), body, in,
 	)
 	h.respond(w, r, status, out, err)
+}
+
+func (h *Handler) createChatMediaUpload(w http.ResponseWriter, r *http.Request) {
+	var in phase1.MediaUploadCreate
+	body, err := decodeStrict(r, &in)
+	if err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, status, err := h.phase1.CreateChatMediaUpload(
+		r.Context(), principal(r), r.PathValue("chat_id"),
+		r.Header.Get("Idempotency-Key"), body, in,
+	)
+	h.respond(w, r, status, out, err)
+}
+
+func (h *Handler) createPublicMediaUpload(w http.ResponseWriter, r *http.Request) {
+	var in phase1.MediaUploadCreate
+	body, err := decodeStrict(r, &in)
+	if err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, status, err := h.phase1.CreatePublicMediaUpload(
+		r.Context(), principal(r), r.Header.Get("Idempotency-Key"), body, in,
+	)
+	h.respond(w, r, status, out, err)
+}
+
+func (h *Handler) completeMediaUpload(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Variants []phase1.MediaVariantInput `json:"variants"`
+	}
+	body, err := decodeStrict(r, &in)
+	if err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, status, err := h.phase1.CompleteMediaUpload(
+		r.Context(), principal(r), r.PathValue("media_id"),
+		r.Header.Get("Idempotency-Key"), body, in.Variants,
+	)
+	h.respond(w, r, status, out, err)
+}
+
+func (h *Handler) accessMedia(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Variant string `json:"variant"`
+	}
+	if _, err := decodeStrict(r, &in); err != nil {
+		h.problem(w, r, phase1.ErrInvalid)
+		return
+	}
+	out, err := h.phase1.AccessMedia(
+		r.Context(), principal(r), r.PathValue("media_id"), in.Variant,
+	)
+	h.respond(w, r, http.StatusOK, out, err)
 }
 
 func decodeStrict(r *http.Request, out any) ([]byte, error) {

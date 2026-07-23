@@ -328,6 +328,18 @@ func (s *Service) validateMessage(
 	if err != nil || len(nodes) == 0 && !markupInfo.HasMedia {
 		return ErrInvalid
 	}
+	for _, mediaID := range markupInfo.MediaIDs {
+		var ready bool
+		if err = s.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM media_objects
+			WHERE media_id=$1 AND status='ready' AND is_encrypted
+			  AND content_mode='private' AND scope_type='chat' AND scope_id=$2)`,
+			mediaID, chatID).Scan(&ready); err != nil {
+			return err
+		}
+		if !ready {
+			return ErrInvalid
+		}
+	}
 	expectedBitmap := uint32(0)
 	if len(nodes) > 0 {
 		expectedBitmap |= 1

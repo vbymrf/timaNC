@@ -57,8 +57,9 @@ services:
     command:
       - |
         mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
-        mc mb --ignore-existing local/media
-        mc mb --ignore-existing local/previews
+        mc mb --ignore-existing local/tima-media-e2e
+        mc mb --ignore-existing local/tima-media-public
+        mc mb --ignore-existing local/tima-public-staging
     restart: "no"
 
   migrate:
@@ -92,10 +93,12 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:?MINIO_PUBLIC_ENDPOINT is required}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_MEDIA_BUCKET: media
-      MINIO_PREVIEWS_BUCKET: previews
+      MINIO_PRIVATE_BUCKET: tima-media-e2e
+      MINIO_PUBLIC_BUCKET: tima-media-public
+      MINIO_STAGING_BUCKET: tima-public-staging
     depends_on:
       postgres:
         condition: service_healthy

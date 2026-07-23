@@ -10,6 +10,7 @@ import (
 type markupInfo struct {
 	HasMedia   bool
 	HasSecrets bool
+	MediaIDs   []string
 }
 
 var secretRefPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
@@ -86,6 +87,7 @@ func validateMarkupValue(
 					return err
 				}
 				info.HasMedia = true
+				info.MediaIDs = append(info.MediaIDs, id)
 			case "href":
 				return ErrInvalid
 			}

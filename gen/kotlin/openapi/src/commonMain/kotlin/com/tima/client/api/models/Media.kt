@@ -74,14 +74,14 @@ data class Media (
     /**
      * 
      *
-     * Values: UPLOADING,PROCESSING,READY,REJECTED
+     * Values: UPLOADING,PROCESSING,READY,BLOCKED
      */
     @Serializable
     enum class Status(val value: kotlin.String) {
         @SerialName(value = "uploading") UPLOADING("uploading"),
         @SerialName(value = "processing") PROCESSING("processing"),
         @SerialName(value = "ready") READY("ready"),
-        @SerialName(value = "rejected") REJECTED("rejected");
+        @SerialName(value = "blocked") BLOCKED("blocked");
     }
 
 }

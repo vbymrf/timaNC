@@ -23,6 +23,19 @@ func TestLoad(t *testing.T) {
 	if cfg.ReadinessTimeout != 750*time.Millisecond {
 		t.Fatalf("ReadinessTimeout = %s", cfg.ReadinessTimeout)
 	}
+	if cfg.MediaURLTTL != 15*time.Minute {
+		t.Fatalf("MediaURLTTL = %s", cfg.MediaURLTTL)
+	}
+}
+
+func TestLoadRejectsMediaURLTTLAboveFifteenMinutes(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://db/tima")
+	t.Setenv("MEDIA_URL_TTL", "16m")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "MEDIA_URL_TTL") {
+		t.Fatalf("Load() error = %v, want MEDIA_URL_TTL error", err)
+	}
 }
 
 func TestLoadRequiresDatabaseURL(t *testing.T) {

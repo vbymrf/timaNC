@@ -10,44 +10,58 @@ import (
 )
 
 type Config struct {
-	HTTPAddr         string
-	DatabaseURL      string
-	RedisURL         string
-	MinIOEndpoint    string
-	Environment      string
-	TokenPepper      string
-	OTPPepper        string
-	DevOTP           string
-	EscrowSigningKey string
-	EscrowKeyID      string
-	EscrowX25519Key  string
-	EscrowMLKEMKey   string
-	ReadTimeout      time.Duration
-	WriteTimeout     time.Duration
-	IdleTimeout      time.Duration
-	ShutdownTimeout  time.Duration
-	ReadinessTimeout time.Duration
+	HTTPAddr           string
+	DatabaseURL        string
+	RedisURL           string
+	MinIOEndpoint      string
+	MinIOPublicURL     string
+	MinIOAccessKey     string
+	MinIOSecretKey     string
+	MediaPrivateBucket string
+	MediaPublicBucket  string
+	MediaStagingBucket string
+	MediaURLTTL        time.Duration
+	Environment        string
+	TokenPepper        string
+	OTPPepper          string
+	DevOTP             string
+	EscrowSigningKey   string
+	EscrowKeyID        string
+	EscrowX25519Key    string
+	EscrowMLKEMKey     string
+	ReadTimeout        time.Duration
+	WriteTimeout       time.Duration
+	IdleTimeout        time.Duration
+	ShutdownTimeout    time.Duration
+	ReadinessTimeout   time.Duration
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		HTTPAddr:         env("HTTP_ADDR", ":8080"),
-		DatabaseURL:      firstNonEmpty(os.Getenv("DATABASE_URL"), os.Getenv("POSTGRES_DSN")),
-		RedisURL:         env("REDIS_URL", "redis://localhost:6379"),
-		MinIOEndpoint:    env("MINIO_ENDPOINT", "http://localhost:9000"),
-		Environment:      env("APP_ENV", "development"),
-		TokenPepper:      os.Getenv("TOKEN_PEPPER"),
-		OTPPepper:        os.Getenv("OTP_PEPPER"),
-		DevOTP:           env("DEV_OTP", "000000"),
-		EscrowSigningKey: os.Getenv("ESCROW_SIGNING_PRIVATE_KEY"),
-		EscrowKeyID:      env("ESCROW_SIGNING_KEY_ID", "dev-ed25519-1"),
-		EscrowX25519Key:  os.Getenv("ESCROW_X25519_PUBLIC_KEY"),
-		EscrowMLKEMKey:   os.Getenv("ESCROW_MLKEM768_PUBLIC_KEY"),
-		ReadTimeout:      duration("HTTP_READ_TIMEOUT", 5*time.Second),
-		WriteTimeout:     duration("HTTP_WRITE_TIMEOUT", 10*time.Second),
-		IdleTimeout:      duration("HTTP_IDLE_TIMEOUT", 60*time.Second),
-		ShutdownTimeout:  duration("SHUTDOWN_TIMEOUT", 10*time.Second),
-		ReadinessTimeout: duration("READINESS_TIMEOUT", 2*time.Second),
+		HTTPAddr:           env("HTTP_ADDR", ":8080"),
+		DatabaseURL:        firstNonEmpty(os.Getenv("DATABASE_URL"), os.Getenv("POSTGRES_DSN")),
+		RedisURL:           env("REDIS_URL", "redis://localhost:6379"),
+		MinIOEndpoint:      env("MINIO_ENDPOINT", "http://localhost:9000"),
+		MinIOPublicURL:     env("MINIO_PUBLIC_ENDPOINT", env("MINIO_ENDPOINT", "http://localhost:9000")),
+		MinIOAccessKey:     os.Getenv("MINIO_ACCESS_KEY"),
+		MinIOSecretKey:     os.Getenv("MINIO_SECRET_KEY"),
+		MediaPrivateBucket: env("MINIO_PRIVATE_BUCKET", "tima-media-e2e"),
+		MediaPublicBucket:  env("MINIO_PUBLIC_BUCKET", "tima-media-public"),
+		MediaStagingBucket: env("MINIO_STAGING_BUCKET", "tima-public-staging"),
+		MediaURLTTL:        duration("MEDIA_URL_TTL", 15*time.Minute),
+		Environment:        env("APP_ENV", "development"),
+		TokenPepper:        os.Getenv("TOKEN_PEPPER"),
+		OTPPepper:          os.Getenv("OTP_PEPPER"),
+		DevOTP:             env("DEV_OTP", "000000"),
+		EscrowSigningKey:   os.Getenv("ESCROW_SIGNING_PRIVATE_KEY"),
+		EscrowKeyID:        env("ESCROW_SIGNING_KEY_ID", "dev-ed25519-1"),
+		EscrowX25519Key:    os.Getenv("ESCROW_X25519_PUBLIC_KEY"),
+		EscrowMLKEMKey:     os.Getenv("ESCROW_MLKEM768_PUBLIC_KEY"),
+		ReadTimeout:        duration("HTTP_READ_TIMEOUT", 5*time.Second),
+		WriteTimeout:       duration("HTTP_WRITE_TIMEOUT", 10*time.Second),
+		IdleTimeout:        duration("HTTP_IDLE_TIMEOUT", 60*time.Second),
+		ShutdownTimeout:    duration("SHUTDOWN_TIMEOUT", 10*time.Second),
+		ReadinessTimeout:   duration("READINESS_TIMEOUT", 2*time.Second),
 	}
 
 	var errs []error
@@ -56,7 +70,8 @@ func Load() (Config, error) {
 	}
 	dev := cfg.Environment == "development" || cfg.Environment == "test"
 	if !dev && (cfg.TokenPepper == "" || cfg.OTPPepper == "" || cfg.EscrowSigningKey == "" ||
-		cfg.EscrowX25519Key == "" || cfg.EscrowMLKEMKey == "") {
+		cfg.EscrowX25519Key == "" || cfg.EscrowMLKEMKey == "" ||
+		cfg.MinIOAccessKey == "" || cfg.MinIOSecretKey == "") {
 		errs = append(errs, errors.New("token, OTP, and escrow keys are required outside development/test"))
 	}
 	if dev {
@@ -65,6 +80,12 @@ func Load() (Config, error) {
 		}
 		if cfg.OTPPepper == "" {
 			cfg.OTPPepper = "development-otp-pepper"
+		}
+		if cfg.MinIOAccessKey == "" {
+			cfg.MinIOAccessKey = "tima_dev"
+		}
+		if cfg.MinIOSecretKey == "" {
+			cfg.MinIOSecretKey = "dev_minio_change_me"
 		}
 	}
 	if u, err := url.ParseRequestURI(cfg.RedisURL); err != nil ||
@@ -75,16 +96,24 @@ func Load() (Config, error) {
 		(u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		errs = append(errs, errors.New("MINIO_ENDPOINT must be an absolute HTTP URL"))
 	}
+	if u, err := url.ParseRequestURI(cfg.MinIOPublicURL); err != nil ||
+		(u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		errs = append(errs, errors.New("MINIO_PUBLIC_ENDPOINT must be an absolute HTTP URL"))
+	}
 	for name, value := range map[string]time.Duration{
 		"HTTP_READ_TIMEOUT":  cfg.ReadTimeout,
 		"HTTP_WRITE_TIMEOUT": cfg.WriteTimeout,
 		"HTTP_IDLE_TIMEOUT":  cfg.IdleTimeout,
 		"SHUTDOWN_TIMEOUT":   cfg.ShutdownTimeout,
 		"READINESS_TIMEOUT":  cfg.ReadinessTimeout,
+		"MEDIA_URL_TTL":      cfg.MediaURLTTL,
 	} {
 		if value <= 0 {
 			errs = append(errs, fmt.Errorf("%s must be positive", name))
 		}
+	}
+	if cfg.MediaURLTTL > 15*time.Minute {
+		errs = append(errs, errors.New("MEDIA_URL_TTL must not exceed 15 minutes"))
 	}
 	return cfg, errors.Join(errs...)
 }

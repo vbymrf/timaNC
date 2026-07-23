@@ -26,7 +26,9 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.net.http.WebSocket
 import java.nio.ByteBuffer
+import java.security.MessageDigest
 import java.time.Instant
+import java.time.Duration
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.util.Base64
@@ -34,8 +36,12 @@ import java.util.UUID
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.awt.image.BufferedImage
+import javax.imageio.ImageIO
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.int
@@ -50,6 +56,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class HttpTwoDeviceRoundTripTest {
     @Test
@@ -210,6 +217,113 @@ class HttpTwoDeviceRoundTripTest {
             assertEquals(plaintext, decrypted)
         }
 
+        val privateMedia = linkedMapOf(
+            "thumbnail" to "cipher-thumbnail".encodeToByteArray(),
+            "preview" to "cipher-preview".encodeToByteArray(),
+            "full" to "cipher-full".encodeToByteArray(),
+        )
+        val privateManifest = mediaManifest(privateMedia)
+        val upload = http.post(
+            "/v1/chats/$chatId/media/uploads",
+            alice,
+            mediaUploadBody(privateManifest),
+            idempotencyKey = UUID.randomUUID().toString(),
+        )
+        val privateMediaId = upload.string("media_id")
+        assertEquals("private", upload.string("content_mode"))
+        val uploadTTL = Duration.between(Instant.now(), Instant.parse(upload.string("expires_at")))
+        assertTrue(!uploadTTL.isNegative && uploadTTL <= Duration.ofMinutes(15))
+        val uploadSlots = upload.getValue("uploads").jsonArray
+        assertEquals(3, uploadSlots.size)
+        uploadSlots.forEach { rawSlot ->
+            val slot = rawSlot.jsonObject
+            val variant = slot.string("variant")
+            http.putAbsolute(slot.string("url"), privateMedia.getValue(variant), "application/octet-stream")
+        }
+        val completedMedia = http.post(
+            "/v1/media/uploads/$privateMediaId/complete",
+            alice,
+            buildJsonObject {
+                put("variants", privateManifest)
+            },
+            idempotencyKey = UUID.randomUUID().toString(),
+        )
+        assertEquals("ready", completedMedia.string("status"))
+        val access = http.post(
+            "/v1/media/$privateMediaId/access",
+            bobLaptop,
+            buildJsonObject { put("variant", "preview") },
+        )
+        val accessTTL = Duration.between(Instant.now(), Instant.parse(access.string("expires_at")))
+        assertTrue(!accessTTL.isNegative && accessTTL <= Duration.ofMinutes(15))
+        assertEquals(
+            privateMedia.getValue("preview").toList(),
+            http.getAbsolute(access.string("url")).toList(),
+        )
+        assertEquals(
+            401,
+            http.postStatus(
+                "/v1/media/$privateMediaId/access",
+                null,
+                buildJsonObject { put("variant", "preview") },
+            ),
+        )
+        val publicSource = ByteArrayOutputStream().use { output ->
+            ImageIO.write(
+                BufferedImage(4, 3, BufferedImage.TYPE_INT_RGB).apply {
+                    setRGB(0, 0, 0x00ff00)
+                },
+                "png",
+                output,
+            )
+            output.toByteArray()
+        }
+        val publicManifest = mediaManifest(mapOf("full" to publicSource), "image/png")
+        val publicUpload = http.post(
+            "/v1/posts/assets",
+            alice,
+            mediaUploadBody(publicManifest),
+            idempotencyKey = UUID.randomUUID().toString(),
+        )
+        val publicMediaId = publicUpload.string("media_id")
+        val publicSlot = publicUpload.getValue("uploads").jsonArray.single().jsonObject
+        http.putAbsolute(publicSlot.string("url"), publicSource, "image/png")
+        val publicCompleted = http.post(
+            "/v1/media/uploads/$publicMediaId/complete",
+            alice,
+            buildJsonObject { put("variants", publicManifest) },
+            idempotencyKey = UUID.randomUUID().toString(),
+        )
+        val publicVariants = publicCompleted.getValue("variants").jsonArray
+            .map { it.jsonObject.string("name") }.toSet()
+        assertEquals(setOf("thumbnail", "preview", "full"), publicVariants)
+        assertFalse(publicCompleted.toString().contains("original"))
+        val publicAccess = http.post(
+            "/v1/media/$publicMediaId/access",
+            bobLaptop,
+            buildJsonObject { put("variant", "thumbnail") },
+        )
+        assertTrue(http.getAbsolute(publicAccess.string("url")).isNotEmpty())
+        val executableSource = "MZ-not-an-image".encodeToByteArray()
+        val executableManifest = mediaManifest(mapOf("full" to executableSource), "image/png")
+        val executableUpload = http.post(
+            "/v1/posts/assets",
+            alice,
+            mediaUploadBody(executableManifest),
+            idempotencyKey = UUID.randomUUID().toString(),
+        )
+        val executableSlot = executableUpload.getValue("uploads").jsonArray.single().jsonObject
+        http.putAbsolute(executableSlot.string("url"), executableSource, "image/png")
+        assertEquals(
+            400,
+            http.postStatus(
+                "/v1/media/uploads/${executableUpload.string("media_id")}/complete",
+                alice,
+                buildJsonObject { put("variants", executableManifest) },
+                UUID.randomUUID().toString(),
+            ),
+        )
+
         val revisedPlaintext = PlainTextDocumentV2(
             textNodes = listOf("black-box edited by Alice"),
             markup = buildJsonObject {
@@ -221,7 +335,7 @@ class HttpTwoDeviceRoundTripTest {
                     })
                     add(buildJsonObject {
                         put("type", "media")
-                        put("media_id", "00000000-0000-0000-0000-000000000099")
+                        put("media_id", privateMediaId)
                         put("secret_ref", "media.key")
                     })
                 }
@@ -489,6 +603,29 @@ class HttpTwoDeviceRoundTripTest {
 
     private fun decodeBase64(value: String): ByteArray = Base64.getDecoder().decode(value)
 
+    private fun mediaManifest(
+        values: Map<String, ByteArray>,
+        contentType: String = "application/octet-stream",
+    ): JsonArray = buildJsonArray {
+        values.forEach { (name, value) ->
+            add(buildJsonObject {
+                put("name", name)
+                put("content_type", contentType)
+                put("size", value.size)
+                put(
+                    "sha256",
+                    MessageDigest.getInstance("SHA-256").digest(value)
+                        .joinToString("") { "%02x".format(it) },
+                )
+            })
+        }
+    }
+
+    private fun mediaUploadBody(manifest: JsonArray): JsonObject = buildJsonObject {
+        put("kind", "image")
+        put("variants", manifest)
+    }
+
     private fun currentQuarter(): String {
         val now = ZonedDateTime.now(ZoneOffset.UTC)
         return "%04dQ%d".format(now.year, (now.monthValue - 1) / 3 + 1)
@@ -513,6 +650,33 @@ class HttpTwoDeviceRoundTripTest {
             idempotencyKey: String? = null,
         ): JsonObject = execute("POST", path, session, body, idempotencyKey)
 
+        fun postStatus(
+            path: String,
+            session: Session?,
+            body: JsonObject,
+            idempotencyKey: String? = null,
+        ): Int = request("POST", path, session, body, idempotencyKey).statusCode()
+
+        fun putAbsolute(url: String, value: ByteArray, contentType: String) {
+            val response = client.send(
+                HttpRequest.newBuilder(URI.create(url))
+                    .header("Content-Type", contentType)
+                    .PUT(HttpRequest.BodyPublishers.ofByteArray(value))
+                    .build(),
+                HttpResponse.BodyHandlers.discarding(),
+            )
+            check(response.statusCode() in 200..299) { "media PUT failed with ${response.statusCode()}" }
+        }
+
+        fun getAbsolute(url: String): ByteArray {
+            val response = client.send(
+                HttpRequest.newBuilder(URI.create(url)).GET().build(),
+                HttpResponse.BodyHandlers.ofByteArray(),
+            )
+            check(response.statusCode() in 200..299) { "media GET failed with ${response.statusCode()}" }
+            return response.body()
+        }
+
         private fun execute(
             method: String,
             path: String,
@@ -520,6 +684,21 @@ class HttpTwoDeviceRoundTripTest {
             body: JsonObject?,
             idempotencyKey: String?,
         ): JsonObject {
+            val response = request(method, path, session, body, idempotencyKey)
+            check(response.statusCode() in 200..299) {
+                "$method $path failed with ${response.statusCode()}: ${response.body()}"
+            }
+            if (response.body().isBlank()) return buildJsonObject {}
+            return kotlinx.serialization.json.Json.parseToJsonElement(response.body()).jsonObject
+        }
+
+        private fun request(
+            method: String,
+            path: String,
+            session: Session?,
+            body: JsonObject?,
+            idempotencyKey: String?,
+        ): HttpResponse<String> {
             val builder = HttpRequest.newBuilder(URI.create(baseUrl + path))
                 .header("Accept", "application/json")
             session?.let {
@@ -533,12 +712,7 @@ class HttpTwoDeviceRoundTripTest {
                 builder.header("Content-Type", "application/json")
                 builder.method(method, HttpRequest.BodyPublishers.ofString(body.toString()))
             }
-            val response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString())
-            check(response.statusCode() in 200..299) {
-                "$method $path failed with ${response.statusCode()}: ${response.body()}"
-            }
-            if (response.body().isBlank()) return buildJsonObject {}
-            return kotlinx.serialization.json.Json.parseToJsonElement(response.body()).jsonObject
+            return client.send(builder.build(), HttpResponse.BodyHandlers.ofString())
         }
     }
 

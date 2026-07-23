@@ -2112,7 +2112,7 @@ components:
       additionalProperties: false
       required: [name, content_type, size, sha256]
       properties:
-        name: {type: string, enum: [original, thumbnail, preview, audio, video]}
+        name: {type: string, enum: [thumbnail, preview, full]}
         content_type: {type: string, pattern: '^[a-z0-9.+-]+/[a-z0-9.+-]+$'}
         size: {type: integer, minimum: 1}
         sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
@@ -2156,7 +2156,7 @@ components:
         id: {$ref: '#/components/schemas/Uuid'}
         kind: {type: string, enum: [image, video, audio, file]}
         content_mode: {type: string, enum: [private, public]}
-        status: {type: string, enum: [uploading, processing, ready, rejected]}
+        status: {type: string, enum: [uploading, processing, ready, blocked]}
         variants: {type: array, items: {$ref: '#/components/schemas/MediaVariantInput'}}
         created_at: {$ref: '#/components/schemas/Timestamp'}
     MediaAccessRequest:

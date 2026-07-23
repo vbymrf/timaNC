@@ -13,6 +13,7 @@ import (
 
 	"tima-server/internal/config"
 	"tima-server/internal/httpapi"
+	"tima-server/internal/media"
 	"tima-server/internal/phase1"
 	"tima-server/internal/readiness"
 )
@@ -53,6 +54,14 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	mediaStore, err := media.NewStore(
+		cfg.MinIOEndpoint, cfg.MinIOPublicURL,
+		cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MediaURLTTL,
+	)
+	if err != nil {
+		return err
+	}
+	phase1Service.MediaStore = mediaStore
 
 	server := &http.Server{
 		Addr:         cfg.HTTPAddr,

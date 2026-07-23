@@ -45,15 +45,13 @@ data class MediaVariantInput (
     /**
      * 
      *
-     * Values: ORIGINAL,THUMBNAIL,PREVIEW,AUDIO,VIDEO
+     * Values: THUMBNAIL,PREVIEW,FULL
      */
     @Serializable
     enum class Name(val value: kotlin.String) {
-        @SerialName(value = "original") ORIGINAL("original"),
         @SerialName(value = "thumbnail") THUMBNAIL("thumbnail"),
         @SerialName(value = "preview") PREVIEW("preview"),
-        @SerialName(value = "audio") AUDIO("audio"),
-        @SerialName(value = "video") VIDEO("video");
+        @SerialName(value = "full") FULL("full");
     }
 
 }

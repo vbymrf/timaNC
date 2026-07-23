@@ -19,6 +19,7 @@ import (
 	"golang.org/x/crypto/argon2"
 
 	"tima-server/internal/config"
+	"tima-server/internal/media"
 )
 
 // devMLKEM768PublicKey is a public-only FIPS 203 ML-KEM-768 fixture generated
@@ -47,23 +48,30 @@ var (
 )
 
 type Service struct {
-	DB             *pgxpool.Pool
-	Environment    string
-	TokenPepper    []byte
-	OTPPepper      []byte
-	DevOTP         string
-	EscrowSigner   ed25519.PrivateKey
-	EscrowKeyID    string
-	EscrowX25519   []byte
-	EscrowMLKEM768 []byte
-	Now            func() time.Time
+	DB                 *pgxpool.Pool
+	Environment        string
+	TokenPepper        []byte
+	OTPPepper          []byte
+	DevOTP             string
+	EscrowSigner       ed25519.PrivateKey
+	EscrowKeyID        string
+	EscrowX25519       []byte
+	EscrowMLKEM768     []byte
+	MediaStore         *media.Store
+	MediaPrivateBucket string
+	MediaPublicBucket  string
+	MediaStagingBucket string
+	Now                func() time.Time
 }
 
 func New(db *pgxpool.Pool, cfg config.Config) (*Service, error) {
 	s := &Service{
 		DB: db, Environment: cfg.Environment, TokenPepper: []byte(cfg.TokenPepper),
 		OTPPepper: []byte(cfg.OTPPepper), DevOTP: cfg.DevOTP, EscrowKeyID: cfg.EscrowKeyID,
-		Now: time.Now,
+		MediaPrivateBucket: cfg.MediaPrivateBucket,
+		MediaPublicBucket:  cfg.MediaPublicBucket,
+		MediaStagingBucket: cfg.MediaStagingBucket,
+		Now:                time.Now,
 	}
 	var err error
 	if cfg.EscrowSigningKey != "" {

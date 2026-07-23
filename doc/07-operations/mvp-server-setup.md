@@ -62,6 +62,7 @@ POSTGRES_DB=tima
 REDIS_PASSWORD=<openssl rand -hex 24>
 MINIO_ROOT_USER=tima-admin
 MINIO_ROOT_PASSWORD=<openssl rand -hex 24>
+MINIO_PUBLIC_ENDPOINT=https://media.example.com
 LIVEKIT_API_KEY=<openssl rand -hex 16>
 LIVEKIT_API_SECRET=<openssl rand -hex 32>
 JWT_SIGNING_KEY=<openssl rand -hex 32>
@@ -265,8 +266,8 @@ docker compose run --rm migrate -path /migrations \
 
 # MinIO: bucket'ы и lifecycle
 docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
-docker compose exec minio mc mb local/media local/previews
-docker compose exec minio mc ilm rule add local/media --transition-days 180 --transition-tier COLD   # cold-ярус ([media-storage.md](../04-data/media-storage.md) §6)
+docker compose exec minio mc mb local/tima-media-e2e local/tima-media-public local/tima-public-staging
+docker compose exec minio mc ilm rule add local/tima-media-e2e --transition-days 180 --transition-tier COLD   # cold-ярус ([media-storage.md](../04-data/media-storage.md) §6)
 
 docker compose up -d                              # всё остальное
 docker compose ps                                 # все healthy?
