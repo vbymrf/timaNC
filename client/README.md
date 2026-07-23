@@ -12,6 +12,12 @@ Modules:
   Path-B wraps, canonical signatures, signed escrow config verification, and hybrid escrow.
 - `integration-harness` — in-process crypto coverage plus a compose-backed JVM HTTP/WS
   roundtrip with mobile attestation, Windows QR linking, revisions and dual media.
+- `apps/android` — minimal Android shell, Play Integrity Standard requests, Android
+  Keystore credential storage, and lifecycle-backed Firebase Messaging tokens.
+- `apps/ios` — Kotlin/Native framework plus a minimal SwiftUI Xcode app, App Attest
+  key/assertion lifecycle, Keychain credential storage, and APNs delegate adapter.
+- `apps/windows` — minimal Swing QR-link shell, DPAPI credential storage, `jpackage`
+  app image, and unsigned MSIX staging/packaging inputs.
 
 `eu.livotov.labs:kodium:1.0.0` is pinned in `gradle/libs.versions.toml`. No local Kodium
 source is compiled into this build.
@@ -44,11 +50,45 @@ complete signed `PersonalMessageEnvelope`.
 The server development escrow root (`dev-ed25519-1`) is pinned only in test sources as a public
 Ed25519 key. No private development signing material is included in the client tree.
 
-Run from this directory with a Gradle 8.14+ installation:
+Platform trust fails closed. Android requires `tima.android.baseUrl` and
+`tima.android.integrityProjectNumber` Gradle properties plus host Firebase initialization; the
+adapter calls Google Play Integrity and FCM and never generates substitute tokens. iOS APNs tokens
+must arrive through `UIApplicationDelegate`. App Attest one-time key enrollment is exposed
+separately from recurring assertions because the current Phase 1 OpenAPI schema has no endpoint
+for the Apple attestation object; the host must enroll it and call `markEnrolled` before assertions
+are allowed. This limitation is deliberate rather than silently treating an assertion as enrollment.
+
+Run from this directory with a Gradle 8.14+ installation. Existing JVM tests remain:
 
 ```text
 gradle jvmTest
 ```
+
+Platform build tasks:
+
+```text
+# Android SDK required; debug uses the local Android debug signing identity.
+gradle :apps:android:assembleDebug \
+  -Ptima.android.baseUrl=https://api.example.com \
+  -Ptima.android.integrityProjectNumber=123456789
+
+# macOS/Xcode required. Gradle builds the XCFramework; Xcode builds an unsigned simulator app.
+gradle :apps:ios:assembleTimaIosAppDebugXCFramework
+xcodebuild -project apps/ios/xcode/Tima.xcodeproj -scheme Tima \
+  -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO
+
+# Windows JDK with jpackage. Set the API endpoint before running the app.
+set TIMA_API_BASE_URL=https://api.example.com
+gradle :apps:windows:packageWindowsAppImage
+
+# Windows SDK makeappx.exe required; output is intentionally unsigned.
+gradle :apps:windows:packageMsixUnsigned
+```
+
+Android release signing, iOS device signing/provisioning, production App Attest enrollment,
+Firebase configuration, APNs entitlements, and MSIX signing certificates are CI/deployment
+inputs and are not committed. `packageMsixUnsigned` creates an artifact suitable for later CI
+signing; Windows will not trust-install it as a release package until it is signed.
 
 The HTTP roundtrip is skipped in ordinary local unit runs. To require it against the development
 stack:
