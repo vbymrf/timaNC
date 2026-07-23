@@ -47,7 +47,7 @@ import kotlin.test.assertNull
 
 class HttpTwoDeviceRoundTripTest {
     @Test
-    fun aliceSendsAndBobFetchesAndDecryptsThroughHttpServer() {
+    fun aliceSendsAndBothBobDevicesFetchAndDecryptThroughHttpServer() {
         val baseUrl = System.getenv("TIMA_E2E_BASE_URL")?.trimEnd('/')
         if (baseUrl == null) {
             check(System.getenv("TIMA_REQUIRE_HTTP_E2E") != "true") {
@@ -58,28 +58,38 @@ class HttpTwoDeviceRoundTripTest {
 
         val http = TestHttpClient(baseUrl)
         val aliceIdentity = DeviceIdentity.generate()
-        val bobIdentity = DeviceIdentity.generate()
+        val bobLaptopIdentity = DeviceIdentity.generate()
+        val bobPhoneIdentity = DeviceIdentity.generate()
         val suffix = (System.currentTimeMillis() % 10_000_000).toString().padStart(7, '0')
+        val bobPhone = "+1666$suffix"
         val alice = register(http, "+1555$suffix", "Alice", aliceIdentity, DevicePlatformDto.ANDROID)
-        val bob = register(http, "+1666$suffix", "Bob", bobIdentity, DevicePlatformDto.WINDOWS)
+        val bobLaptop = register(
+            http, bobPhone, "Bob", bobLaptopIdentity, DevicePlatformDto.WINDOWS,
+        )
+        val bobMobile = login(
+            http, bobPhone, "Bob mobile", bobPhoneIdentity, DevicePlatformDto.ANDROID,
+        )
+        assertEquals(bobLaptop.userId, bobMobile.userId)
 
         val chat = http.post(
             "/v1/chats",
             alice,
-            buildJsonObject { put("peer_user_id", bob.userId) },
+            buildJsonObject { put("peer_user_id", bobLaptop.userId) },
             idempotencyKey = UUID.randomUUID().toString(),
         )
         val chatId = chat.string("id")
 
-        val bobBundles = http.get("/v1/keys/bundle/${bob.userId}", alice)
+        val bobBundles = http.get("/v1/keys/bundle/${bobLaptop.userId}", alice)
             .getValue("bundles").jsonArray
-        assertEquals(1, bobBundles.size)
-        val bobBundle = bobBundles.single().jsonObject
-        assertEquals(bob.deviceId, bobBundle.string("device_id"))
-        val bobDirectoryKeys = DevicePublicKeys(
-            x25519 = decodeBase64(bobBundle.string("identity_key")),
-            ed25519 = decodeBase64(bobBundle.string("signing_identity_key")),
-        )
+        assertEquals(2, bobBundles.size)
+        val bobDirectoryKeys = bobBundles.associate { bundle ->
+            val value = bundle.jsonObject
+            value.string("device_id") to DevicePublicKeys(
+                x25519 = decodeBase64(value.string("identity_key")),
+                ed25519 = decodeBase64(value.string("signing_identity_key")),
+            )
+        }
+        assertEquals(setOf(bobLaptop.deviceId, bobMobile.deviceId), bobDirectoryKeys.keys)
 
         val epoch = currentQuarter()
         val signedEscrow = parseEscrowConfig(
@@ -129,10 +139,7 @@ class HttpTwoDeviceRoundTripTest {
                 messageKeyId = 0u,
             ),
             document = plaintext,
-            recipientDevices = mapOf(
-                alice.deviceId to aliceIdentity.publicKeys,
-                bob.deviceId to bobDirectoryKeys,
-            ),
+            recipientDevices = mapOf(alice.deviceId to aliceIdentity.publicKeys) + bobDirectoryKeys,
             escrowConfig = verifiedEscrow,
             ratchetEnvelope = null,
         )
@@ -151,18 +158,9 @@ class HttpTwoDeviceRoundTripTest {
             idempotencyKey = sendKey,
         )
         assertEquals(sent.string("id"), replayed.string("id"))
+        assertEquals(3, sent.getValue("wrapped_keys").jsonArray.size)
 
-        val historyResponse = http.get("/v1/chats/$chatId/messages?limit=10", bob)
-        assertFalse(historyResponse.toString().contains("black-box hello from Alice"))
-        assertFalse(historyResponse.toString().contains("fetched by Bob over HTTP"))
-        val items = historyResponse.getValue("items").jsonArray
-        assertEquals(1, items.size)
-        val history = items.single().jsonObject.toHistoryDto()
-        assertEquals(1, history.wrapped_keys.size)
-        assertEquals(bob.deviceId, history.wrapped_keys.single().device_id)
-        assertNull(history.document.ratchet_envelope)
-
-        val aliceBundles = http.get("/v1/keys/bundle/${alice.userId}", bob)
+        val aliceBundles = http.get("/v1/keys/bundle/${alice.userId}", bobLaptop)
             .getValue("bundles").jsonArray
         assertEquals(1, aliceBundles.size)
         val aliceBundle = aliceBundles.single().jsonObject
@@ -171,14 +169,29 @@ class HttpTwoDeviceRoundTripTest {
             x25519 = decodeBase64(aliceBundle.string("identity_key")),
             ed25519 = decodeBase64(aliceBundle.string("signing_identity_key")),
         )
-        val fetchedEnvelope = RestCryptoTransportAdapter.fromHistory(history)
-        val decrypted = MessengerCrypto(HybridKodiumEscrowBlobBuilder()).decryptTextMessageViaPathB(
-            recipientDeviceId = bob.deviceId,
-            recipient = bobIdentity,
-            senderPublicKeys = aliceDirectoryKeys,
-            envelope = fetchedEnvelope,
-        )
-        assertEquals(plaintext, decrypted)
+        listOf(
+            bobLaptop to bobLaptopIdentity,
+            bobMobile to bobPhoneIdentity,
+        ).forEach { (recipientSession, recipientIdentity) ->
+            val historyResponse = http.get("/v1/chats/$chatId/messages?limit=10", recipientSession)
+            assertFalse(historyResponse.toString().contains("black-box hello from Alice"))
+            assertFalse(historyResponse.toString().contains("fetched by Bob over HTTP"))
+            val items = historyResponse.getValue("items").jsonArray
+            assertEquals(1, items.size)
+            val history = items.single().jsonObject.toHistoryDto()
+            assertEquals(1, history.wrapped_keys.size)
+            assertEquals(recipientSession.deviceId, history.wrapped_keys.single().device_id)
+            assertNull(history.document.ratchet_envelope)
+
+            val fetchedEnvelope = RestCryptoTransportAdapter.fromHistory(history)
+            val decrypted = MessengerCrypto(HybridKodiumEscrowBlobBuilder()).decryptTextMessageViaPathB(
+                recipientDeviceId = recipientSession.deviceId,
+                recipient = recipientIdentity,
+                senderPublicKeys = aliceDirectoryKeys,
+                envelope = fetchedEnvelope,
+            )
+            assertEquals(plaintext, decrypted)
+        }
     }
 
     private fun register(
@@ -208,8 +221,43 @@ class HttpTwoDeviceRoundTripTest {
             body = buildJsonObject {
                 put("challenge_id", challenge.string("challenge_id"))
                 put("otp", "000000")
-                put("password", "phase1-black-box-password")
+                put("password", TEST_PASSWORD)
                 put("display_name", displayName)
+                putJsonObject("device") {
+                    put("name", registration.name)
+                    put("platform", registration.platform.wireValue)
+                    put("identity_public_key", registration.identity_public_key)
+                    put("signing_public_key", registration.signing_public_key)
+                    registration.app_version?.let { put("app_version", it) }
+                }
+            },
+        )
+        return Session(
+            accessToken = auth.string("access_token"),
+            userId = auth.getValue("user").jsonObject.string("id"),
+            deviceId = auth.getValue("device").jsonObject.string("id"),
+        )
+    }
+
+    private fun login(
+        http: TestHttpClient,
+        phone: String,
+        deviceName: String,
+        identity: DeviceIdentity,
+        platform: DevicePlatformDto,
+    ): Session {
+        val registration = RestCryptoTransportAdapter.deviceRegistration(
+            name = deviceName,
+            platform = platform,
+            publicKeys = identity.publicKeys,
+            appVersion = "0.1.0-e2e",
+        )
+        val auth = http.post(
+            "/v1/auth/login",
+            session = null,
+            body = buildJsonObject {
+                put("phone", phone)
+                put("password", TEST_PASSWORD)
                 putJsonObject("device") {
                     put("name", registration.name)
                     put("platform", registration.platform.wireValue)
@@ -393,6 +441,7 @@ class HttpTwoDeviceRoundTripTest {
     }
 
     private companion object {
+        const val TEST_PASSWORD = "phase1-black-box-password"
         const val DEVELOPMENT_ESCROW_SIGNER_ID = "dev-ed25519-1"
         const val DEVELOPMENT_ESCROW_SIGNER_PUBLIC_KEY =
             "IsUwucyZS8S/MjltIw/P+N+35bWEPJ4YMkpAWi9tHC8="
