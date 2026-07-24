@@ -39,6 +39,9 @@
 - [x] Unsigned Android/iOS/Windows validation workflows; signed/internal-track artifacts deferred to Phase 5
 - [x] Encrypted-at-rest SQLDelight UI cache on Android/iOS/Windows with platform-protected row key and logout wipe
 - [x] Durable post-encryption client send/retry outbox across process restart on Android/iOS/Windows
+- [x] Private 1:1 single-image alpha shared pipeline: exactly three encrypted JPEG variants, durable retry and media-only DocumentV2
+- [x] Android Views and Windows Swing image picker, progress, thumbnail and in-app preview
+- [ ] iOS PHPicker/UIKit normalization and SwiftUI thumbnail/preview source implemented; Xcode Swift archive validation pending
 - [ ] Complete native messaging UI and Phase 1 acceptance journeys
 
 **Exit:** hosted repository-controlled CI matrix проходит; hybrid notification
@@ -67,8 +70,10 @@ Encrypted durable chat/history restoration and the post-encryption send/retry
 outbox are implemented on all clients. The exact ciphertext request and
 idempotency key survive restart; reservation must still complete online before
 the durable boundary, so completely offline composition/send is not claimed.
-Media UI and hosted native acceptance evidence remain incomplete, so Phase 1
-stays BLOCKED.
+Android/Windows private image alpha is implemented over the shared secure
+pipeline. iOS native picker/render source is wired and KMP targets compile, but
+Xcode Swift/archive validation and hosted three-platform media acceptance
+evidence remain incomplete, so Phase 1 stays BLOCKED.
 Notification behavior is specified in
 [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
 Phase 2 does not start while Phase 1 remains blocked.

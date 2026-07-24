@@ -1,5 +1,7 @@
 package com.tima.client.data
 
+import com.tima.client.domain.PlainTextDocumentV2
+import com.tima.client.media.MediaAttachmentUi
 import com.tima.client.network.PrivateMessageHistoryDto
 import com.tima.client.network.PrivateMessageWriteDto
 import com.tima.client.network.PrivateMessageWriteCodec
@@ -46,6 +48,7 @@ interface MessagingRemoteDataSource {
 data class DecryptedMessage(
     val text: String,
     val revisionNumber: ULong,
+    val attachment: MediaAttachmentUi? = null,
 )
 
 interface PrivateMessageCrypto {
@@ -58,6 +61,22 @@ interface PrivateMessageCrypto {
     ): PrivateMessageWriteDto
 
     suspend fun decrypt(value: PrivateMessageHistoryDto): DecryptedMessage
+
+    suspend fun encryptDocument(
+        chatId: String,
+        document: PlainTextDocumentV2,
+        reservation: ReservedMessageIds,
+        parentRevisionId: String? = null,
+    ): PrivateMessageWriteDto {
+        require(document.textNodes.size == 1 && document.markup == null && document.secretMetadata == null)
+        return encrypt(
+            chatId,
+            document.textNodes.single(),
+            reservation,
+            parentRevisionId,
+            document.metadata.revisionNumber,
+        )
+    }
 }
 
 /**

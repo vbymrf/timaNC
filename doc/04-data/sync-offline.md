@@ -82,9 +82,27 @@ POST /recovery/requests/{id}/confirm — requester acknowledges
 
 ## 8. Offline media
 
-- Chunk upload queue in `media_queue`.
-- Resume presigned URLs if expired.
-- Private variants are ciphertext; receiver repeats MIME/AV validation after decryption.
+- После native normalization каждый из трёх JPEG variants шифруется до durable
+  boundary. SQLite хранит encrypted queue record, app-private files — только
+  ciphertext; source/normalized plaintext в SQLite и durable files не попадает.
+- Restart повторяет незавершённые PUT по сохранённым idempotency keys и manifest.
+  При 401/403 или локально истёкшем presigned slot запись атомарно сбрасывает
+  старый `media_id`/slots и сохраняет новые init/complete idempotency keys до
+  повторного authenticated init. Старый незавершённый объект остаётся server-side
+  orphan до TTL/retention cleanup; клиент не заявляет его немедленное удаление.
+  Текущий alpha не заявляет OS background transfer.
+- После complete media attachment канонически шифруется в media-only DocumentV2
+  и передаётся существующему exact-ciphertext message outbox. Это две durable
+  стадии; queue удаляется только после достижения message-outbox boundary.
+  Стабильные message local ID, reservation key и send key записываются в media
+  queue до upload, поэтому crash после message transport success не создаёт
+  вторую reservation/encryption/message.
+- Receiver запрашивает только thumbnail/preview, проверяет ciphertext
+  checksum/size, AEAD/version, JPEG magic и dimensions после decrypt и не
+  экспортирует plaintext во внешние приложения.
+- Logout удаляет media queue, protected queue key, ciphertext temp files и
+  decrypted in-memory previews. Перезапись перед delete является best effort:
+  flash/SSD copy-on-write и wear levelling не гарантируют физическое стирание.
 
 ## 9. Windows linked device
 

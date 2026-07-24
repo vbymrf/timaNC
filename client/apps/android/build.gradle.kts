@@ -52,6 +52,7 @@ kotlin {
 dependencies {
     implementation(project(":modules:core:core-data"))
     implementation(project(":modules:core:core-database"))
+    implementation(project(":modules:core:core-media"))
     implementation(project(":modules:core:core-network"))
     implementation(project(":modules:core:core-sync"))
     implementation(project(":modules:messenger-crypto"))

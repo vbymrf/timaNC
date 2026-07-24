@@ -15,22 +15,23 @@
 
 1. Отправитель определяет MIME по magic bytes, проверяет файл локальным AV и блокирует executable.
 2. Клиент очищает метаданные и создаёт `thumbnail`, `preview`, `full`.
-3. Каждый вариант шифруется отдельным `media_key`; файлы больше 10 МБ шифруются по chunks.
+3. Каждый вариант шифруется отдельным случайным 32-byte `media_key` с versioned
+   AEAD prefix. Phase 1 не реализует chunking.
 4. Доменный `POST /v1/chats/{chat_id}/media/uploads` или `/v1/groups/{group_id}/media/uploads` создаёт объект и возвращает presigned PUT URL на 15 минут.
 5. Клиент загружает ciphertext и вызывает `POST /v1/media/uploads/{media_id}/complete`.
-6. В `DocumentV2.markup` записываются `media_id` и `secret_ref`; обязательные ключи вариантов и опциональные sensitive имя/caption входят в `encrypted_metadata`.
+6. В `DocumentV2.markup.entities` записывается ровно одна media entity с
+   `media_id` и `secret_ref`; обязательные ключи вариантов входят только в
+   private `encrypted_metadata` (Phase 1 image alpha не добавляет имя/caption).
 7. Получатель после расшифрования повторно определяет MIME и проверяет файл перед render/open.
 
 Сервер никогда не видит private plaintext. Он проверяет размер, количество вариантов/chunks, checksum ciphertext, квоту и связь объекта с сообщением.
 
-### 2.1. Chunked encryption
+### 2.1. Реальный лимит Phase 1
 
-```text
-media_key = random(32)
-for i, chunk in enumerate(chunks):
-  chunk_key = HKDF(media_key, info="chunk:" + i)
-  chunk_ct[i] = AEAD(chunk_key, unique_nonce, chunk)
-```
+Private image alpha принимает один source не более 25 MiB, никогда не сохраняет
+Original и создаёт ровно `thumbnail`, `preview`, `full`. Серверный лимит каждого
+ciphertext variant — 100 MiB. Chunking, 2 GB upload и OS background transfer
+отсутствуют; это будущие возможности, а не свойства текущего API.
 
 ## 3. Public/social pipeline
 
@@ -50,7 +51,12 @@ for i, chunk in enumerate(chunks):
 | Executable/script (`exe`, `apk`, `bat`, `sh`, `vbs`, `jar`, `class` и аналоги) | Загрузка, хранение и передача запрещены |
 | Unknown | Блокируется |
 
-Максимальный размер файла — 2 ГБ. Максимум медиа в одном сообщении — 10.
+Phase 1 поддерживает только одно private 1:1 image attachment. Video, audio,
+voice, generic files, albums, camera, public/group attachment UI, external
+export/share и payloads свыше 100 MiB не входят в этот slice.
+Completely offline pre-upload composition также не заявляется как acceptance
+journey: durable media retry начинается после локального шифрования variants,
+но server init/message reservation всё равно требуют сеть.
 
 ## 5. Варианты
 
@@ -58,7 +64,7 @@ for i, chunk in enumerate(chunks):
 
 | Вариант | Image | Video | Назначение |
 |---------|-------|-------|------------|
-| `thumbnail` | 40×40 | первый безопасный кадр | Список сообщений |
+| `thumbnail` | до 40×40 | первый безопасный кадр | Список сообщений |
 | `preview` | до 320 px | до 480p | Поток |
 | `full` | до 1280 px | до 720p | Полноэкранный просмотр |
 
@@ -71,7 +77,8 @@ Original не сохраняется, не выдаётся и не имеет `
 3. Сервер выдаёт presigned GET URL на 15 минут.
 4. Private-клиент скачивает ciphertext, разрешает `secret_ref` и расшифровывает вариант ключом из `DocumentV2.encrypted_metadata`.
 
-Постоянные и публичные URL в сообщении не хранятся. Range requests разрешены по границам chunks.
+Постоянные и публичные URL в сообщении не хранятся. Phase 1 не использует range
+requests или chunks.
 
 ## 7. Жизненный цикл
 

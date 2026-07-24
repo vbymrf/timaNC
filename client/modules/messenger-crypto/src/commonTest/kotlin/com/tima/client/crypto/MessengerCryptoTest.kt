@@ -2,6 +2,9 @@ package com.tima.client.crypto
 
 import com.tima.client.domain.EscrowKeySet
 import com.tima.client.domain.EscrowPublicKeys
+import com.tima.client.domain.DocumentMetadata
+import com.tima.client.domain.EnvelopeHeader
+import com.tima.client.domain.PlainTextDocumentV2
 import com.tima.client.domain.Region
 import com.tima.client.domain.SignedEscrowConfig
 import com.tima.client.domain.VerifiedEscrowConfig
@@ -16,6 +19,9 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class MessengerCryptoTest {
     @Test
@@ -123,6 +129,66 @@ class MessengerCryptoTest {
             Kodium.decryptSymmetric(escrowKey, blob.symmetricKeyWrap).getOrThrow(),
         )
         assertContentEquals(commitment, blob.keyCommitment)
+    }
+
+    @Test
+    fun mediaOnlyDocumentRoundTripsWithPresenceBitmapTwelve() {
+        val sender = DeviceIdentity.fromSeed(ByteArray(32) { (it + 1).toByte() })
+        val recipient = DeviceIdentity.fromSeed(ByteArray(32) { (it + 41).toByte() })
+        val escrowIdentity = DeviceIdentity.fromSeed(ByteArray(32) { (it + 81).toByte() })
+        val (mlKemPublic, _) = MLKEM.keyPair()
+        val crypto = MessengerCrypto(HybridKodiumEscrowBlobBuilder())
+        val markup = buildJsonObject {
+            put("entities", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "media")
+                    put("media_id", "123e4567-e89b-12d3-a456-426614174000")
+                    put("secret_ref", "media-1")
+                })
+            })
+        }
+        val secret = buildJsonObject {
+            put("media-1", buildJsonObject { put("kind", "image") })
+        }
+        val document = PlainTextDocumentV2(
+            markup = markup,
+            secretMetadata = secret,
+            metadata = DocumentMetadata(revisionNumber = 1uL),
+        )
+        val envelope = crypto.encryptDocument(
+            sender,
+            EnvelopeHeader(
+                messageId = 7uL,
+                revisionId = "00000000-0000-4000-8000-000000000007",
+                parentRevisionId = null,
+                chatId = "00000000-0000-4000-8000-000000000008",
+                senderId = "00000000-0000-4000-8000-000000000009",
+                senderDeviceId = "00000000-0000-4000-8000-000000000010",
+                messageKeyId = 0u,
+            ),
+            document,
+            mapOf("00000000-0000-4000-8000-000000000011" to recipient.publicKeys),
+            VerifiedEscrowConfig(
+                Region.RU,
+                "2026Q3",
+                1u,
+                EscrowKeySet(
+                    "media-test",
+                    EscrowPublicKeys(escrowIdentity.publicKeys.x25519, mlKemPublic),
+                ),
+            ),
+        )
+
+        assertEquals(12u, envelope.document.presenceBitmap)
+        assertEquals(
+            document,
+            crypto.decryptDocumentViaPathB(
+                "00000000-0000-4000-8000-000000000011",
+                recipient,
+                sender.publicKeys,
+                envelope,
+            ),
+        )
     }
 
     private fun ByteArray.toHex(): String = joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }

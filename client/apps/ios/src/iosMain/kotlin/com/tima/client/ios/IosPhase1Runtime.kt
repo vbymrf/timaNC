@@ -5,12 +5,14 @@ import com.tima.client.crypto.HybridKodiumEscrowBlobBuilder
 import com.tima.client.crypto.MessengerCrypto
 import com.tima.client.data.ClientSession
 import com.tima.client.data.EncryptedSqlDelightMessagingCache
+import com.tima.client.data.EncryptedSqlDelightMediaQueueStore
 import com.tima.client.data.IdGenerator
 import com.tima.client.data.MessageBubble
 import com.tima.client.data.Phase1MessagingCoordinator
 import com.tima.client.data.ProductionPrivateMessageCrypto
 import com.tima.client.data.SecureStorageSessionRepository
 import com.tima.client.data.TimaMessagingRemoteDataSource
+import com.tima.client.data.SqlDelightCiphertextMediaBlobStore
 import com.tima.client.database.TimaDatabase
 import com.tima.client.network.AttestationCoordinator
 import com.tima.client.network.AttestationProvider
@@ -24,6 +26,17 @@ import com.tima.client.network.RestGapFill
 import com.tima.client.network.TimaHttpTransport
 import com.tima.client.network.TimaRealtimeTransport
 import com.tima.client.network.WakeSource
+import com.tima.client.media.MediaIdGenerator
+import com.tima.client.media.MediaMessageSender
+import com.tima.client.media.MediaUploadUiState
+import com.tima.client.media.MediaVariantName
+import com.tima.client.media.NormalizedImageSet
+import com.tima.client.media.NormalizedImageVariant
+import com.tima.client.media.PlatformImageNormalizer
+import com.tima.client.media.PrivateImageDownloader
+import com.tima.client.media.PrivateImageUploadCoordinator
+import com.tima.client.media.PrivateMediaTransport
+import com.tima.client.media.MediaAttachmentUi
 import com.tima.client.sync.WakeToSyncCoordinator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
@@ -47,7 +60,10 @@ class IosPhase1Runtime(
     private val databaseDriver = NativeSqliteDriver(TimaDatabase.Schema, "messaging-cache-v1.db")
     private val database = TimaDatabase(databaseDriver)
     private val messagingStore = EncryptedSqlDelightMessagingCache(database, secureStorage)
+    private val mediaQueue = EncryptedSqlDelightMediaQueueStore(database, secureStorage)
+    private val mediaBlobs = SqlDelightCiphertextMediaBlobStore(database)
     private val httpClient = HttpClient(Darwin)
+    private val mediaHttpClient = HttpClient(Darwin) { followRedirects = false }
     private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
     private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { auth })
     private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { auth })
@@ -81,6 +97,24 @@ class IosPhase1Runtime(
         ids = IdGenerator(::newUuid),
         nowEpochMillis = { time(null) * 1_000L },
     )
+    private val mediaTransport = PrivateMediaTransport(
+        transport,
+        mediaHttpClient,
+        developmentMode,
+        { time(null) * 1_000L },
+    )
+    val media = PrivateImageUploadCoordinator(
+        normalizer = PlatformImageNormalizer { error("iOS supplies normalized JPEG variants") },
+        queue = mediaQueue,
+        blobs = mediaBlobs,
+        transport = mediaTransport,
+        sender = MediaMessageSender { chatId, attachment, binding ->
+            messaging.ensureMediaMessage(chatId, attachment, binding)
+        },
+        ids = MediaIdGenerator(::newUuid),
+        nowEpochMillis = { time(null) * 1_000L },
+    )
+    private val mediaDownloader = PrivateImageDownloader(mediaTransport)
     val authentication = IosAuthenticationClient(
         transport,
         attestation,
@@ -136,6 +170,7 @@ class IosPhase1Runtime(
     suspend fun restoreSession() {
         sessions.current()?.let(::installSession)
         messaging.loadSession()
+        if (auth != null) media.resumePending()
         if (auth != null) messaging.refreshChats()
     }
 
@@ -143,12 +178,14 @@ class IosPhase1Runtime(
         val effectiveOtp = if (otp.isBlank() && developmentMode) "000000" else otp.trim()
         authentication.register(phone, password, displayName, effectiveOtp)
         messaging.loadSession()
+        media.resumePending()
         messaging.refreshChats()
     }
 
     suspend fun login(phone: String, password: String) {
         authentication.login(phone, password)
         messaging.loadSession()
+        media.resumePending()
         messaging.refreshChats()
     }
 
@@ -156,6 +193,7 @@ class IosPhase1Runtime(
         runCatching { transport.post("/v1/auth/logout") }
         sessions.clear()
         auth = null
+        media.wipeSession()
         messaging.clearSessionState()
     }
 
@@ -194,6 +232,37 @@ class IosPhase1Runtime(
         messaging.sendText(requireNotNull(messaging.state.value.activeChatId), text)
     }
 
+    fun mediaState(): MediaUploadUiState = media.state.value
+
+    suspend fun sendNormalizedImage(
+        thumbnail: ByteArray,
+        thumbnailWidth: Int,
+        thumbnailHeight: Int,
+        preview: ByteArray,
+        previewWidth: Int,
+        previewHeight: Int,
+        full: ByteArray,
+        fullWidth: Int,
+        fullHeight: Int,
+    ): String = media.selectAndSendNormalized(
+        requireNotNull(messaging.state.value.activeChatId),
+        NormalizedImageSet(
+            listOf(
+                NormalizedImageVariant(MediaVariantName.THUMBNAIL, thumbnail, thumbnailWidth, thumbnailHeight),
+                NormalizedImageVariant(MediaVariantName.PREVIEW, preview, previewWidth, previewHeight),
+                NormalizedImageVariant(MediaVariantName.FULL, full, fullWidth, fullHeight),
+            ),
+        ),
+    )
+
+    suspend fun retryMedia(localId: String) = media.retry(localId)
+
+    suspend fun downloadMedia(attachment: MediaAttachmentUi, variant: String): ByteArray =
+        mediaDownloader.download(
+            attachment,
+            MediaVariantName.entries.single { it.wireValue == variant },
+        )
+
     suspend fun retry(message: MessageBubble) {
         messaging.retrySend(message.localId)
     }
@@ -216,6 +285,7 @@ class IosPhase1Runtime(
     }
 
     fun close() {
+        mediaHttpClient.close()
         httpClient.close()
         databaseDriver.close()
     }

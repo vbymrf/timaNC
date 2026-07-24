@@ -1,5 +1,6 @@
 package com.tima.client.data
 
+import com.tima.client.media.MediaAttachmentUi
 import kotlinx.serialization.Serializable
 
 /**
@@ -61,6 +62,7 @@ data class MessageBubble(
     val edited: Boolean = false,
     val delivery: MessageDeliveryState,
     val errorCode: String? = null,
+    val attachment: MediaAttachmentUi? = null,
 )
 
 sealed interface SendUiState {

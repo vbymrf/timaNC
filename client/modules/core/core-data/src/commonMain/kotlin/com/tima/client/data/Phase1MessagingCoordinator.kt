@@ -1,5 +1,11 @@
 package com.tima.client.data
 
+import com.tima.client.domain.DocumentMetadata
+import com.tima.client.domain.PlainTextDocumentV2
+import com.tima.client.media.MediaAttachmentUi
+import com.tima.client.media.MediaMessageBinding
+import com.tima.client.media.MediaTransferException
+import com.tima.client.media.PrivateImageDocument
 import com.tima.client.network.PrivateMessageWriteDto
 import com.tima.client.network.PrivateMessageWriteCodec
 import com.tima.client.network.RestGapFill
@@ -20,6 +26,12 @@ interface Phase1MessagingRepository : RestGapFill {
     suspend fun createChat(peerUserId: String): ChatPreview
     suspend fun openThread(chatId: String)
     suspend fun sendText(chatId: String, text: String): String
+    suspend fun sendMedia(chatId: String, attachment: MediaAttachmentUi): String
+    suspend fun ensureMediaMessage(
+        chatId: String,
+        attachment: MediaAttachmentUi,
+        binding: MediaMessageBinding,
+    )
     suspend fun retrySend(localId: String)
     suspend fun editText(chatId: String, messageId: ULong, text: String)
     suspend fun markRead(chatId: String, messageId: ULong)
@@ -163,6 +175,54 @@ class Phase1MessagingCoordinator(
         return localId
     }
 
+    override suspend fun sendMedia(chatId: String, attachment: MediaAttachmentUi): String {
+        val binding = MediaMessageBinding(ids.next(), ids.next(), ids.next())
+        ensureMediaMessage(chatId, attachment, binding)
+        return binding.localId
+    }
+
+    override suspend fun ensureMediaMessage(
+        chatId: String,
+        attachment: MediaAttachmentUi,
+        binding: MediaMessageBinding,
+    ) {
+        val operation = PendingSend(
+            localId = binding.localId,
+            chatId = chatId,
+            senderUserId = requireNotNull(sessions.current()).userId,
+            text = "",
+            reserveIdempotencyKey = binding.reservationIdempotencyKey,
+            sendIdempotencyKey = binding.sendIdempotencyKey,
+            attachment = attachment,
+        )
+        cache.outboxSend(binding.localId)?.let {
+            check(it.chatId == chatId && it.idempotencyKey == binding.sendIdempotencyKey) {
+                "media binding collides with another durable outbox row"
+            }
+            return
+        }
+        cache.messages(chatId).singleOrNull { it.localId == binding.localId }?.let {
+            check(it.attachment == attachment) { "media binding collides with another cached message" }
+            if (it.delivery == MessageDeliveryState.SENT || it.delivery == MessageDeliveryState.READ) return
+        }
+        val stable = pendingMutex.withLock {
+            preDurable[binding.localId]?.also {
+                check(it.chatId == chatId && it.attachment == attachment)
+            } ?: operation.also { preDurable[binding.localId] = it }
+        }
+        cache.upsertMessage(stable.bubble(MessageDeliveryState.PENDING))
+        showCachedThread(chatId)
+        prepareAndEnqueue(stable)
+        val sent = mutableState.value.send as? SendUiState.Sent
+        if (cache.outboxSend(binding.localId) == null && sent?.localId != binding.localId) {
+            val failure = mutableState.value.send as? SendUiState.Error
+            throw MediaTransferException(
+                code = failure?.code ?: "MEDIA_MESSAGE_NOT_DURABLE",
+                retryable = failure?.retryable == true,
+            )
+        }
+    }
+
     override suspend fun retrySend(localId: String) {
         requireNotNull(sessions.current()) { "authenticated session required" }
         val durable = cache.outboxSend(localId)
@@ -231,11 +291,25 @@ class Phase1MessagingCoordinator(
                 operation.chatId,
                 operation.reserveIdempotencyKey,
             ).also { operation.reservation = it }
-            val encrypted = operation.encrypted ?: crypto.encrypt(
-                operation.chatId,
-                operation.text,
-                reservation,
-            ).also { operation.encrypted = it }
+            val encrypted = operation.encrypted ?: if (operation.attachment == null) {
+                crypto.encrypt(operation.chatId, operation.text, reservation)
+            } else {
+                crypto.encryptDocument(
+                    operation.chatId,
+                    PlainTextDocumentV2(
+                        markup = PrivateImageDocument.markup(
+                            operation.attachment.mediaId,
+                            operation.attachment.secretRef,
+                        ),
+                        secretMetadata = PrivateImageDocument.secretMetadata(
+                            operation.attachment.secretRef,
+                            operation.attachment,
+                        ),
+                        metadata = DocumentMetadata(revisionNumber = 1uL),
+                    ),
+                    reservation,
+                )
+            }.also { operation.encrypted = it }
             val envelope = PrivateMessageWriteCodec.encode(encrypted)
             val now = nowEpochMillis()
             cache.enqueueSend(
@@ -393,6 +467,7 @@ class Phase1MessagingCoordinator(
                 revisionNumber = plain.revisionNumber,
                 senderUserId = value.sender_id,
                 text = plain.text,
+                attachment = plain.attachment,
                 createdAt = value.created_at,
                 edited = plain.revisionNumber > 1uL,
                 delivery = MessageDeliveryState.SENT,
@@ -457,6 +532,7 @@ class Phase1MessagingCoordinator(
         val text: String,
         val reserveIdempotencyKey: String,
         val sendIdempotencyKey: String,
+        val attachment: MediaAttachmentUi? = null,
         var reservation: ReservedMessageIds? = null,
         var encrypted: PrivateMessageWriteDto? = null,
     ) {
@@ -469,6 +545,7 @@ class Phase1MessagingCoordinator(
                 revisionNumber = 1uL,
                 senderUserId = senderUserId,
                 text = text,
+                attachment = attachment,
                 createdAt = null,
                 delivery = state,
             )

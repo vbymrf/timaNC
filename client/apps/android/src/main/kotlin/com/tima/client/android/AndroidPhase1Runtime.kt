@@ -6,6 +6,7 @@ import com.tima.client.crypto.HybridKodiumEscrowBlobBuilder
 import com.tima.client.crypto.MessengerCrypto
 import com.tima.client.data.ClientSession
 import com.tima.client.data.EncryptedSqlDelightMessagingCache
+import com.tima.client.data.EncryptedSqlDelightMediaQueueStore
 import com.tima.client.data.IdGenerator
 import com.tima.client.data.Phase1MessagingCoordinator
 import com.tima.client.data.ProductionPrivateMessageCrypto
@@ -23,6 +24,11 @@ import com.tima.client.network.RealtimeReconnect
 import com.tima.client.network.RestGapFill
 import com.tima.client.network.TimaHttpTransport
 import com.tima.client.network.TimaRealtimeTransport
+import com.tima.client.media.MediaIdGenerator
+import com.tima.client.media.MediaMessageSender
+import com.tima.client.media.PrivateImageUploadCoordinator
+import com.tima.client.media.PrivateImageDownloader
+import com.tima.client.media.PrivateMediaTransport
 import com.tima.client.sync.WakeToSyncCoordinator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -47,12 +53,14 @@ class AndroidPhase1Runtime(
         AndroidSqliteDriver(TimaDatabase.Schema, context.applicationContext, "messaging-cache-v1.db")
     private val database = TimaDatabase(databaseDriver)
     private val httpClient = HttpClient(OkHttp)
+    private val mediaHttpClient = HttpClient(OkHttp) { followRedirects = false }
     private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
     private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { authContext })
     private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { authContext })
     private var wakeSink: NotificationWakeSink? = null
     private val sessions = SecureStorageSessionRepository(secureStorage)
     private val messagingStore = EncryptedSqlDelightMessagingCache(database, secureStorage)
+    private val mediaQueue = EncryptedSqlDelightMediaQueueStore(database, secureStorage)
     private val identities = AndroidDeviceIdentityRepository(secureStorage)
     private val trust = AndroidTrustMaterialProvider(transport, sessions, identities, developmentMode)
     private val attestationProvider: AttestationProvider = when {
@@ -82,6 +90,24 @@ class AndroidPhase1Runtime(
         ids = IdGenerator { UUID.randomUUID().toString() },
         nowEpochMillis = System::currentTimeMillis,
     )
+    private val mediaTransport = PrivateMediaTransport(
+        transport,
+        mediaHttpClient,
+        developmentMode,
+        System::currentTimeMillis,
+    )
+    val media = PrivateImageUploadCoordinator(
+        normalizer = AndroidImageNormalizer(),
+        queue = mediaQueue,
+        blobs = AndroidCiphertextBlobStore(context.applicationContext),
+        transport = mediaTransport,
+        sender = MediaMessageSender { chatId, attachment, binding ->
+            messaging.ensureMediaMessage(chatId, attachment, binding)
+        },
+        ids = MediaIdGenerator { UUID.randomUUID().toString() },
+        nowEpochMillis = System::currentTimeMillis,
+    )
+    val mediaDownloader = PrivateImageDownloader(mediaTransport)
     val authentication = AndroidAuthenticationClient(
         transport = transport,
         attestation = attestation,
@@ -138,6 +164,7 @@ class AndroidPhase1Runtime(
     suspend fun restoreSession() {
         sessions.current()?.let(::installSession)
         messaging.loadSession()
+        if (authContext != null) media.resumePending()
         if (authContext != null) messaging.refreshChats()
     }
 
@@ -145,11 +172,13 @@ class AndroidPhase1Runtime(
         runCatching { transport.post("/v1/auth/logout") }
         sessions.clear()
         authContext = null
+        media.wipeSession()
         messaging.clearSessionState()
     }
 
     override fun close() {
         wakeSink?.let(AndroidNotificationWakeBridge::uninstall)
+        mediaHttpClient.close()
         httpClient.close()
         databaseDriver.close()
     }

@@ -2,18 +2,23 @@ package com.tima.client.android
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.tima.client.data.MessageBubble
 import com.tima.client.data.MessageDeliveryState
+import com.tima.client.media.MEDIA_INPUT_LIMIT_BYTES
+import com.tima.client.media.MediaVariantName
 import com.tima.client.network.PlatformServiceUnavailableException
 import com.tima.client.network.WakeSource
 import kotlinx.coroutines.CoroutineScope
@@ -44,6 +49,9 @@ class MainActivity : Activity() {
     private lateinit var threadList: LinearLayout
     private lateinit var compose: EditText
     private lateinit var send: Button
+    private lateinit var attachImage: Button
+    private lateinit var retryMedia: Button
+    private lateinit var mediaState: TextView
     private lateinit var diagnostics: LinearLayout
     private var activeChatId: String? = null
 
@@ -65,6 +73,15 @@ class MainActivity : Activity() {
                         current.trustSummary,
                     )
                     render(view)
+                }
+            }
+            scope.launch {
+                current.media.state.collect { media ->
+                    mediaState.text = media.state?.let {
+                        "$it: ${media.completedVariants}/${media.totalVariants}" +
+                            (media.errorCode?.let { code -> " · $code" } ?: "")
+                    } ?: "No image upload"
+                    retryMedia.isEnabled = media.retryable && media.localId != null
                 }
             }
             scope.launch { runOperation("Session restored") { current.restoreSession() } }
@@ -172,6 +189,27 @@ class MainActivity : Activity() {
                 compose.text.clear()
             }
         }
+        attachImage = button(R.id.media_attach_image, "Attach encrypted image") {
+            if (activeChatId != null) {
+                startActivityForResult(
+                    Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "image/*"
+                    },
+                    IMAGE_PICK_REQUEST,
+                )
+            }
+        }
+        mediaState = textView(R.id.media_upload_state, "No image upload").apply {
+            contentDescription = "Encrypted image upload progress"
+        }
+        retryMedia = button(R.id.media_retry, "Retry encrypted image upload") {
+            runtime?.media?.state?.value?.localId?.let { localId ->
+                runOperation("Encrypted image retry completed") {
+                    checkNotNull(runtime).media.retry(localId)
+                }
+            }
+        }.apply { isEnabled = false }
         diagnostics = diagnosticsPanel()
         val diagnosticsToggle = button(R.id.diagnostics_toggle, "Trust & push diagnostics") {
             diagnostics.visibility = if (diagnostics.visibility == View.GONE) View.VISIBLE else View.GONE
@@ -179,7 +217,7 @@ class MainActivity : Activity() {
         listOf(
             status, sessionState, phone, password, displayName, otp, register, login, logout,
             peerId, createChat, refreshChats, chatList, threadTitle, refreshThread, threadList,
-            compose, send, diagnosticsToggle, diagnostics,
+            compose, send, attachImage, mediaState, retryMedia, diagnosticsToggle, diagnostics,
         ).forEach(root::addView)
         return ScrollView(this).apply {
             addView(
@@ -248,6 +286,7 @@ class MainActivity : Activity() {
         createChat.isEnabled = view.signedIn
         refreshChats.isEnabled = view.signedIn
         send.isEnabled = view.sendEnabled
+        attachImage.isEnabled = view.sendEnabled && activeChatId != null
         compose.isEnabled = view.sendEnabled
         renderChats(view)
         renderThread(view)
@@ -277,8 +316,49 @@ class MainActivity : Activity() {
         orientation = LinearLayout.VERTICAL
         contentDescription = "Private message ${message.messageId ?: message.localId}"
         addView(TextView(this@MainActivity).apply {
-            text = "${message.text}${if (message.edited) " (edited)" else ""}\n${message.delivery}"
+            text = "${message.text.ifEmpty { if (message.attachment != null) "Encrypted image" else "" }}" +
+                "${if (message.edited) " (edited)" else ""}\n${message.delivery}"
         })
+        message.attachment?.let { attachment ->
+            val image = ImageView(this@MainActivity).apply {
+                contentDescription = "Open encrypted image preview ${message.localId}"
+                adjustViewBounds = true
+            }
+            addView(image)
+            scope.launch {
+                runCatching {
+                    checkNotNull(runtime).mediaDownloader.download(attachment, MediaVariantName.THUMBNAIL)
+                }.onSuccess { jpeg ->
+                    try {
+                        image.setImageBitmap(BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size))
+                    } finally {
+                        jpeg.fill(0)
+                    }
+                }
+            }
+            image.setOnClickListener {
+                scope.launch {
+                    runCatching {
+                        checkNotNull(runtime).mediaDownloader.download(attachment, MediaVariantName.PREVIEW)
+                    }.onSuccess { jpeg ->
+                        try {
+                            val preview = ImageView(this@MainActivity).apply {
+                                setImageBitmap(BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size))
+                                adjustViewBounds = true
+                                contentDescription = "Decrypted in-app image preview"
+                            }
+                            AlertDialog.Builder(this@MainActivity)
+                                .setTitle("Encrypted image")
+                                .setView(preview)
+                                .setPositiveButton("Close", null)
+                                .show()
+                        } finally {
+                            jpeg.fill(0)
+                        }
+                    }
+                }
+            }
+        }
         if (message.delivery == MessageDeliveryState.ERROR) {
             addView(Button(this@MainActivity).apply {
                 text = "Retry"
@@ -342,7 +422,7 @@ class MainActivity : Activity() {
     }
 
     private fun setProductEnabled(enabled: Boolean) {
-        listOf(register, login, logout, createChat, refreshChats, refreshThread, send).forEach {
+        listOf(register, login, logout, createChat, refreshChats, refreshThread, send, attachImage, retryMedia).forEach {
             it.isEnabled = enabled
         }
     }
@@ -367,9 +447,27 @@ class MainActivity : Activity() {
         setOnClickListener { action() }
     }
 
+    @Deprecated("Compatible system picker result bridge for this platform Activity shell")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != IMAGE_PICK_REQUEST || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        val chatId = activeChatId ?: return
+        runOperation("Encrypted image queued") {
+            val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                readBounded(input, MEDIA_INPUT_LIMIT_BYTES)
+            } ?: error("selected image cannot be read")
+            checkNotNull(runtime).media.selectAndSend(chatId, bytes)
+        }
+    }
+
     override fun onDestroy() {
-        runtime?.close()
         scope.cancel()
+        runtime?.close()
         super.onDestroy()
+    }
+
+    private companion object {
+        const val IMAGE_PICK_REQUEST = 4101
     }
 }

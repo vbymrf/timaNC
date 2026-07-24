@@ -162,7 +162,9 @@
 - Executable/active content (`script`, macro, active HTML/SVG, event handlers, polyglot executable) блокируется. `code` в DocumentV2 остаётся inert text.
 - Chunk assembly metadata не может переопределить подписанный DocumentV2 media binding.
 - Retention применяется к variants и immutable revisions. Legal hold приостанавливает physical purge, включая soft-deleted; hold/release/purge пишутся в WORM audit.
-- Max size 2 GB (UI limit).
+- Phase 1 executable contract: source image ≤25 MiB and each of exactly three
+  ciphertext variants ≤100 MiB. The former 2 GB/chunked target is future scope
+  and is not implemented.
 
 ## 7. Realtime Gateway
 

@@ -20,6 +20,7 @@ include(
     ":modules:core:core-domain",
     ":modules:core:core-network",
     ":modules:core:core-database",
+    ":modules:core:core-media",
     ":modules:core:core-sync",
     ":modules:core:core-data",
     ":modules:core:core-sdk",

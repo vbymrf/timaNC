@@ -5,6 +5,8 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.tima.client.data.ChatPreview
 import com.tima.client.data.MessageBubble
 import com.tima.client.data.MessageDeliveryState
+import com.tima.client.media.MEDIA_INPUT_LIMIT_BYTES
+import com.tima.client.media.MediaVariantName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,6 +21,8 @@ import java.awt.GridLayout
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
+import java.nio.file.Files
 import javax.swing.BorderFactory
 import javax.swing.BoxLayout
 import javax.swing.DefaultListCellRenderer
@@ -27,6 +31,7 @@ import javax.swing.ImageIcon
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JFrame
+import javax.swing.JFileChooser
 import javax.swing.JLabel
 import javax.swing.JList
 import javax.swing.JOptionPane
@@ -37,6 +42,8 @@ import javax.swing.SwingUtilities
 import javax.swing.JTextArea
 import javax.swing.JTextField
 import javax.swing.ListSelectionModel
+import javax.swing.filechooser.FileNameExtensionFilter
+import javax.imageio.ImageIO
 
 fun main() {
     SwingUtilities.invokeLater {
@@ -92,6 +99,15 @@ private class WindowsShell(
         .identified("message.compose", "Encrypted private message text")
     private val send = JButton("Send encrypted text")
         .identified("message.send", "Encrypt and send private message")
+    private val attachImage = JButton("Attach encrypted image")
+        .identified("media.attach-image", "Select one private image for encrypted upload")
+    private val openPreview = JButton("Open image preview")
+        .identified("media.open-preview", "Open selected encrypted image inside Tima")
+    private val mediaState = JLabel("No image upload")
+        .identified("media.upload-state", "Encrypted image upload progress")
+    private val retryMedia = JButton("Retry image upload")
+        .identified("media.retry", "Retry the encrypted image upload")
+        .apply { isEnabled = false }
     private val retry = JButton("Retry")
         .identified("message.retry", "Retry selected failed message")
     private val edit = JButton("Edit")
@@ -104,6 +120,8 @@ private class WindowsShell(
         .identified("session.logout", "Logout and wipe the encrypted offline messaging cache")
     private val frame = JFrame("Tima")
     private var rendered: WindowsMessagingViewState? = null
+    private val thumbnailCache = mutableMapOf<String, ImageIcon>()
+    private val thumbnailLoading = mutableSetOf<String>()
 
     fun show() {
         configureActions()
@@ -130,8 +148,11 @@ private class WindowsShell(
             add(JScrollPane(messages), BorderLayout.CENTER)
             add(JPanel(BorderLayout(4, 4)).apply {
                 add(JScrollPane(compose), BorderLayout.CENTER)
-                add(JPanel(GridLayout(2, 3, 4, 4)).apply {
+                add(JPanel(GridLayout(0, 3, 4, 4)).apply {
                     add(send)
+                    add(attachImage)
+                    add(openPreview)
+                    add(retryMedia)
                     add(retry)
                     add(edit)
                     add(delete)
@@ -149,6 +170,7 @@ private class WindowsShell(
                 add(status)
                 add(session)
                 add(delivery)
+                add(mediaState)
             }, BorderLayout.NORTH)
             add(JPanel(BorderLayout()).apply {
                 add(linkingPanel, BorderLayout.NORTH)
@@ -158,8 +180,8 @@ private class WindowsShell(
         frame.defaultCloseOperation = JFrame.DISPOSE_ON_CLOSE
         frame.addWindowListener(object : WindowAdapter() {
             override fun windowClosed(event: WindowEvent) {
-                runtime.close()
                 scope.cancel()
+                runtime.close()
             }
         })
         frame.minimumSize = Dimension(900, 640)
@@ -176,6 +198,17 @@ private class WindowsShell(
                     runtime.deliverySummary,
                 )
                 SwingUtilities.invokeLater { render(view) }
+            }
+        }
+        scope.launch {
+            runtime.media.state.collect { state ->
+                SwingUtilities.invokeLater {
+                    mediaState.text = state.state?.let {
+                        "$it: ${state.completedVariants}/${state.totalVariants}" +
+                            (state.errorCode?.let { code -> " · $code" } ?: "")
+                    } ?: "No image upload"
+                    retryMedia.isEnabled = state.retryable && state.localId != null
+                }
             }
         }
         runtime.startPeriodicCatchUp(scope)
@@ -227,6 +260,48 @@ private class WindowsShell(
                 operation = { runtime.send(text) },
             )
         }
+        attachImage.addActionListener {
+            val chatId = rendered?.activeChatId ?: return@addActionListener
+            val chooser = JFileChooser().apply {
+                dialogTitle = "Select one private image"
+                fileFilter = FileNameExtensionFilter("Images", "jpg", "jpeg", "png", "gif", "bmp")
+                isAcceptAllFileFilterUsed = false
+            }
+            if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
+                runOperation("Encrypted image queued") {
+                    val bytes = Files.newInputStream(chooser.selectedFile.toPath()).use {
+                        readBounded(it, MEDIA_INPUT_LIMIT_BYTES)
+                    }
+                    runtime.media.selectAndSend(chatId, bytes)
+                }
+            }
+        }
+        openPreview.addActionListener {
+            val attachment = messages.selectedValue?.attachment ?: return@addActionListener
+            runOperation(
+                "Encrypted image preview opened",
+                operation = { runtime.mediaDownloader.download(attachment, MediaVariantName.PREVIEW) },
+                success = { jpeg ->
+                    try {
+                        val image = requireNotNull(ImageIO.read(ByteArrayInputStream(jpeg)))
+                        JOptionPane.showMessageDialog(
+                            frame,
+                            JLabel(ImageIcon(image)),
+                            "Encrypted image",
+                            JOptionPane.PLAIN_MESSAGE,
+                        )
+                    } finally {
+                        jpeg.fill(0)
+                    }
+                },
+                failure = {},
+            )
+        }
+        retryMedia.addActionListener {
+            runtime.media.state.value.localId?.let { localId ->
+                runOperation("Encrypted image retry completed") { runtime.media.retry(localId) }
+            }
+        }
         retry.addActionListener {
             messages.selectedValue?.let { value ->
                 runOperation("Message retried") { runtime.retry(value) }
@@ -252,7 +327,11 @@ private class WindowsShell(
             }
         }
         logout.addActionListener {
-            runOperation("Signed out; encrypted offline cache and protected key wiped") { runtime.logout() }
+            runOperation("Signed out; encrypted offline cache and protected key wiped") {
+                runtime.logout()
+                thumbnailCache.clear()
+                thumbnailLoading.clear()
+            }
         }
     }
 
@@ -292,15 +371,47 @@ private class WindowsShell(
                 index: Int,
                 isSelected: Boolean,
                 cellHasFocus: Boolean,
-            ): Component = super.getListCellRendererComponent(
-                list,
-                (value as? MessageBubble)?.let {
-                    "${it.text}${if (it.edited) " (edited)" else ""} · ${it.delivery}"
-                } ?: value,
-                index,
-                isSelected,
-                cellHasFocus,
-            )
+            ): Component {
+                val message = value as? MessageBubble
+                val component = super.getListCellRendererComponent(
+                    list,
+                    message?.let {
+                        "${it.text.ifEmpty { if (it.attachment != null) "Encrypted image" else "" }}" +
+                            "${if (it.edited) " (edited)" else ""} · ${it.delivery}"
+                    } ?: value,
+                    index,
+                    isSelected,
+                    cellHasFocus,
+                ) as JLabel
+                component.icon = message?.let { thumbnailCache[it.localId] }
+                val attachment = message?.attachment
+                if (attachment != null &&
+                    message.localId !in thumbnailCache &&
+                    thumbnailLoading.add(message.localId)
+                ) {
+                    scope.launch {
+                        runCatching {
+                            runtime.mediaDownloader.download(
+                                attachment,
+                                MediaVariantName.THUMBNAIL,
+                            )
+                        }.onSuccess { jpeg ->
+                            try {
+                                val decoded = ImageIO.read(ByteArrayInputStream(jpeg))
+                                val scaled = decoded.getScaledInstance(40, 40, java.awt.Image.SCALE_SMOOTH)
+                                SwingUtilities.invokeLater {
+                                    thumbnailCache[message.localId] = ImageIcon(scaled)
+                                    messages.repaint()
+                                }
+                            } finally {
+                                jpeg.fill(0)
+                            }
+                        }
+                        thumbnailLoading.remove(message.localId)
+                    }
+                }
+                return component
+            }
         }
         messages.addListSelectionListener { updateMessageActions() }
     }
@@ -315,6 +426,7 @@ private class WindowsShell(
         }
         send.isEnabled = view.sendEnabled
         compose.isEnabled = view.sendEnabled
+        attachImage.isEnabled = view.sendEnabled && view.activeChatId != null
 
         val selectedChat = view.activeChatId
         chatModel.clear()
@@ -346,6 +458,7 @@ private class WindowsShell(
             value?.messageId != null && value.senderUserId == currentUser && runtime.privateSendingEnabled
         delete.isEnabled = value?.messageId != null && value.senderUserId == currentUser
         markRead.isEnabled = value?.messageId != null && value.senderUserId != currentUser
+        openPreview.isEnabled = value?.attachment != null
     }
 
     private fun showEdit(message: MessageBubble) {

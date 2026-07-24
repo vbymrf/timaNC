@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.sqldelight)
 }
 
+// Keep generated migration class paths below the Win32 toolchain limit during D8 transforms.
+layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("core-database"))
+
 kotlin {
     jvmToolchain(17)
     jvm()

@@ -6,6 +6,7 @@ import com.tima.client.network.SecureStorage
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -14,6 +15,19 @@ import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
 
 class EncryptedSqlDelightMessagingCacheTest {
+    @Test
+    fun oldEncryptedBubbleJsonDefaultsAttachmentToNull() {
+        val oldJson = """
+            {
+              "localId":"old-1","chatId":"chat-1","messageId":null,"revisionId":null,
+              "revisionNumber":1,"senderUserId":"user-1","text":"legacy",
+              "createdAt":null,"edited":false,"delivery":"SENT","errorCode":null
+            }
+        """.trimIndent()
+        val decoded = Json { ignoreUnknownKeys = false }.decodeFromString<MessageBubble>(oldJson)
+        assertNull(decoded.attachment)
+    }
+
     @Test
     fun encryptedRowsSurviveRestartAndPreserveReplacementSemantics() = runBlocking {
         val path = Files.createTempFile("tima-messaging-cache", ".sqlite")

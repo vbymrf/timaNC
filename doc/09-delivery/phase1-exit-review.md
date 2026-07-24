@@ -88,6 +88,10 @@ green rerun above.
   registration, soft-fail fallback routing, common wake-to-sync behavior and the
   architecture in
   [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md).
+- Secure shared private-image alpha with exactly three independently keyed
+  ciphertext variants, encrypted restart queue and media-only DocumentV2;
+  Android/Windows picker, normalization, progress, thumbnail and in-app preview
+  are locally implemented. This is not three-platform acceptance evidence.
 
 Production source does not fall back to development HMAC attestation or generated
 push/signing credentials. Kodium remains pinned to `1.0.0`. LiveKit and every
@@ -98,8 +102,9 @@ other Phase 2 service remain outside the default stack and this review.
 1. Complete native acceptance journeys. Current platform shells wire trust,
    storage, push and Windows linking, but do not yet constitute the full
    end-user messaging UI.
-2. Complete encrypted media UI journeys and retain hosted Android/iOS/Windows
-   native evidence.
+2. Validate the implemented iOS PHPicker/UIKit normalization and SwiftUI render
+   bridge with an actual Xcode Swift build/archive, then retain hosted
+   Android/iOS/Windows encrypted-media acceptance evidence.
 
 The durable post-encryption send/retry item is complete. Android, iOS and
 Windows persist the exact canonical ciphertext body, message/revision identity

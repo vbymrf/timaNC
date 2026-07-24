@@ -70,6 +70,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_ application: UIApplication) {
+        runtime?.close()
+    }
+
     func application(
         _ application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],

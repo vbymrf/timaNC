@@ -1,0 +1,4 @@
+CREATE TABLE media_cipher_blob (
+  blob_id TEXT NOT NULL PRIMARY KEY,
+  ciphertext BLOB NOT NULL
+);

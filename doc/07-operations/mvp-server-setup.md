@@ -237,7 +237,7 @@ api.beta.{$DOMAIN} {
 
 s3.beta.{$DOMAIN} {
     reverse_proxy minio:9000            # auth-issued presigned URL, фиксированный TTL 15 минут
-    request_body { max_size 2GB }
+    request_body { max_size 100MB }      # Phase 1 cap per ciphertext variant; no chunked/2GB path
 }
 
 rtc.beta.{$DOMAIN} {

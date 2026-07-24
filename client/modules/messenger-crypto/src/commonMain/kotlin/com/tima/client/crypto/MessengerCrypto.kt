@@ -91,6 +91,22 @@ class MessengerCrypto(
         recipientDevices: Map<String, DevicePublicKeys>,
         escrowConfig: VerifiedEscrowConfig,
         ratchetEnvelope: ByteArray? = null,
+    ): PersonalMessageEnvelope = encryptDocument(
+        sender,
+        header,
+        document,
+        recipientDevices,
+        escrowConfig,
+        ratchetEnvelope,
+    )
+
+    fun encryptDocument(
+        sender: DeviceIdentity,
+        header: EnvelopeHeader,
+        document: PlainTextDocumentV2,
+        recipientDevices: Map<String, DevicePublicKeys>,
+        escrowConfig: VerifiedEscrowConfig,
+        ratchetEnvelope: ByteArray? = null,
     ): PersonalMessageEnvelope {
         validate(header, document)
         require(recipientDevices.isNotEmpty()) { "at least one Path-B device wrap is required" }
@@ -159,6 +175,18 @@ class MessengerCrypto(
     }
 
     fun decryptTextMessageViaPathB(
+        recipientDeviceId: String,
+        recipient: DeviceIdentity,
+        senderPublicKeys: DevicePublicKeys,
+        envelope: PersonalMessageEnvelope,
+    ): PlainTextDocumentV2 = decryptDocumentViaPathB(
+        recipientDeviceId,
+        recipient,
+        senderPublicKeys,
+        envelope,
+    )
+
+    fun decryptDocumentViaPathB(
         recipientDeviceId: String,
         recipient: DeviceIdentity,
         senderPublicKeys: DevicePublicKeys,

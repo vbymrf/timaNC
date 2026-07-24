@@ -18,6 +18,9 @@
     <item name="thread_list" type="id" />
     <item name="message_compose" type="id" />
     <item name="message_send" type="id" />
+    <item name="media_attach_image" type="id" />
+    <item name="media_upload_state" type="id" />
+    <item name="media_retry" type="id" />
     <item name="diagnostics_toggle" type="id" />
     <item name="diagnostics_panel" type="id" />
     <item name="diagnostics_prepare_trust" type="id" />

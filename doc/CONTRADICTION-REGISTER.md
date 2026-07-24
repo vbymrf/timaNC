@@ -1,6 +1,6 @@
 # Реестр противоречий документации TIMA
 
-> **Дата фиксации:** 2026-07-22  
+> **Дата фиксации:** 2026-07-24
 > **Статус:** verified — решения C-001…C-040 применены к активной нормативной документации; итоговая проверка 2026-07-22.  
 > **Профиль поставки:** single-region beta VPS → RU/EU regional cells до GA.
 
@@ -57,6 +57,7 @@
 | C-040 | P0 | `escrow_strict` | Production bypass невозможен; флаг допустим только local dev/test и отсутствует в production config | `ci-cd-release.md`, security/ops | resolved |
 | C-041 | P1 | Cohort timing | Invited cohort до 100 и его SLO evidence перенесены из Phase 1 repository exit в Phase 5 Closed Beta | `roadmap.md`, `nfr-slo.md`, `load-test-plan.md`, `phase1-exit-review.md` | resolved |
 | C-042 | P1 | Hybrid notifications | FCM/APNs остаются vendor channels; собственный Go gateway + Android UnifiedPush + WS/REST catch-up образуют credential-free path; iOS без APNs не получает background wake | `hybrid-notification-delivery.md`, `push-payloads.md`, `client-architecture.md` | resolved |
+| C-043 | P0 | Phase 1 private media limits | Один private 1:1 image; source ≤25 MiB; ровно `thumbnail`/`preview`/`full`; ≤100 MiB ciphertext на variant; Original, chunks, 2 GB и OS background transfer отсутствуют | `media-storage.md`, `backend-services.md`, `mvp-server-setup.md`, OpenAPI | resolved |
 
 ## 3. Dual-region production
 

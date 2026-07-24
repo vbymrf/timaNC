@@ -2,6 +2,10 @@ package com.tima.client.data
 
 import com.tima.client.crypto.HybridKodiumEscrowBlobBuilder
 import com.tima.client.crypto.MessengerCrypto
+import com.tima.client.domain.PlainTextDocumentV2
+import com.tima.client.media.MediaAttachmentUi
+import com.tima.client.media.MediaVariantSecret
+import com.tima.client.media.MediaMessageBinding
 import com.tima.client.network.AuthContext
 import com.tima.client.network.PrivateDocumentEnvelopeDto
 import com.tima.client.network.PrivateMessageHistoryDto
@@ -18,11 +22,15 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class Phase1MessagingCoordinatorTest {
@@ -80,6 +88,78 @@ class Phase1MessagingCoordinatorTest {
         assertEquals(1, fixture.crypto.encryptCalls)
         assertEquals(2, fixture.remote.sendCalls)
         assertFalse(fixture.remote.lastWrite.toString().contains("retry secret"))
+    }
+
+    @Test
+    fun completedMediaBindsToExactDurableMessageOutbox() = runBlocking {
+        val fixture = fixture()
+        val variant = MediaVariantSecret(
+            "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+            "ab".repeat(32),
+            100,
+            1,
+            1,
+        )
+        val attachment = MediaAttachmentUi(
+            mediaId = "00000000-0000-4000-8000-000000000009",
+            secretRef = "media:test",
+            thumbnail = variant,
+            preview = variant,
+            full = variant,
+        )
+        fixture.remote.failNextSend = true
+        val localId = fixture.coordinator.sendMedia(TEST_CHAT, attachment)
+        val durable = assertNotNull(fixture.cache.outboxSend(localId))
+        val exact = durable.envelope.copyOf()
+        assertEquals(
+            attachment.mediaId,
+            fixture.crypto.lastDocument?.markup
+                ?.get("entities")?.jsonArray?.single()?.jsonObject
+                ?.get("media_id")?.jsonPrimitive?.content,
+        )
+
+        fixture.coordinator.retrySend(localId)
+
+        assertTrue(exact.contentEquals(fixture.remote.serializedWrites.last()))
+        assertEquals(1, fixture.crypto.documentEncryptCalls)
+    }
+
+    @Test
+    fun mediaBindingResumeAfterSenderSuccessIsCrashIdempotent() = runBlocking {
+        val fixture = fixture()
+        val variant = MediaVariantSecret(
+            "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+            "cd".repeat(32),
+            101,
+            1,
+            1,
+        )
+        val attachment = MediaAttachmentUi(
+            "00000000-0000-4000-8000-000000000009",
+            "media:crash",
+            thumbnail = variant,
+            preview = variant,
+            full = variant,
+        )
+        val binding = MediaMessageBinding(
+            localId = "stable-message-local-id",
+            reservationIdempotencyKey = "00000000-0000-4000-8000-000000000091",
+            sendIdempotencyKey = "00000000-0000-4000-8000-000000000092",
+        )
+
+        fixture.coordinator.ensureMediaMessage(TEST_CHAT, attachment, binding)
+        // Simulates media-queue resume after a crash before SENT_TO_OUTBOX was persisted.
+        fixture.coordinator.ensureMediaMessage(TEST_CHAT, attachment, binding)
+
+        assertEquals(1, fixture.remote.reservationCalls)
+        assertEquals(binding.reservationIdempotencyKey, fixture.remote.lastReservationKey)
+        assertEquals(1, fixture.crypto.documentEncryptCalls)
+        assertEquals(1, fixture.remote.sendCalls)
+        assertEquals(binding.sendIdempotencyKey, fixture.remote.lastSendKey)
+        assertEquals(
+            listOf(binding.localId),
+            fixture.cache.messages(TEST_CHAT).map(MessageBubble::localId),
+        )
     }
 
     @Test
@@ -206,16 +286,17 @@ class Phase1MessagingCoordinatorTest {
             ),
         )
         var currentOnline = online
+        val cache = NonDurableInMemoryMessagingCache()
         val coordinator = Phase1MessagingCoordinator(
             sessions = sessions,
             remote = remote,
             crypto = crypto,
-            cache = NonDurableInMemoryMessagingCache(),
+            cache = cache,
             ids = IdGenerator { values.removeFirst() },
             connectivity = Connectivity { currentOnline },
             nowEpochMillis = { 0L },
         )
-        return Fixture(coordinator, remote, crypto, currentOnline) {
+        return Fixture(coordinator, remote, crypto, cache, currentOnline) {
             currentOnline = it
         }
     }
@@ -224,6 +305,7 @@ class Phase1MessagingCoordinatorTest {
         val coordinator: Phase1MessagingCoordinator,
         val remote: FakeRemote,
         val crypto: FakeCrypto,
+        val cache: NonDurableInMemoryMessagingCache,
         onlineValue: Boolean,
         private val setOnline: (Boolean) -> Unit,
     ) {
@@ -245,6 +327,8 @@ class Phase1MessagingCoordinatorTest {
         var encryptCalls = 0
         var lastParentRevisionId: String? = null
         var lastRevisionNumber: ULong? = null
+        var lastDocument: PlainTextDocumentV2? = null
+        var documentEncryptCalls = 0
 
         override suspend fun encrypt(
             chatId: String,
@@ -261,6 +345,17 @@ class Phase1MessagingCoordinatorTest {
 
         override suspend fun decrypt(value: PrivateMessageHistoryDto) =
             DecryptedMessage("decrypted:${value.document.encrypted_nodes.single()}", value.document.metadata.revision_number)
+
+        override suspend fun encryptDocument(
+            chatId: String,
+            document: PlainTextDocumentV2,
+            reservation: ReservedMessageIds,
+            parentRevisionId: String?,
+        ): PrivateMessageWriteDto {
+            documentEncryptCalls++
+            lastDocument = document
+            return encryptedWrite(reservation.messageId, reservation.revisionId)
+        }
     }
 
     private class FakeRemote : MessagingRemoteDataSource {
@@ -270,6 +365,8 @@ class Phase1MessagingCoordinatorTest {
         val historyCalls = mutableListOf<String>()
         var failNextSend = false
         var sendCalls = 0
+        var reservationCalls = 0
+        var lastReservationKey: String? = null
         var editCalls = 0
         var lastWrite: PrivateMessageWriteDto? = null
         val serializedWrites = mutableListOf<ByteArray>()
@@ -290,8 +387,11 @@ class Phase1MessagingCoordinatorTest {
             return RemoteHistoryPage(historyByChat[chatId].orEmpty(), null)
         }
 
-        override suspend fun reserveMessage(chatId: String, idempotencyKey: String) =
-            ReservedMessageIds(7uL, TEST_REVISION)
+        override suspend fun reserveMessage(chatId: String, idempotencyKey: String): ReservedMessageIds {
+            reservationCalls++
+            lastReservationKey = idempotencyKey
+            return ReservedMessageIds(7uL, TEST_REVISION)
+        }
 
         override suspend fun send(
             chatId: String,

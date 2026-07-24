@@ -5,6 +5,7 @@ import com.tima.client.crypto.HybridKodiumEscrowBlobBuilder
 import com.tima.client.crypto.MessengerCrypto
 import com.tima.client.data.ClientSession
 import com.tima.client.data.EncryptedSqlDelightMessagingCache
+import com.tima.client.data.EncryptedSqlDelightMediaQueueStore
 import com.tima.client.data.IdGenerator
 import com.tima.client.data.MessageBubble
 import com.tima.client.data.Phase1MessagingCoordinator
@@ -21,12 +22,18 @@ import com.tima.client.network.RestGapFill
 import com.tima.client.network.TimaHttpTransport
 import com.tima.client.network.TimaRealtimeTransport
 import com.tima.client.network.WakeSource
+import com.tima.client.media.MediaIdGenerator
+import com.tima.client.media.MediaMessageSender
+import com.tima.client.media.PrivateImageUploadCoordinator
+import com.tima.client.media.PrivateImageDownloader
+import com.tima.client.media.PrivateMediaTransport
 import com.tima.client.sync.WakeToSyncCoordinator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
+import java.sql.DriverManager
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -52,7 +59,9 @@ class WindowsPhase1Runtime(
     private val databaseDriver = openDatabase(databasePath)
     private val database = TimaDatabase(databaseDriver)
     private val messagingStore = EncryptedSqlDelightMessagingCache(database, storage)
+    private val mediaQueue = EncryptedSqlDelightMediaQueueStore(database, storage)
     private val httpClient = HttpClient(CIO)
+    private val mediaHttpClient = HttpClient(CIO) { followRedirects = false }
     private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
     private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { auth })
     private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { auth })
@@ -74,6 +83,24 @@ class WindowsPhase1Runtime(
         ids = IdGenerator { UUID.randomUUID().toString() },
         nowEpochMillis = System::currentTimeMillis,
     )
+    private val mediaTransport = PrivateMediaTransport(
+        transport,
+        mediaHttpClient,
+        developmentMode,
+        System::currentTimeMillis,
+    )
+    val media = PrivateImageUploadCoordinator(
+        normalizer = WindowsImageNormalizer(),
+        queue = mediaQueue,
+        blobs = WindowsCiphertextBlobStore(databasePath.toAbsolutePath().parent.resolve("private-media-cipher-v1")),
+        transport = mediaTransport,
+        sender = MediaMessageSender { chatId, attachment, binding ->
+            messaging.ensureMediaMessage(chatId, attachment, binding)
+        },
+        ids = MediaIdGenerator { UUID.randomUUID().toString() },
+        nowEpochMillis = System::currentTimeMillis,
+    )
+    val mediaDownloader = PrivateImageDownloader(mediaTransport)
     val privateSendingEnabled: Boolean
         get() = developmentMode
     val trustSummary: String
@@ -155,12 +182,14 @@ class WindowsPhase1Runtime(
         linking.saveRefreshedSession(session, refreshed.string("refresh_token"))
         installSession(session)
         messaging.loadSession()
+        media.resumePending()
         messaging.refreshChats()
     }
 
     suspend fun claimLink(): LinkedWindowsSession = linking.claim().also {
         installSession(ClientSession(it.accessToken, it.userId, it.deviceId))
         messaging.loadSession()
+        media.resumePending()
         messaging.refreshChats()
     }
 
@@ -168,6 +197,7 @@ class WindowsPhase1Runtime(
         runCatching { transport.post("/v1/auth/logout") }
         linking.clearLinkedSession()
         auth = null
+        media.wipeSession()
         messaging.clearSessionState()
     }
 
@@ -207,6 +237,7 @@ class WindowsPhase1Runtime(
     }
 
     override fun close() {
+        mediaHttpClient.close()
         httpClient.close()
         databaseDriver.close()
     }
@@ -222,11 +253,60 @@ class WindowsPhase1Runtime(
             return Path.of(localAppData, "Tima", "data", "messaging-cache-v1.db")
         }
 
-        private fun openDatabase(path: Path): JdbcSqliteDriver {
+        internal fun openDatabase(path: Path): JdbcSqliteDriver {
             Files.createDirectories(requireNotNull(path.parent))
             val create = Files.notExists(path)
-            return JdbcSqliteDriver("jdbc:sqlite:${path.toAbsolutePath()}").also {
-                if (create) TimaDatabase.Schema.create(it)
+            val url = "jdbc:sqlite:${path.toAbsolutePath()}"
+            Class.forName("org.sqlite.JDBC")
+            val oldVersion = if (create) null else databaseVersion(url)
+            return JdbcSqliteDriver(url).also { driver ->
+                if (create) {
+                    TimaDatabase.Schema.create(driver)
+                } else {
+                    val semanticVersion = if (oldVersion == 0L && hasPhase1Schema(url)) {
+                        1L
+                    } else {
+                        requireNotNull(oldVersion)
+                    }
+                    require(semanticVersion in 1..TimaDatabase.Schema.version) {
+                        "unsupported Windows messaging database version $semanticVersion"
+                    }
+                    if (semanticVersion < TimaDatabase.Schema.version) {
+                        TimaDatabase.Schema.migrate(
+                            driver,
+                            semanticVersion,
+                            TimaDatabase.Schema.version,
+                        )
+                    }
+                }
+                setDatabaseVersion(url, TimaDatabase.Schema.version)
+            }
+        }
+
+        private fun databaseVersion(url: String): Long =
+            DriverManager.getConnection(url).use { connection ->
+                connection.createStatement().use { statement ->
+                    statement.executeQuery("PRAGMA user_version").use { rows ->
+                        check(rows.next())
+                        rows.getLong(1)
+                    }
+                }
+            }
+
+        private fun hasPhase1Schema(url: String): Boolean =
+            DriverManager.getConnection(url).use { connection ->
+                connection.prepareStatement(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'ui_chat_cache'",
+                ).use { statement ->
+                    statement.executeQuery().use { it.next() }
+                }
+            }
+
+        private fun setDatabaseVersion(url: String, version: Long) {
+            DriverManager.getConnection(url).use { connection ->
+                connection.createStatement().use {
+                    it.execute("PRAGMA user_version = $version")
+                }
             }
         }
 

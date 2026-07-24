@@ -7,6 +7,7 @@ import com.tima.client.domain.DocumentMetadata
 import com.tima.client.domain.EnvelopeHeader
 import com.tima.client.domain.PlainTextDocumentV2
 import com.tima.client.domain.VerifiedEscrowConfig
+import com.tima.client.media.PrivateImageDocument
 import com.tima.client.network.PrivateMessageHistoryDto
 import com.tima.client.network.RestCryptoTransportAdapter
 import com.tima.client.network.ReservedMessageIds
@@ -45,8 +46,29 @@ class ProductionPrivateMessageCrypto(
         reservation: ReservedMessageIds,
         parentRevisionId: String?,
         revisionNumber: ULong,
+    ) = encryptDocument(
+        chatId = chatId,
+        document = PlainTextDocumentV2(
+            textNodes = listOf(text),
+            metadata = DocumentMetadata(revisionNumber = revisionNumber),
+        ),
+        reservation = reservation,
+        parentRevisionId = parentRevisionId,
+    )
+
+    override suspend fun encryptDocument(
+        chatId: String,
+        document: PlainTextDocumentV2,
+        reservation: ReservedMessageIds,
+        parentRevisionId: String?,
     ) = run {
-        require(text.isNotBlank()) { "message text must not be blank" }
+        val revisionNumber = document.metadata.revisionNumber
+        val isText = document.textNodes.isNotEmpty()
+        val isMedia = document.textNodes.isEmpty() &&
+            PrivateImageDocument.isPrivateImageMarkup(document.markup) &&
+            PrivateImageDocument.parse(document.markup, document.secretMetadata) != null
+        require(isText || isMedia) { "private document must contain supported text or image media" }
+        require(document.textNodes.all { it.isNotBlank() }) { "message text must not be blank" }
         require(revisionNumber in 1uL..(UInt.MAX_VALUE.toULong() + 1uL)) {
             "revision number exceeds message-key identifier range"
         }
@@ -64,7 +86,7 @@ class ProductionPrivateMessageCrypto(
         check(recipients!!.containsKey(session!!.deviceId)) {
             "recipient directory must include the sending device"
         }
-        val envelope = messengerCrypto.encryptTextMessage(
+        val envelope = messengerCrypto.encryptDocument(
             sender = identity!!,
             header = EnvelopeHeader(
                 messageId = reservation.messageId,
@@ -75,10 +97,7 @@ class ProductionPrivateMessageCrypto(
                 senderDeviceId = session.deviceId,
                 messageKeyId = (revisionNumber - 1uL).toUInt(),
             ),
-            document = PlainTextDocumentV2(
-                textNodes = listOf(text),
-                metadata = DocumentMetadata(revisionNumber = revisionNumber),
-            ),
+            document = document,
             recipientDevices = recipients,
             escrowConfig = escrow!!,
         )
@@ -95,7 +114,7 @@ class ProductionPrivateMessageCrypto(
             if (senderKeys == null) add("sender signing directory")
         }
         if (missing.isNotEmpty()) throw MissingEncryptionConfigurationException(missing)
-        val document = messengerCrypto.decryptTextMessageViaPathB(
+        val document = messengerCrypto.decryptDocumentViaPathB(
             recipientDeviceId = session!!.deviceId,
             recipient = identity!!,
             senderPublicKeys = senderKeys!!,
@@ -104,6 +123,11 @@ class ProductionPrivateMessageCrypto(
         return DecryptedMessage(
             text = document.textNodes.joinToString("\n"),
             revisionNumber = document.metadata.revisionNumber,
+            attachment = if (PrivateImageDocument.isPrivateImageMarkup(document.markup)) {
+                PrivateImageDocument.parse(document.markup, document.secretMetadata)
+            } else {
+                null
+            },
         )
     }
 }

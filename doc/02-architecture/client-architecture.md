@@ -101,8 +101,21 @@ Durable decrypted UI history и post-encryption send/retry outbox реализо
 bytes и idempotency key записываются до первой попытки, а restart/resume
 восстанавливает stale `sending` и due retry без повторного шифрования.
 Reservation failure остаётся до durable boundary; полностью offline
-composition/send не заявлен. Media UI и hosted native acceptance evidence
-остаются открытыми блокерами Phase 1.
+composition/send не заявлен.
+
+`client/modules/core/core-media` теперь реализует private 1:1 single-image
+alpha: строгую модель трёх JPEG variants, отдельные random media keys, versioned
+Kodium AEAD, ciphertext SHA-256/size manifest, строгие init/PUT/complete/access
+codec, restart-safe queue и post-decrypt validation. Полная retry-запись
+(включая keys и presigned URL) зашифрована session-scoped row key; app-private
+variant files содержат только ciphertext. Presigned absolute requests не
+получают TIMA Authorization, разрешают только HTTPS (или explicit loopback dev)
+и fail-closed при redirect/неожиданном variant. Android и Windows имеют picker,
+normalizer, progress/retry state, thumbnail и in-app preview. iOS source теперь
+содержит PHPicker без broad permission, bounded read, ImageIO/UIKit normalization,
+SQLite ciphertext blob store и SwiftUI thumbnail/in-app preview. KMP iOS targets
+компилируются, но Xcode/Swift archive в текущей Windows-среде не проверен; поэтому
+iOS completion и hosted native acceptance остаются блокерами Phase 1.
 
 ## 4. Platform adapters (`expect`/`actual`)
 
@@ -150,7 +163,7 @@ Operational endpoints (`/healthz`, `/readyz`, `/metrics`) не входят в c
 | `crypto_sessions` | ratchet state (encrypted blob) |
 | `identity` | public keys, device id |
 | `search_fts` | decrypted index (private chats only) |
-| `media_queue` | `thumbnail/preview/full`, upload chunks, retry state; без Original |
+| `media_queue` | encrypted manifest/keys/URLs для ровно `thumbnail/preview/full`, retry state; без Original/chunks |
 | `sync_outbox` | canonical ciphertext request bytes + idempotency/path/retry state; no private plaintext |
 | `inbox_local` | кэш inbox_threads/events, read-state |
 | `emotions_local` | pending emotion/recommendation sync |

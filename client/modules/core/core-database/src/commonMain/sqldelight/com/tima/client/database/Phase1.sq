@@ -55,6 +55,50 @@ CREATE TABLE media_queue (
   created_at_epoch_ms INTEGER NOT NULL
 );
 
+CREATE TABLE media_cipher_blob (
+  blob_id TEXT NOT NULL PRIMARY KEY,
+  ciphertext BLOB NOT NULL
+);
+
+insertMediaQueue:
+INSERT INTO media_queue(
+  local_id, media_id, chat_id, encrypted_manifest, state, retry_count, created_at_epoch_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?);
+
+updateMediaQueue:
+UPDATE media_queue SET
+  media_id = ?,
+  encrypted_manifest = ?,
+  state = ?,
+  retry_count = ?
+WHERE local_id = ?;
+
+selectMediaQueueById:
+SELECT * FROM media_queue WHERE local_id = ?;
+
+selectPendingMediaQueue:
+SELECT * FROM media_queue
+WHERE state NOT IN ('SENT_TO_OUTBOX', 'TERMINAL')
+ORDER BY created_at_epoch_ms;
+
+deleteMediaQueue:
+DELETE FROM media_queue WHERE local_id = ?;
+
+deleteAllMediaQueue:
+DELETE FROM media_queue;
+
+upsertMediaCipherBlob:
+INSERT OR REPLACE INTO media_cipher_blob(blob_id, ciphertext) VALUES (?, ?);
+
+selectMediaCipherBlob:
+SELECT ciphertext FROM media_cipher_blob WHERE blob_id = ?;
+
+deleteMediaCipherBlob:
+DELETE FROM media_cipher_blob WHERE blob_id = ?;
+
+deleteAllMediaCipherBlobs:
+DELETE FROM media_cipher_blob;
+
 CREATE TABLE ui_chat_cache (
   chat_id TEXT NOT NULL PRIMARY KEY,
   position INTEGER NOT NULL,
