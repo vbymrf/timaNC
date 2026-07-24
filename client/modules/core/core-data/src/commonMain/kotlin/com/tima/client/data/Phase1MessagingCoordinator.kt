@@ -153,7 +153,20 @@ class Phase1MessagingCoordinator(
         } else {
             chatIds
         }
-        targets.forEach { refreshHistory(it) }
+        targets.forEach { chatId ->
+            try {
+                refreshHistory(chatId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (mutableState.value.activeChatId == chatId) {
+                    val cached = cache.messages(chatId)
+                    mutableState.value = mutableState.value.copy(
+                        thread = error.toUiError(cached.takeIf { it.isNotEmpty() }),
+                    )
+                }
+            }
+        }
     }
 
     override suspend fun sendText(chatId: String, text: String): String {

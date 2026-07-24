@@ -10,6 +10,7 @@ import com.tima.client.crypto.EscrowConfigVerifier
 import com.tima.client.data.ClientSession
 import com.tima.client.data.DeviceIdentityProvider
 import com.tima.client.data.RecipientDeviceDirectory
+import com.tima.client.data.RefreshTokenRepository
 import com.tima.client.data.SenderKeyDirectory
 import com.tima.client.data.SessionRepository
 import com.tima.client.data.VerifiedEscrowConfigProvider
@@ -81,6 +82,7 @@ class IosAuthenticationClient(
     private val transport: TimaHttpTransport,
     private val attestation: AttestationCoordinator,
     private val sessions: SessionRepository,
+    private val refreshTokens: RefreshTokenRepository,
     private val identities: IosDeviceIdentityRepository,
     private val onSession: (ClientSession) -> Unit,
 ) {
@@ -141,6 +143,7 @@ class IosAuthenticationClient(
             userId = response.getValue("user").jsonObject.string("id"),
             deviceId = response.getValue("device").jsonObject.string("id"),
         ).also {
+            refreshTokens.save(response.string("refresh_token"))
             sessions.save(it)
             onSession(it)
         }

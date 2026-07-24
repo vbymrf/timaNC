@@ -8,8 +8,10 @@ import com.tima.client.data.ClientSession
 import com.tima.client.data.EncryptedSqlDelightMessagingCache
 import com.tima.client.data.EncryptedSqlDelightMediaQueueStore
 import com.tima.client.data.IdGenerator
+import com.tima.client.data.MobileSessionRefresher
 import com.tima.client.data.Phase1MessagingCoordinator
 import com.tima.client.data.ProductionPrivateMessageCrypto
+import com.tima.client.data.SecureStorageRefreshTokenRepository
 import com.tima.client.data.SecureStorageSessionRepository
 import com.tima.client.data.TimaMessagingRemoteDataSource
 import com.tima.client.database.TimaDatabase
@@ -34,6 +36,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import java.net.URI
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 
 class AndroidPhase1Runtime(
     context: Context,
@@ -59,6 +62,13 @@ class AndroidPhase1Runtime(
     private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { authContext })
     private var wakeSink: NotificationWakeSink? = null
     private val sessions = SecureStorageSessionRepository(secureStorage)
+    private val refreshTokens = SecureStorageRefreshTokenRepository(secureStorage)
+    private val sessionRefresher = MobileSessionRefresher(
+        transport,
+        sessions,
+        refreshTokens,
+        ::installSession,
+    )
     private val messagingStore = EncryptedSqlDelightMessagingCache(database, secureStorage)
     private val mediaQueue = EncryptedSqlDelightMediaQueueStore(database, secureStorage)
     private val identities = AndroidDeviceIdentityRepository(secureStorage)
@@ -112,6 +122,7 @@ class AndroidPhase1Runtime(
         transport = transport,
         attestation = attestation,
         sessions = sessions,
+        refreshTokens = refreshTokens,
         identities = identities,
         onSession = ::installSession,
     )
@@ -162,14 +173,22 @@ class AndroidPhase1Runtime(
     }
 
     suspend fun restoreSession() {
-        sessions.current()?.let(::installSession)
-        messaging.loadSession()
-        if (authContext != null) media.resumePending()
-        if (authContext != null) messaging.refreshChats()
+        val restored = try {
+            sessionRefresher.restore()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            messaging.loadSession(drainOutbox = false)
+            throw error
+        }
+        messaging.loadSession(drainOutbox = restored != null)
+        if (restored != null) media.resumePending()
+        if (restored != null) messaging.refreshChats()
     }
 
     suspend fun logout() {
         runCatching { transport.post("/v1/auth/logout") }
+        refreshTokens.clear()
         sessions.clear()
         authContext = null
         media.wipeSession()

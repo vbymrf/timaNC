@@ -250,7 +250,9 @@ object MediaRestCodec {
                 it.value.jsonPrimitive.contentOrNull ?: error("upload header must be a string")
             }
             val slotExpiry = Rfc3339Utc.parseEpochMillis(slot.string("expires_at"))
-            require(slotExpiry > nowEpochMillis && slotExpiry <= expiresAt)
+            require(slotExpiry >= expiresAt) {
+                "each upload slot must remain valid through the aggregate upload deadline"
+            }
             PresignedUploadSlot(variant, slot.string("url"), headers, slotExpiry)
         }
         require(slots.map { it.variant } == MediaVariantName.entries)
@@ -272,7 +274,13 @@ object MediaRestCodec {
                 item.string("sha256"),
             )
         }
-        require(actual == expected) { "completed media manifest differs from requested ciphertext" }
+        require(actual.size == MediaVariantName.entries.size)
+        require(actual.map { it.name }.toSet() == MediaVariantName.entries.toSet()) {
+            "completed media response must contain each canonical variant exactly once"
+        }
+        require(actual.associateBy { it.name } == expected.associateBy { it.name }) {
+            "completed media manifest differs from requested ciphertext"
+        }
     }
 
     fun access(

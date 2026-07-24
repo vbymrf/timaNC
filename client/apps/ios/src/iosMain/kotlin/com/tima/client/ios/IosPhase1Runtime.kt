@@ -8,8 +8,10 @@ import com.tima.client.data.EncryptedSqlDelightMessagingCache
 import com.tima.client.data.EncryptedSqlDelightMediaQueueStore
 import com.tima.client.data.IdGenerator
 import com.tima.client.data.MessageBubble
+import com.tima.client.data.MobileSessionRefresher
 import com.tima.client.data.Phase1MessagingCoordinator
 import com.tima.client.data.ProductionPrivateMessageCrypto
+import com.tima.client.data.SecureStorageRefreshTokenRepository
 import com.tima.client.data.SecureStorageSessionRepository
 import com.tima.client.data.TimaMessagingRemoteDataSource
 import com.tima.client.data.SqlDelightCiphertextMediaBlobStore
@@ -41,6 +43,7 @@ import com.tima.client.sync.WakeToSyncCoordinator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.coroutines.CancellationException
 import kotlin.time.TimeSource
 import platform.posix.time
 import platform.Foundation.NSURL
@@ -70,6 +73,13 @@ class IosPhase1Runtime(
     private var wakeSink: NotificationWakeSink? = null
     private val clockStart = TimeSource.Monotonic.markNow()
     private val sessions = SecureStorageSessionRepository(secureStorage)
+    private val refreshTokens = SecureStorageRefreshTokenRepository(secureStorage)
+    private val sessionRefresher = MobileSessionRefresher(
+        transport,
+        sessions,
+        refreshTokens,
+        ::installSession,
+    )
     private val identities = IosDeviceIdentityRepository(secureStorage)
     private val trust = IosTrustMaterialProvider(transport, sessions, identities, developmentMode)
     private var apnsAvailable = false
@@ -119,6 +129,7 @@ class IosPhase1Runtime(
         transport,
         attestation,
         sessions,
+        refreshTokens,
         identities,
         ::installSession,
     )
@@ -168,10 +179,17 @@ class IosPhase1Runtime(
     }
 
     suspend fun restoreSession() {
-        sessions.current()?.let(::installSession)
-        messaging.loadSession()
-        if (auth != null) media.resumePending()
-        if (auth != null) messaging.refreshChats()
+        val restored = try {
+            sessionRefresher.restore()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            messaging.loadSession(drainOutbox = false)
+            throw error
+        }
+        messaging.loadSession(drainOutbox = restored != null)
+        if (restored != null) media.resumePending()
+        if (restored != null) messaging.refreshChats()
     }
 
     suspend fun register(phone: String, password: String, displayName: String, otp: String) {
@@ -191,6 +209,7 @@ class IosPhase1Runtime(
 
     suspend fun logout() {
         runCatching { transport.post("/v1/auth/logout") }
+        refreshTokens.clear()
         sessions.clear()
         auth = null
         media.wipeSession()

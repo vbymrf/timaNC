@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.android.library)
 }
 
+layout.buildDirectory.set(rootProject.layout.buildDirectory.dir("core-data"))
+
 kotlin {
     jvmToolchain(17)
     jvm()

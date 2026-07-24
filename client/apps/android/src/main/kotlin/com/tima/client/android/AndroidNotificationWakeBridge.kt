@@ -5,6 +5,7 @@ import com.google.firebase.messaging.RemoteMessage
 import com.tima.client.network.NotificationWakeSignal
 import com.tima.client.network.NotificationWakeSink
 import com.tima.client.network.WakeSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +22,7 @@ object AndroidNotificationWakeBridge {
             sink = value
             pending.values.toList().also { pending.clear() }
         }
-        queued.forEach { signal -> scope.launch { value.wake(signal) } }
+        queued.forEach { signal -> launchWake(value, signal) }
     }
 
     fun uninstall(value: NotificationWakeSink) {
@@ -41,7 +42,19 @@ object AndroidNotificationWakeBridge {
                 null
             }
         }
-        current?.let { scope.launch { it.wake(signal) } }
+        current?.let { launchWake(it, signal) }
+    }
+
+    private fun launchWake(value: NotificationWakeSink, signal: NotificationWakeSignal) {
+        scope.launch {
+            try {
+                value.wake(signal)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Lifecycle and push wakes are best-effort; explicit UI actions surface errors.
+            }
+        }
     }
 
     private const val MAX_PENDING_WAKES = 32

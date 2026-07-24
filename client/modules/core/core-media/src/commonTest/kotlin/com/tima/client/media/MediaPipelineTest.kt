@@ -150,7 +150,41 @@ class MediaPipelineTest {
                 manifest,
             )
         }
+        val readyWithDatabaseOrdering = Json.parseToJsonElement(
+            """{"id":"00000000-0000-4000-8000-000000000001","kind":"image","content_mode":"private","status":"ready","variants":[${manifest.sortedBy { it.name.wireValue }.joinToString(",") { """{"name":"${it.name.wireValue}","content_type":"application/octet-stream","size":100,"sha256":"${it.sha256}"}""" }}],"created_at":"2026-07-24T00:00:00Z"}""",
+        ).jsonObject
+        MediaRestCodec.completed(
+            readyWithDatabaseOrdering,
+            "00000000-0000-4000-8000-000000000001",
+            manifest,
+        )
         assertEquals(0L, Rfc3339Utc.parseEpochMillis("1970-01-01T00:00:00Z"))
+    }
+
+    @Test
+    fun uploadCodecAcceptsSlotsValidBeyondAggregateMinimumDeadline() {
+        val upload = Json.parseToJsonElement(
+            """
+            {
+              "media_id":"00000000-0000-4000-8000-000000000001",
+              "content_mode":"private",
+              "expires_at":"2026-07-24T00:15:00Z",
+              "uploads":[
+                {"variant":"thumbnail","method":"PUT","url":"https://media.invalid/thumbnail","headers":{},"expires_at":"2026-07-24T00:15:00Z"},
+                {"variant":"preview","method":"PUT","url":"https://media.invalid/preview","headers":{},"expires_at":"2026-07-24T00:15:01Z"},
+                {"variant":"full","method":"PUT","url":"https://media.invalid/full","headers":{},"expires_at":"2026-07-24T00:15:02Z"}
+              ]
+            }
+            """.trimIndent(),
+        ).jsonObject
+
+        val parsed = MediaRestCodec.upload(
+            upload,
+            Rfc3339Utc.parseEpochMillis("2026-07-24T00:00:00Z"),
+        )
+
+        assertEquals(MediaVariantName.entries, parsed.uploads.map { it.variant })
+        assertTrue(parsed.uploads.all { it.expiresAtEpochMillis >= parsed.expiresAtEpochMillis })
     }
 
     @Test
