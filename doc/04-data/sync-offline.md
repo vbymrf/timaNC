@@ -86,8 +86,24 @@ Same sync API after QR trust. Full participant E2E + recovery paths.
 | New operator | Owner grants → new wraps |
 | Operator revoked | Rotate VP keys |
 
-## 11. Ссылки
+## 11. Push/WS wake-up и catch-up
+
+FCM, APNs, UnifiedPush, foreground WebSocket и app resume вызывают один общий
+sync coordinator. Wake-up payload сообщает только тип события и scope для
+синхронизации; он не заменяет server-authoritative данные.
+
+Coordinator coalesces повторы, выполняет delta sync с сохранённого cursor,
+идемпотентно обновляет SQLite и восстанавливает WebSocket subscription. Поэтому
+повторная доставка через vendor и собственный канал не создаёт дубликатов, а
+полная недоступность push компенсируется при следующем WS connect/app resume.
+
+На iOS без APNs catch-up запускается только при активном приложении или его
+возврате в foreground. Подробнее:
+[hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md).
+
+## 12. Ссылки
 
 - [key-lifecycle.md](../03-security/key-lifecycle.md) §12
 - [crypto-protocol.md](../03-security/crypto-protocol.md) §4
 - [realtime-events.md](../05-api/realtime-events.md)
+- [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md)

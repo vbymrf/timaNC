@@ -65,10 +65,14 @@ flowchart TB
 |------------|---------|-----|---------|
 | Secure key storage | Keystore | Keychain / Secure Enclave | DPAPI + linked phone key |
 | Attestation | Play Integrity | App Attest | QR trust (no attestation) |
-| Push | FCM | APNs | WNS / polling fallback |
+| Push | FCM + UnifiedPush fallback | APNs + foreground/resume catch-up | Foreground WS / periodic REST; optional future WNS |
 | Camera/Mic | CameraX | AVFoundation | MediaFoundation |
 | LiveKit | client-sdk-android | client-sdk-swift | official LiveKit C++ SDK 1.0 через узкий JNI/JNA adapter |
 | Biometric lock | BiometricPrompt | LocalAuthentication | Windows Hello |
+
+Все push/WS/app-resume сигналы входят в единый sync coordinator; transport не
+является источником сообщения. Полная схема и ограничение iOS без APNs:
+[hybrid-notification-delivery.md](./hybrid-notification-delivery.md).
 
 ## 4.1. LiveKit на Windows
 
@@ -147,3 +151,4 @@ Operational endpoints (`/healthz`, `/readyz`, `/metrics`) не входят в c
 - [crypto-protocol.md](../03-security/crypto-protocol.md)
 - [multi-device](../04-data/sync-offline.md#4-multi-device)
 - [client-hardening.md](../03-security/client-hardening.md)
+- [hybrid-notification-delivery.md](./hybrid-notification-delivery.md)

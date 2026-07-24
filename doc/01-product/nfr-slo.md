@@ -4,12 +4,16 @@
 
 | Фаза | MAU | Concurrent WS | Msg ingest/s (peak) | Регионы |
 |------|-----|---------------|---------------------|---------|
-| Messaging Alpha / beta VPS | invited cohort до 100 (capacity trigger до ~10 тыс. active) | до ~10 тыс. | измеряется на staging | 1, non-production |
+| Messaging Alpha / beta VPS | repository/dev traffic; invited cohort до 100 deferred to Phase 5 | до ~10 тыс. capacity trigger | измеряется на staging | 1, non-production |
 | Communication MVP / GA target | 100 тыс. | 15 тыс. | 500 | RU/EU regional cells; multi-AZ/DR внутри residency boundary |
 | Growth | 1 млн | 150 тыс. | 5 000 | RU/EU cells + capacity cells по legal policy |
 | Target | 10 млн | 1.5 млн | 50 000 | 2+ active cells (по SLO и residency) |
 
 > Оценки требуют подтверждения [load-test-plan.md](../08-quality/load-test-plan.md). Telegram-подобные цифры хранения из legacy doc **не являются SLA**.
+
+Invited-cohort evidence до 100 пользователей является operational gate Phase 5.
+Phase 1 bounded smoke проверяет регрессию протокола, но не подтверждает cohort
+capacity или vendor push SLO.
 
 ## 2. Service Level Objectives
 
@@ -21,7 +25,7 @@
 | WebSocket session stability | 99.5% reconnect < 30s | 99.9% | Client telemetry |
 | Call setup (p95) | < 4 s | < 3 s | Invite → media |
 | Media upload start (p95) | < 3 s | < 2 s | Presigned URL ready |
-| Push delivery (p95) | < 10 s | < 5 s | FCM/APNs |
+| Notification wake → sync (p95) | < 10 s | < 5 s | FCM/APNs/UnifiedPush; foreground/resume catch-up measured separately |
 
 ## 3. RPO / RTO
 

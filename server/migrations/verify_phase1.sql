@@ -25,7 +25,8 @@ BEGIN
   END IF;
   IF to_regclass('public.idx_device_attestation_expiry') IS NULL OR
      to_regclass('public.idx_device_link_claim_token') IS NULL OR
-     to_regclass('public.idx_device_link_expiry') IS NULL THEN
+     to_regclass('public.idx_device_link_expiry') IS NULL OR
+     to_regclass('public.idx_device_push_routing') IS NULL THEN
     RAISE EXCEPTION 'device trust indexes missing';
   END IF;
   IF NOT EXISTS (
@@ -52,11 +53,23 @@ BEGIN
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'device_push_registrations'::regclass
       AND conname IN ('device_push_provider_check', 'device_push_token_check',
+                      'device_push_priority_check',
                       'device_push_registrations_pkey',
                       'device_push_registrations_token_hash_key')
-    GROUP BY conrelid HAVING count(*) = 4
+    GROUP BY conrelid HAVING count(*) = 5
   ) THEN
     RAISE EXCEPTION 'device push constraints missing';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='device_push_registrations'
+      AND column_name='priority' AND data_type='smallint' AND is_nullable='NO'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid='device_push_registrations'::regclass
+      AND tgname='device_push_platform_provider' AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'hybrid push routing schema missing';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
@@ -104,6 +117,7 @@ DECLARE
   a UUID := gen_random_uuid();
   b UUID := gen_random_uuid();
   d UUID := gen_random_uuid();
+  dw UUID := gen_random_uuid();
   c UUID := gen_random_uuid();
   mid BIGINT;
   stored BIGINT;
@@ -112,7 +126,24 @@ BEGIN
   INSERT INTO users(user_id, account_home_region, display_name) VALUES
     (a, 'RU', 'phase1-a'), (b, 'RU', 'phase1-b');
   INSERT INTO devices(device_id, user_id, platform, identity_pubkey, signing_pubkey)
-    VALUES (d, a, 'android', decode(repeat('01', 32), 'hex'), decode(repeat('02', 32), 'hex'));
+    VALUES
+      (d, a, 'android', decode(repeat('01', 32), 'hex'), decode(repeat('02', 32), 'hex')),
+      (dw, a, 'windows', decode(repeat('06', 32), 'hex'), decode(repeat('07', 32), 'hex'));
+  INSERT INTO device_push_registrations
+    (device_id, provider, token_ciphertext, token_hash, priority) VALUES
+    (d, 'fcm', decode('01', 'hex'), decode(repeat('03', 32), 'hex'), 10),
+    (d, 'unifiedpush', decode('02', 'hex'), decode(repeat('04', 32), 'hex'), 20);
+  INSERT INTO device_push_registrations
+    (device_id, provider, token_ciphertext, token_hash, priority)
+    VALUES (dw, 'wns', decode('03', 'hex'), decode(repeat('08', 32), 'hex'), 100);
+  BEGIN
+    INSERT INTO device_push_registrations
+      (device_id, provider, token_ciphertext, token_hash, priority)
+      VALUES (d, 'apns', decode('03', 'hex'), decode(repeat('05', 32), 'hex'), 30);
+    RAISE EXCEPTION 'invalid Android/APNs registration accepted';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM = 'invalid Android/APNs registration accepted' THEN RAISE; END IF;
+  END;
   INSERT INTO chats(chat_id, user_a, user_b, conversation_home_region)
     VALUES (c, least(a::TEXT, b::TEXT)::UUID, greatest(a::TEXT, b::TEXT)::UUID, 'RU');
   INSERT INTO chat_message_counters(chat_id) VALUES (c)

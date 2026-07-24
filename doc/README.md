@@ -10,12 +10,12 @@
 | [Реестр противоречий](./CONTRADICTION-REGISTER.md) | Принятые решения C-001…C-040 и контроль синхронизации |
 | [Аудит мержа doc_ver2](./MERGE-AUDIT.md) | Статус этапов, закрытые конфликты, post-MVP |
 | [01-product](./01-product/) | PRD, глоссарий, **сообщества** ([communities.md](./01-product/communities.md)), группы/каналы, NFR/SLO, матрица безопасности |
-| [02-architecture](./02-architecture/) | Системная, клиентская, backend, **module-boundaries**, **tech-stack**, deployment; MVP VPS — [mvp-server-setup.md](./07-operations/mvp-server-setup.md) |
+| [02-architecture](./02-architecture/) | Системная, клиентская, backend, **hybrid notifications**, module-boundaries, tech-stack, deployment |
 | [03-security](./03-security/) | Threat model, crypto protocol, escrow, compliance |
 | [04-data](./04-data/) | `DocumentV2`, модель данных, media storage, sync, search, retention, **feed-ranking** |
 | [05-api](./05-api/) | REST, WebSocket, push, rate limits, **Bot API** |
 | [06-realtime](./06-realtime/) | LiveKit, signaling, recording policy |
-| [07-operations](./07-operations/) | Observability, DR, incident response, runbooks, **[MVP server setup](./07-operations/mvp-server-setup.md)** (VPS + Caddy) |
+| [07-operations](./07-operations/) | Observability, DR, runbooks, [MVP server setup](./07-operations/mvp-server-setup.md), [credential-free development](./07-operations/credential-free-development.md) |
 | [08-quality](./08-quality/) | Test strategy, load/security tests |
 | [09-delivery](./09-delivery/) | Roadmap, CI/CD, релизы |
 | [adr](./adr/) | Architecture Decision Records |
@@ -33,6 +33,7 @@
 - **Масштаб:** 100 тыс. → 10 млн MAU; бета — VPS ([mvp-server-setup.md](./07-operations/mvp-server-setup.md)).
 - **Production residency:** до GA — изолированные RU/EU cells, conversation home region и ciphertext-only relay ([ADR-0018](./adr/0018-dual-region-ru-eu-production-architecture.md)); beta остаётся single-region.
 - **Bot Platform:** [ADR-0009](./adr/0009-native-bot-app-platform.md), Phase 3b; schema-first [ADR-0012](./adr/0012-schema-first-api.md).
+- **Уведомления:** FCM/APNs + собственный gateway/UnifiedPush + WS/REST catch-up ([hybrid-notification-delivery.md](./02-architecture/hybrid-notification-delivery.md)).
 
 ## Источники требований
 
@@ -67,4 +68,7 @@
 
 ## Статус репозитория
 
-На момент документирования: **design-first workspace** — UI-ТЗ и архитектурные спеки готовы; прикладной код клиента и backend **ещё не реализован**.
+На момент документирования Phase 1 repository implementation существует, но
+exit остаётся **BLOCKED**: hosted CI, hybrid notification path и полный
+messaging UI ещё не закрыты. Актуальное evidence:
+[phase1-exit-review.md](./09-delivery/phase1-exit-review.md).

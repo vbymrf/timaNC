@@ -134,7 +134,9 @@ Each fixture sample has a distinct reservation and signed envelope; the generato
 the machine-readable summary, and enforces p99 `< 0.8s` send-to-ack and `< 2s` online
 delivery. It is a regression smoke, not evidence for the invited-cohort, 100-user, 10k
 WebSocket, or production capacity claims. Larger evidence requires an isolated staging run,
-an approved data-seeding strategy, and retained results.
+an approved data-seeding strategy, and retained results. The invited cohort is a
+deferred Phase 5 operational gate; see
+[credential-free-development.md](../07-operations/credential-free-development.md).
 
 ## 6. Disclaimer
 
@@ -146,3 +148,5 @@ Telegram-style storage estimates in legacy crypto doc **must be validated** by S
 - [scaling-capacity.md](../02-architecture/scaling-capacity.md)
 - [feed-ranking.md](../04-data/feed-ranking.md)
 - [bot-platform-test-plan.md](./bot-platform-test-plan.md) §10
+- [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md)
+- [credential-free-development.md](../07-operations/credential-free-development.md)

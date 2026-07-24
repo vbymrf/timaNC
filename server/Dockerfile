@@ -15,12 +15,14 @@ RUN unformatted="$(gofmt -l cmd internal)"; test -z "$unformatted" || { echo "$u
     && go test ./... \
     && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/tima-server ./cmd/tima-server \
     && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/tima-worker ./cmd/tima-worker \
-    && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/realtime-gw ./cmd/realtime-gw
+    && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/realtime-gw ./cmd/realtime-gw \
+    && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/push-gateway ./cmd/push-gateway
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/tima-server /tima-server
 COPY --from=build /out/tima-worker /tima-worker
 COPY --from=build /out/realtime-gw /realtime-gw
-EXPOSE 8080 8081
+COPY --from=build /out/push-gateway /push-gateway
+EXPOSE 8080 8081 8082
 USER nonroot:nonroot
 ENTRYPOINT ["/tima-server"]

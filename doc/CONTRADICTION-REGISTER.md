@@ -55,6 +55,8 @@
 | C-038 | P0 | Production residency | До GA две regional cells RU/EU; beta остаётся single-region | ADR-0008/0018, deployment/roadmap | resolved |
 | C-039 | P0 | Audit retention | Escrow/legal-hold/WORM audit — 7 лет; transmission metadata — 3 года; content/keys — 6 месяцев | `nfr-slo.md`, `retention-archival.md`, compliance | resolved |
 | C-040 | P0 | `escrow_strict` | Production bypass невозможен; флаг допустим только local dev/test и отсутствует в production config | `ci-cd-release.md`, security/ops | resolved |
+| C-041 | P1 | Cohort timing | Invited cohort до 100 и его SLO evidence перенесены из Phase 1 repository exit в Phase 5 Closed Beta | `roadmap.md`, `nfr-slo.md`, `load-test-plan.md`, `phase1-exit-review.md` | resolved |
+| C-042 | P1 | Hybrid notifications | FCM/APNs остаются vendor channels; собственный Go gateway + Android UnifiedPush + WS/REST catch-up образуют credential-free path; iOS без APNs не получает background wake | `hybrid-notification-delivery.md`, `push-payloads.md`, `client-architecture.md` | resolved |
 
 ## 3. Dual-region production
 

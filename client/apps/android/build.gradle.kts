@@ -1,7 +1,11 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.google.services)
+    alias(libs.plugins.google.services) apply false
+}
+
+if (file("google-services.json").isFile) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 android {
@@ -38,10 +42,12 @@ kotlin {
 
 dependencies {
     implementation(project(":modules:core:core-network"))
+    implementation(project(":modules:core:core-sync"))
     implementation(project(":modules:messenger-crypto"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.play.integrity)
     implementation(libs.firebase.messaging)
+    testImplementation(kotlin("test"))
 }

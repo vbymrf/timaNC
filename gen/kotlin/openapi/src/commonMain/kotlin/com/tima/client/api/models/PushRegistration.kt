@@ -23,29 +23,35 @@ import kotlinx.serialization.encoding.*
 /**
  * 
  *
- * @param provider 
+ * @param provider FCM and UnifiedPush are Android-only, APNs is iOS-only, and WNS is Windows-only; credential-free Windows delivery uses WS/REST catch-up without a push registration.
  * @param token 
+ * @param priority Lower values are attempted first; later registrations are fallbacks.
  */
 @Serializable
 
 data class PushRegistration (
 
+    /* FCM and UnifiedPush are Android-only, APNs is iOS-only, and WNS is Windows-only; credential-free Windows delivery uses WS/REST catch-up without a push registration. */
     @SerialName(value = "provider") @Required val provider: PushRegistration.Provider,
 
-    @SerialName(value = "token") @Required val token: kotlin.String
+    @SerialName(value = "token") @Required val token: kotlin.String,
+
+    /* Lower values are attempted first; later registrations are fallbacks. */
+    @SerialName(value = "priority") val priority: kotlin.Int? = 100
 
 ) : kotlin.collections.HashMap<String, kotlinx.serialization.json.JsonElement>() {
 
     /**
-     * 
+     * FCM and UnifiedPush are Android-only, APNs is iOS-only, and WNS is Windows-only; credential-free Windows delivery uses WS/REST catch-up without a push registration.
      *
-     * Values: FCM,APNS,WNS
+     * Values: FCM,APNS,WNS,UNIFIEDPUSH
      */
     @Serializable
     enum class Provider(val value: kotlin.String) {
         @SerialName(value = "fcm") FCM("fcm"),
         @SerialName(value = "apns") APNS("apns"),
-        @SerialName(value = "wns") WNS("wns");
+        @SerialName(value = "wns") WNS("wns"),
+        @SerialName(value = "unifiedpush") UNIFIEDPUSH("unifiedpush");
     }
 
 }

@@ -20,8 +20,11 @@ var _ MappedNullable = &PushRegistration{}
 
 // PushRegistration struct for PushRegistration
 type PushRegistration struct {
+	// FCM and UnifiedPush are Android-only, APNs is iOS-only, and WNS is Windows-only; credential-free Windows delivery uses WS/REST catch-up without a push registration.
 	Provider string `json:"provider"`
 	Token string `json:"token"`
+	// Lower values are attempted first; later registrations are fallbacks.
+	Priority *int32 `json:"priority,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -35,6 +38,8 @@ func NewPushRegistration(provider string, token string) *PushRegistration {
 	this := PushRegistration{}
 	this.Provider = provider
 	this.Token = token
+	var priority int32 = 100
+	this.Priority = &priority
 	return &this
 }
 
@@ -43,6 +48,8 @@ func NewPushRegistration(provider string, token string) *PushRegistration {
 // but it doesn't guarantee that properties required by API are set
 func NewPushRegistrationWithDefaults() *PushRegistration {
 	this := PushRegistration{}
+	var priority int32 = 100
+	this.Priority = &priority
 	return &this
 }
 
@@ -94,6 +101,38 @@ func (o *PushRegistration) SetToken(v string) {
 	o.Token = v
 }
 
+// GetPriority returns the Priority field value if set, zero value otherwise.
+func (o *PushRegistration) GetPriority() int32 {
+	if o == nil || IsNil(o.Priority) {
+		var ret int32
+		return ret
+	}
+	return *o.Priority
+}
+
+// GetPriorityOk returns a tuple with the Priority field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PushRegistration) GetPriorityOk() (*int32, bool) {
+	if o == nil || IsNil(o.Priority) {
+		return nil, false
+	}
+	return o.Priority, true
+}
+
+// HasPriority returns a boolean if a field has been set.
+func (o *PushRegistration) HasPriority() bool {
+	if o != nil && !IsNil(o.Priority) {
+		return true
+	}
+
+	return false
+}
+
+// SetPriority gets a reference to the given int32 and assigns it to the Priority field.
+func (o *PushRegistration) SetPriority(v int32) {
+	o.Priority = &v
+}
+
 func (o PushRegistration) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -106,6 +145,9 @@ func (o PushRegistration) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["provider"] = o.Provider
 	toSerialize["token"] = o.Token
+	if !IsNil(o.Priority) {
+		toSerialize["priority"] = o.Priority
+	}
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -152,6 +194,7 @@ func (o *PushRegistration) UnmarshalJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &additionalProperties); err == nil {
 		delete(additionalProperties, "provider")
 		delete(additionalProperties, "token")
+		delete(additionalProperties, "priority")
 		o.AdditionalProperties = additionalProperties
 	}
 

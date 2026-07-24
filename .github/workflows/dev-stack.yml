@@ -142,10 +142,14 @@ jobs:
 
       - name: Run bounded Phase 1 SLO smoke
         env:
-          TIMA_K6_FIXTURE: build/phase1-k6-fixture.json
+          TIMA_K6_FIXTURE: ${{ github.workspace }}/build/phase1-k6-fixture.json
           TIMA_K6_VUS: "1"
           TIMA_K6_MAX_DURATION: 2m
-        run: k6 run --summary-export build/phase1-k6-summary.json tests/load/phase1_slo_smoke.js
+        run: |
+          test -f "${TIMA_K6_FIXTURE}"
+          k6 run \
+            --summary-export "${{ github.workspace }}/build/phase1-k6-summary.json" \
+            tests/load/phase1_slo_smoke.js
 
       - name: Upload Phase 1 SLO smoke summary
         if: always()
@@ -153,7 +157,7 @@ jobs:
         with:
           name: phase1-k6-slo-smoke
           path: build/phase1-k6-summary.json
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Enforce alpha message send-to-ack budget
         shell: bash

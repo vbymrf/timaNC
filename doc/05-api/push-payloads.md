@@ -108,11 +108,20 @@ VoIP push (APNs PushKit / FCM high priority).
 
 ## 3. Platform specifics
 
-| Platform | Channel |
-|----------|---------|
-| Android | FCM data + notification |
-| iOS | APNs alert + PushKit for calls |
-| Windows | WNS toast / polling fallback |
+| Platform | Primary | Independent fallback |
+|----------|---------|----------------------|
+| Android | FCM data + notification | UnifiedPush via TIMA `push-gateway`, foreground WS, REST catch-up |
+| iOS | APNs alert + PushKit for calls | Foreground WS and REST catch-up on app resume |
+| Windows | Foreground WS | Periodic REST catch-up; WNS is optional in a future credentialed profile |
+
+Все transport передают один и тот же generic payload. FCM/APNs credentials
+опциональны для credential-free stack; отсутствие vendor adapter не делает
+gateway unhealthy.
+
+На iOS fallback не является background push: без APNs entitlement операционная
+система не позволяет надёжно разбудить suspended/terminated приложение.
+Нормативный routing, failover и sync flow описаны в
+[hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md).
 
 ## 4. Privacy settings (UI 3 levels)
 
@@ -130,3 +139,5 @@ Setting «hide preview» → generic «Новое сообщение» only.
 ## 6. Ссылки
 
 - [doc_UI/26-notifications.md](../doc_UI/26-notifications.md)
+- [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md)
+- [sync-offline.md](../04-data/sync-offline.md)

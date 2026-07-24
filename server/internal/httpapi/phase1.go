@@ -245,7 +245,7 @@ func (h *Handler) registerPush(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) deletePush(w http.ResponseWriter, r *http.Request) {
-	if err := h.phase1.DeletePush(r.Context(), principal(r)); err != nil {
+	if err := h.phase1.DeletePush(r.Context(), principal(r), r.URL.Query().Get("provider")); err != nil {
 		h.problem(w, r, err)
 		return
 	}

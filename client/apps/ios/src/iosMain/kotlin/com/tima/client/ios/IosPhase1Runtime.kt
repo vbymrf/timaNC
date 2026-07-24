@@ -2,10 +2,19 @@ package com.tima.client.ios
 
 import com.tima.client.network.AttestationCoordinator
 import com.tima.client.network.AuthContext
+import com.tima.client.network.ForegroundRealtimeSync
+import com.tima.client.network.NotificationWakeSignal
+import com.tima.client.network.NotificationWakeSink
 import com.tima.client.network.Phase1PlatformClient
+import com.tima.client.network.RealtimeReconnect
+import com.tima.client.network.RestGapFill
 import com.tima.client.network.TimaHttpTransport
+import com.tima.client.network.TimaRealtimeTransport
+import com.tima.client.network.WakeSource
+import com.tima.client.sync.WakeToSyncCoordinator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
+import kotlin.time.TimeSource
 
 class IosPhase1Runtime(baseUrl: String) {
     val secureStorage = KeychainSecureStorage()
@@ -14,12 +23,43 @@ class IosPhase1Runtime(baseUrl: String) {
 
     private var auth: AuthContext? = null
     private val httpClient = HttpClient(Darwin)
-    private val transport = TimaHttpTransport(httpClient, validBaseUrl(baseUrl), { auth })
+    private val validatedBaseUrl = validBaseUrl(baseUrl)
+    private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { auth })
+    private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { auth })
+    private var wakeSink: NotificationWakeSink? = null
+    private val clockStart = TimeSource.Monotonic.markNow()
     val phase1 = Phase1PlatformClient(
         transport,
         AttestationCoordinator(transport, appAttest),
         apns,
     )
+
+    fun installWakeCoordinator(
+        gapFill: RestGapFill,
+        reconnect: RealtimeReconnect,
+    ): WakeToSyncCoordinator = WakeToSyncCoordinator(
+        gapFill = gapFill,
+        realtime = reconnect,
+        nowMillis = { clockStart.elapsedNow().inWholeMilliseconds },
+    ).also { wakeSink = it }
+
+    suspend fun applicationDidBecomeActive() {
+        checkNotNull(wakeSink) { "wake coordinator is not installed" }
+            .wake(NotificationWakeSignal(WakeSource.APP_RESUME))
+    }
+
+    suspend fun didReceiveApnsWake(payload: Map<String, String>) {
+        checkNotNull(wakeSink) { "wake coordinator is not installed" }
+            .wake(NotificationWakeSignal(WakeSource.APNS, payload))
+    }
+
+    suspend fun runForegroundRealtime(
+        subscriptionFrame: ByteArray,
+        consumeFrame: suspend (ByteArray) -> Unit,
+    ) {
+        val coordinator = checkNotNull(wakeSink) { "wake coordinator is not installed" }
+        ForegroundRealtimeSync(realtime, coordinator).run(subscriptionFrame, consumeFrame)
+    }
 
     suspend fun restoreSession() {
         val token = secureStorage.read(ACCESS_TOKEN)?.decodeToString()

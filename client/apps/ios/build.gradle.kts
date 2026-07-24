@@ -24,6 +24,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":modules:core:core-network"))
+            api(project(":modules:core:core-sync"))
             api(project(":modules:messenger-crypto"))
             implementation(libs.kotlinx.coroutines.core)
         }

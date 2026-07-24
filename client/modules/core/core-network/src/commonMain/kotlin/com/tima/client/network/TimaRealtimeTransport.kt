@@ -11,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 
@@ -61,4 +62,37 @@ class TimaRealtimeTransport(
             }
         }
     }
+}
+
+/**
+ * Keeps realtime frames transport-only: the repository consumes each frame,
+ * then the shared wake path performs authoritative gap fill. A frame is never
+ * treated as durable message state.
+ */
+class ForegroundRealtimeSync(
+    private val transport: TimaRealtimeTransport,
+    private val wakeSink: NotificationWakeSink,
+) {
+    suspend fun run(
+        subscriptionFrame: ByteArray,
+        consumeFrame: suspend (ByteArray) -> Unit,
+    ) {
+        transport.binaryEvents(subscriptionFrame).collect { frame ->
+            consumeFrame(frame)
+            wakeSink.wake(
+                NotificationWakeSignal(
+                    source = WakeSource.REALTIME,
+                    transportCoalescingId = frameCoalescingId(frame),
+                ),
+            )
+        }
+    }
+}
+
+internal fun frameCoalescingId(frame: ByteArray): String {
+    var hash = -3750763034362895579L
+    frame.forEach { byte ->
+        hash = (hash xor (byte.toInt() and 0xff).toLong()) * 1099511628211L
+    }
+    return "${frame.size}:${hash.toULong().toString(16)}"
 }

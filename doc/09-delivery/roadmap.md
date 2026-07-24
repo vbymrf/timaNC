@@ -4,7 +4,9 @@
 >
 > **Release policy:** Alpha и beta распространяются по внутренним трекам; публичная публикация Android/iOS/Windows в stores разрешена только после прохождения gates Phase 5. GA не является частью Phase 5 и объявляется только после её успешного exit.
 >
-> **Capacity scope:** 100 приглашённых пользователей — cohort Phase 1, а не архитектурный предел. Базовая target architecture проектируется и проверяется на **100k MAU**; Phase 6 развивает её до 10M MAU.
+> **Capacity scope:** invited cohort до 100 пользователей перенесён в Phase 5
+> Closed Beta и не является архитектурным пределом. Базовая target architecture
+> проектируется и проверяется на **100k MAU**; Phase 6 развивает её до 10M MAU.
 
 ## Phase 0: Foundation
 
@@ -30,15 +32,26 @@
 - [x] Auth-gated presigned URL with fixed TTL 15 minutes
 - [x] Immutable message revisions + `message.edited`
 - [x] Domain API and SDK formats ([domain-api-formats.md](../10-sdk/domain-api-formats.md))
-- [ ] Attestation iOS/Android — production adapters are implemented; real vendor credential gate remains open
+- [x] Attestation iOS/Android production adapter boundaries; real vendor verification deferred to Phase 5
 - [x] Windows QR linking — server, DPAPI-backed client flow and black-box roundtrip
 - [x] Private 1:1 participant E2E (envelope + escrow)
-- [ ] Minimal generic push for offline delivery: fail-closed FCM/APNs adapters and generic payload policy exist; real gateway delivery remains open
-- [ ] Internal-track builds for Android/iOS and internal MSIX distribution — workflows exist; signed artifacts have not been produced
+- [x] Hybrid generic notification delivery: repository-owned Go gateway, FCM/APNs/WNS adapters, Android UnifiedPush fallback, generic payload policy and shared WS/REST catch-up
+- [x] Unsigned Android/iOS/Windows validation workflows; signed/internal-track artifacts deferred to Phase 5
+- [ ] Complete native messaging UI and Phase 1 acceptance journeys
 
-**Exit:** invited cohort до 100 пользователей работает в non-production single-region alpha; message SLO выполнен; каждое private message имеет `escrow_blob`; content/media/revision contract gates проходят. Signed PreKey не блокирует envelope-only alpha и становится blocking перед внешним тестированием ratchet path A.
+**Exit:** hosted repository-controlled CI matrix проходит; hybrid notification
+fallback и native messaging acceptance подтверждены; local message smoke
+выполнен; каждое private message имеет `escrow_blob`;
+content/media/revision contract gates проходят. Signed PreKey не блокирует
+envelope-only development и становится blocking перед внешним тестированием
+ratchet path A.
 
-**Current review:** [Phase 1 exit is BLOCKED](./phase1-exit-review.md) pending credentialed platform builds, real attestation/push and invited-cohort evidence.
+**Current review:** [Phase 1 exit is BLOCKED](./phase1-exit-review.md). Hybrid
+notification implementation passes local verification; a green hosted CI rerun
+and the native messaging UI remain open.
+Notification behavior is specified in
+[hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
+Phase 2 does not start while Phase 1 remains blocked.
 
 ## Phase 2: Communication MVP (Month 3)
 
@@ -105,6 +118,9 @@
 - [ ] Observability hardening
 - [ ] Closed beta via TestFlight / internal track / internal MSIX
 - [ ] RC builds for Android, iOS and Windows; MSIX is the primary Windows package
+- [ ] Real App Attest / Play Integrity / FCM / APNs end-to-end verification
+- [ ] Signed AAB, iOS archive and MSIX installed on representative devices
+- [ ] Invited cohort до 100 пользователей with immutable delivery/SLO evidence
 - [ ] Dual RU/EU production readiness drill
 - [ ] Public store metadata and submissions prepared, but not released before exit
 

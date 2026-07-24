@@ -47,11 +47,15 @@ jobs:
       - name: Verify generated models are committed
         shell: powershell
         run: |
-          $changes = @(git status --porcelain --untracked-files=all -- gen)
+          git diff --exit-code -- gen
+          if ($LASTEXITCODE -ne 0) {
+            throw "Generation changed committed files. Run .\schema\codegen\generate.ps1 and commit gen/."
+          }
+          $untracked = @(git ls-files --others --exclude-standard -- gen)
           if ($LASTEXITCODE -ne 0) {
             throw "Unable to inspect generated files."
           }
-          if ($changes.Count -ne 0) {
-            $changes | ForEach-Object { Write-Host $_ }
-            throw "Generation changed committed files. Run .\schema\codegen\generate.ps1 and commit gen/."
+          if ($untracked.Count -ne 0) {
+            $untracked | ForEach-Object { Write-Host $_ }
+            throw "Generation created untracked files. Run .\schema\codegen\generate.ps1 and commit gen/."
           }

@@ -47,4 +47,31 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) {
         Task { try? await runtime?.apns.didFailToRegisterForRemoteNotifications() }
     }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        Task { try? await runtime?.applicationDidBecomeActive() }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        let allowed = ["type", "chat_id", "preview", "encrypted", "collapse_key", "event_id"]
+        let payload = allowed.reduce(into: [String: String]()) { values, key in
+            if let value = userInfo[key] as? String {
+                values[key] = value
+            } else if let value = userInfo[key] as? Bool {
+                values[key] = String(value)
+            }
+        }
+        Task {
+            do {
+                try await runtime?.didReceiveApnsWake(payload: payload)
+                completionHandler(.newData)
+            } catch {
+                completionHandler(.failed)
+            }
+        }
+    }
 }

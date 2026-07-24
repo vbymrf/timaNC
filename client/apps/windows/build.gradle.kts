@@ -13,6 +13,7 @@ kotlin {
 
 dependencies {
     implementation(project(":modules:core:core-network"))
+    implementation(project(":modules:core:core-sync"))
     implementation(project(":modules:messenger-crypto"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.ktor.client.cio)
@@ -74,6 +75,7 @@ val prepareMsixInputs by tasks.registering {
         copy {
             from("src/msix/Package.appxmanifest")
             into(stage)
+            rename { "AppxManifest.xml" }
         }
         val assets = stage.resolve("Assets").apply { mkdirs() }
         mapOf(

@@ -135,8 +135,9 @@ func Load() (Config, error) {
 	}
 	if cfg.PushGatewayURL != "" {
 		if u, err := url.ParseRequestURI(cfg.PushGatewayURL); err != nil ||
-			u.Scheme != "https" || u.Host == "" {
-			errs = append(errs, errors.New("PUSH_GATEWAY_URL must be an absolute HTTPS URL"))
+			(u.Scheme != "https" && !(u.Scheme == "http" &&
+				(dev || u.Hostname() == "push-gateway"))) || u.Host == "" {
+			errs = append(errs, errors.New("PUSH_GATEWAY_URL must use HTTPS or the internal push-gateway service"))
 		}
 	}
 	if cfg.AttestationGatewayURL != "" {

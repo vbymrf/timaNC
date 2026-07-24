@@ -154,6 +154,12 @@ paths:
       tags: [Users]
       operationId: deleteDevicePush
       x-tima-implementation-phase: phase-1
+      parameters:
+        - name: provider
+          in: query
+          required: false
+          schema: {type: string, enum: [fcm, apns, wns, unifiedpush]}
+          description: Removes one transport when set; omission removes every registration for the current device.
       responses:
         '204': {description: Push registration removed}
         default: {$ref: '#/components/responses/Error'}
@@ -1767,8 +1773,17 @@ components:
       additionalProperties: false
       required: [provider, token]
       properties:
-        provider: {type: string, enum: [fcm, apns, wns]}
+        provider:
+          type: string
+          enum: [fcm, apns, wns, unifiedpush]
+          description: FCM and UnifiedPush are Android-only, APNs is iOS-only, and WNS is Windows-only; credential-free Windows delivery uses WS/REST catch-up without a push registration.
         token: {type: string, minLength: 16, maxLength: 4096}
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 100
+          description: Lower values are attempted first; later registrations are fallbacks.
     SignedPrekey:
       type: object
       additionalProperties: false

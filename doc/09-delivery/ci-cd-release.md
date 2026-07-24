@@ -13,6 +13,10 @@ tima/
 
 Current workspace contains generated contracts, KMP client libraries and platform
 shells, Go services, Compose infrastructure, and Phase 1 release/SLO workflows.
+Until Phase 5 the active policy is
+[credential-free development](../07-operations/credential-free-development.md):
+unsigned validation and the repository-owned notification path run without
+Apple/Google store accounts; credentialed release jobs remain manual.
 
 ## 2. Pipelines
 
@@ -54,8 +58,8 @@ Release smoke проверяет URL-контракт: `/healthz`, `/readyz`, `/
 | Phase | Server modules | Client flags | CI gate |
 |-------|----------------|--------------|---------|
 | 0 | core schema + migration baseline | — | schema validation + clean `golang-migrate up` |
-| 1 | `auth`, `messages`, `media`, realtime, push | — | messaging HTTP/WS E2E + content/media/revision + platform build matrix |
-| 2 | `calls` | `calls` | call interoperability and Communication MVP gates |
+| 1 | `auth`, `messages`, `media`, realtime, hybrid push | — | messaging HTTP/WS/push E2E + content/media/revision + unsigned platform matrix |
+| 2 | `calls` | `calls` | not started while Phase 1 is BLOCKED; call interoperability and Communication MVP gates |
 | 3 | `feed`, `emotions`, `attributes`, `shelves`, `inbox` | `public_feed`, `social_inbox`, `emotions` | [test-strategy.md](../08-quality/test-strategy.md) §8 Phase 3 |
 | 3b | `bot_gateway`, webhook workers | `bot_platform` | [bot-platform-test-plan.md](../08-quality/bot-platform-test-plan.md) §12 |
 | 4+ | sharding, HSM escrow, retention/legal hold | `blogger_mode` | HSM mandatory before production; load S1–S13 + hold drill |
@@ -107,5 +111,8 @@ Production-like beta stack: [mvp-server-setup.md](../07-operations/mvp-server-se
 
 - [test-strategy.md](../08-quality/test-strategy.md)
 - [mvp-server-setup.md](../07-operations/mvp-server-setup.md)
+- [release-gates.md](../07-operations/release-gates.md)
+- [credential-free-development.md](../07-operations/credential-free-development.md)
+- [phase1-exit-review.md](./phase1-exit-review.md)
 - [dependency-policy.md](./dependency-policy.md)
 - [roadmap.md](./roadmap.md)

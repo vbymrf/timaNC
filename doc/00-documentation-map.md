@@ -1,6 +1,6 @@
 # Реестр документации TIMA
 
-> **Версия реестра:** 1.3 · **Дата:** 2026-07-22  
+> **Версия реестра:** 1.4 · **Дата:** 2026-07-24
 > **Мерж doc_ver2:** см. [MERGE-AUDIT.md](./MERGE-AUDIT.md)
 > **Решения по противоречиям:** [CONTRADICTION-REGISTER.md](./CONTRADICTION-REGISTER.md)
 > Легенда статусов: `done` — заполнено · `draft` — черновик · `planned` — запланировано · `legacy` — устаревший источник, сохранён для истории
@@ -10,14 +10,14 @@
 | Раздел | Документов | Статус раздела |
 |--------|------------|----------------|
 | 01-product | 8 + social-objects | done |
-| 02-architecture | 8 | done |
+| 02-architecture | 9 | done |
 | 03-security | 7 + legacy | done |
 | 04-data | 8 | done |
 | 05-api | 9 | done |
 | 06-realtime | 4 | done |
-| 07-operations | 5 | done (merge этап 6) |
+| 07-operations | 7 | done (merge этап 6 + Phase 1 release policy) |
 | 08-quality | 3 | done |
-| 09-delivery | 3 | done |
+| 09-delivery | 4 | done |
 | adr | 18 | done |
 | doc_UI | 38 | done (merge doc_ver2 этап 2) |
 
@@ -51,6 +51,7 @@
 | A-04 | [data-flows.md](./02-architecture/data-flows.md) | Architecture | MVP | done | merge этап 7: feed/inbox flows |
 | A-05 | [deployment-topology.md](./02-architecture/deployment-topology.md) | SRE | MVP | done | merge этап 7: Caddy MVP, ADR-0010/0011 |
 | A-06 | [scaling-capacity.md](./02-architecture/scaling-capacity.md) | SRE | Scale | done | crypto doc §6, ADR-0008; merge этап 6: ступень 0 VPS |
+| A-10 | [hybrid-notification-delivery.md](./02-architecture/hybrid-notification-delivery.md) | Client/Backend | Phase 1 | done (spec) | FCM/APNs + TIMA gateway/UnifiedPush + WS/REST catch-up |
 
 ---
 
@@ -121,6 +122,8 @@
 | O-03 | [incident-response.md](./07-operations/incident-response.md) | SRE | MVP | done | — |
 | O-04 | [runbooks.md](./07-operations/runbooks.md) | SRE | MVP | done | — |
 | O-05 | [mvp-server-setup.md](./07-operations/mvp-server-setup.md) | SRE | MVP | done | doc_ver2/07-deployment/server-setup.md; VPS Caddy compose |
+| O-06 | [release-gates.md](./07-operations/release-gates.md) | DevOps/Security | Phase 1–5 | done | unsigned/credentialed environment contracts |
+| O-07 | [credential-free-development.md](./07-operations/credential-free-development.md) | Architecture/DevOps | Phase 1 | done | development posture before store accounts |
 
 ---
 
@@ -142,6 +145,7 @@
 | DEL-01 | [roadmap.md](./09-delivery/roadmap.md) | PM | All | done | merge этап 5–6: Phase 3b Bot, `entity_message` MVP |
 | DEL-02 | [ci-cd-release.md](./09-delivery/ci-cd-release.md) | DevOps | MVP | done | merge этап 6: MVP VPS deploy, phase gates |
 | DEL-03 | [dependency-policy.md](./09-delivery/dependency-policy.md) | DevOps | All | done | merge этап 6: Caddy, bot SDK |
+| DEL-04 | [phase1-exit-review.md](./09-delivery/phase1-exit-review.md) | PM/Architecture | Phase 1 | done | dated evidence and BLOCKED decision |
 
 ---
 

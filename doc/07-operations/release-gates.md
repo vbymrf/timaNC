@@ -1,5 +1,8 @@
 # Phase 1 release gates
 
+Current development posture without store accounts:
+[credential-free-development.md](./credential-free-development.md).
+
 The repository has two deliberately separate paths:
 
 - `client-platform-validation.yml` builds an unsigned Android AAB, an unsigned iOS
@@ -16,6 +19,27 @@ Repository administrators must create `android-release`, `ios-release`,
 `windows-release`, and `server-production` as protected GitHub environments with required
 reviewers. Environment protection is repository configuration and cannot be established by
 workflow YAML.
+
+## Credential-free hybrid notifications
+
+The target Phase 1 stack includes a repository-owned Go `push-gateway`.
+Its `unifiedpush` path must start and pass health checks without Apple/Google
+credentials. FCM and APNs are optional adapters enabled only when their
+environment contract is complete.
+
+Credential-free behavior:
+
+- Android uses UnifiedPush plus foreground WebSocket/REST catch-up.
+- Windows uses WebSocket and periodic REST catch-up without WNS.
+- iOS uses foreground/resume catch-up; reliable background wake remains
+  unavailable without APNs entitlement.
+- Missing vendor credentials disable only the matching adapter and must not
+  cause placeholder credentials or development fallback in production.
+
+The full channel selection, privacy and degradation contract is defined in
+[hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md).
+Until the gateway is implemented and its E2E passes, this is target
+architecture rather than verified Phase 1 evidence.
 
 ## GitHub environment contract
 

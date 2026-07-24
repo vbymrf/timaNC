@@ -16,9 +16,11 @@ struct ContentView: View {
                 }
                 Task {
                     do {
-                        let digest = SHA256.hash(data: Data("tima-app-attest-enrollment".utf8))
-                        let challenge = KotlinByteArray(size: Int32(digest.count))
-                        for (index, byte) in digest.enumerated() {
+                        let digestBytes = Array(
+                            SHA256.hash(data: Data("tima-app-attest-enrollment".utf8))
+                        )
+                        let challenge = KotlinByteArray(size: Int32(digestBytes.count))
+                        for (index, byte) in digestBytes.enumerated() {
                             challenge.set(index: Int32(index), value: Int8(bitPattern: byte))
                         }
                         let enrollment = try await runtime.appAttest.prepareEnrollment(

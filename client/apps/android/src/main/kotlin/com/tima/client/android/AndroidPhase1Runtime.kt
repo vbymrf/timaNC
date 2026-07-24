@@ -3,8 +3,14 @@ package com.tima.client.android
 import android.content.Context
 import com.tima.client.network.AttestationCoordinator
 import com.tima.client.network.AuthContext
+import com.tima.client.network.ForegroundRealtimeSync
+import com.tima.client.network.NotificationWakeSink
 import com.tima.client.network.Phase1PlatformClient
+import com.tima.client.network.RealtimeReconnect
+import com.tima.client.network.RestGapFill
 import com.tima.client.network.TimaHttpTransport
+import com.tima.client.network.TimaRealtimeTransport
+import com.tima.client.sync.WakeToSyncCoordinator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 
@@ -16,15 +22,47 @@ class AndroidPhase1Runtime(
     val secureStorage = AndroidKeystoreSecureStorage(context)
     val integrity = PlayIntegrityAttestationProvider(context, cloudProjectNumber)
     val pushTokens = FcmPushTokenProvider(context)
+    val unifiedPush = UnifiedPushEndpointProvider(context)
 
     private var auth: AuthContext? = null
     private val httpClient = HttpClient(OkHttp)
-    private val transport = TimaHttpTransport(httpClient, validBaseUrl(baseUrl), { auth })
+    private val validatedBaseUrl = validBaseUrl(baseUrl)
+    private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { auth })
+    private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { auth })
+    private var wakeSink: NotificationWakeSink? = null
     val phase1 = Phase1PlatformClient(
         transport,
         AttestationCoordinator(transport, integrity),
         pushTokens,
     )
+    val unifiedPushPhase1 = Phase1PlatformClient(
+        transport,
+        AttestationCoordinator(transport, integrity),
+        unifiedPush,
+    )
+
+    fun installWakeCoordinator(coordinator: NotificationWakeSink) {
+        wakeSink?.let(AndroidNotificationWakeBridge::uninstall)
+        wakeSink = coordinator
+        AndroidNotificationWakeBridge.install(coordinator)
+    }
+
+    fun installWakeCoordinator(
+        gapFill: RestGapFill,
+        reconnect: RealtimeReconnect,
+    ): WakeToSyncCoordinator = WakeToSyncCoordinator(
+        gapFill = gapFill,
+        realtime = reconnect,
+        nowMillis = System::currentTimeMillis,
+    ).also(::installWakeCoordinator)
+
+    suspend fun runForegroundRealtime(
+        subscriptionFrame: ByteArray,
+        consumeFrame: suspend (ByteArray) -> Unit,
+    ) {
+        val coordinator = checkNotNull(wakeSink) { "wake coordinator is not installed" }
+        ForegroundRealtimeSync(realtime, coordinator).run(subscriptionFrame, consumeFrame)
+    }
 
     suspend fun restoreSession() {
         val token = secureStorage.read(ACCESS_TOKEN)?.decodeToString()
@@ -44,6 +82,7 @@ class AndroidPhase1Runtime(
     }
 
     override fun close() {
+        wakeSink?.let(AndroidNotificationWakeBridge::uninstall)
         httpClient.close()
     }
 

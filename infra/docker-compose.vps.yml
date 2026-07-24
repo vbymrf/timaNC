@@ -101,7 +101,7 @@ services:
       MINIO_PUBLIC_BUCKET: tima-media-public
       MINIO_STAGING_BUCKET: tima-public-staging
       PUSH_TOKEN_ENCRYPTION_KEY: ${PUSH_TOKEN_ENCRYPTION_KEY:?PUSH_TOKEN_ENCRYPTION_KEY is required}
-      PUSH_GATEWAY_URL: ${PUSH_GATEWAY_URL:?PUSH_GATEWAY_URL is required}
+      PUSH_GATEWAY_URL: http://push-gateway:8082/v1/send
       PUSH_GATEWAY_TOKEN: ${PUSH_GATEWAY_TOKEN:?PUSH_GATEWAY_TOKEN is required}
       ATTESTATION_GATEWAY_URL: ${ATTESTATION_GATEWAY_URL:?ATTESTATION_GATEWAY_URL is required}
       ATTESTATION_GATEWAY_TOKEN: ${ATTESTATION_GATEWAY_TOKEN:?ATTESTATION_GATEWAY_TOKEN is required}
@@ -137,7 +137,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       PUSH_TOKEN_ENCRYPTION_KEY: ${PUSH_TOKEN_ENCRYPTION_KEY:?PUSH_TOKEN_ENCRYPTION_KEY is required}
-      PUSH_GATEWAY_URL: ${PUSH_GATEWAY_URL:?PUSH_GATEWAY_URL is required}
+      PUSH_GATEWAY_URL: http://push-gateway:8082/v1/send
       PUSH_GATEWAY_TOKEN: ${PUSH_GATEWAY_TOKEN:?PUSH_GATEWAY_TOKEN is required}
       ATTESTATION_GATEWAY_URL: ${ATTESTATION_GATEWAY_URL:?ATTESTATION_GATEWAY_URL is required}
       ATTESTATION_GATEWAY_TOKEN: ${ATTESTATION_GATEWAY_TOKEN:?ATTESTATION_GATEWAY_TOKEN is required}
@@ -148,6 +148,25 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      push-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+  push-gateway:
+    image: tima-server:${TIMA_VERSION:-phase1}
+    entrypoint: ["/push-gateway"]
+    environment:
+      PUSH_GATEWAY_ADDR: :8082
+      PUSH_GATEWAY_TOKEN: ${PUSH_GATEWAY_TOKEN:?PUSH_GATEWAY_TOKEN is required}
+      FCM_ENDPOINT: ${FCM_ENDPOINT:-}
+      FCM_BEARER_TOKEN: ${FCM_BEARER_TOKEN:-}
+      APNS_ENDPOINT: ${APNS_ENDPOINT:-}
+      APNS_BEARER_TOKEN: ${APNS_BEARER_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "/push-gateway", "--healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   realtime-gw:
@@ -170,7 +189,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       PUSH_TOKEN_ENCRYPTION_KEY: ${PUSH_TOKEN_ENCRYPTION_KEY:?PUSH_TOKEN_ENCRYPTION_KEY is required}
-      PUSH_GATEWAY_URL: ${PUSH_GATEWAY_URL:?PUSH_GATEWAY_URL is required}
+      PUSH_GATEWAY_URL: http://push-gateway:8082/v1/send
       PUSH_GATEWAY_TOKEN: ${PUSH_GATEWAY_TOKEN:?PUSH_GATEWAY_TOKEN is required}
       ATTESTATION_GATEWAY_URL: ${ATTESTATION_GATEWAY_URL:?ATTESTATION_GATEWAY_URL is required}
       ATTESTATION_GATEWAY_TOKEN: ${ATTESTATION_GATEWAY_TOKEN:?ATTESTATION_GATEWAY_TOKEN is required}

@@ -8,6 +8,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.tima.client.network.PlatformServiceUnavailableException
+import com.tima.client.network.WakeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,10 +32,18 @@ class MainActivity : Activity() {
             setOnClickListener { prepareTrust() }
         }
         val registerPush = Button(this).apply {
-            text = "Register push token"
+            text = "Register FCM token"
             setOnClickListener {
                 runPlatformOperation("Push token registered") {
                     phase1.registerCurrentPushToken()
+                }
+            }
+        }
+        val registerUnifiedPush = Button(this).apply {
+            text = "Register UnifiedPush endpoint"
+            setOnClickListener {
+                runPlatformOperation("UnifiedPush endpoint registered") {
+                    unifiedPushPhase1.registerCurrentPushToken()
                 }
             }
         }
@@ -46,6 +55,7 @@ class MainActivity : Activity() {
                 addView(status)
                 addView(prepare)
                 addView(registerPush)
+                addView(registerUnifiedPush)
             },
             ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -57,9 +67,15 @@ class MainActivity : Activity() {
             status.text = "Blocked: ${it.message}"
             prepare.isEnabled = false
             registerPush.isEnabled = false
+            registerUnifiedPush.isEnabled = false
             null
         }
         scope.launch { runtime?.restoreSession() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        AndroidNotificationWakeBridge.wake(WakeSource.APP_RESUME)
     }
 
     private fun prepareTrust() {
