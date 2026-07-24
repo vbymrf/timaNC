@@ -38,7 +38,7 @@
 - [x] Hybrid generic notification delivery: repository-owned Go gateway, FCM/APNs/WNS adapters, Android UnifiedPush fallback, generic payload policy and shared WS/REST catch-up
 - [x] Unsigned Android/iOS/Windows validation workflows; signed/internal-track artifacts deferred to Phase 5
 - [x] Encrypted-at-rest SQLDelight UI cache on Android/iOS/Windows with platform-protected row key and logout wipe
-- [ ] Durable client send/retry outbox across process restart (coordinator `PendingSend` remains memory-only)
+- [x] Durable post-encryption client send/retry outbox across process restart on Android/iOS/Windows
 - [ ] Complete native messaging UI and Phase 1 acceptance journeys
 
 **Exit:** hosted repository-controlled CI matrix проходит; hybrid notification
@@ -63,9 +63,12 @@ flags; Windows additionally permits HTTP only for loopback in that mode.
 Production profiles fail closed with encrypted writes disabled until platform
 attestation enrollment where applicable and verified production escrow roots
 are provisioned. iOS without APNs advertises foreground/resume catch-up only.
-Encrypted durable chat/history restoration is implemented on all clients.
-Durable send/retry outbox state across restart, media UI and hosted native
-acceptance evidence remain incomplete, so Phase 1 stays BLOCKED.
+Encrypted durable chat/history restoration and the post-encryption send/retry
+outbox are implemented on all clients. The exact ciphertext request and
+idempotency key survive restart; reservation must still complete online before
+the durable boundary, so completely offline composition/send is not claimed.
+Media UI and hosted native acceptance evidence remain incomplete, so Phase 1
+stays BLOCKED.
 Notification behavior is specified in
 [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
 Phase 2 does not start while Phase 1 remains blocked.

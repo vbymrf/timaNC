@@ -13,7 +13,8 @@ import kotlinx.serialization.json.Json
  *
  * Identifiers and ordering fields remain queryable. Complete model payloads,
  * including message text and peer display names, are encrypted before SQLite.
- * This cache deliberately does not make coordinator PendingSend operations durable.
+ * The same database also owns the ciphertext-only send outbox, allowing bubble and outbox
+ * transitions to commit atomically.
  */
 class EncryptedSqlDelightMessagingCache(
     database: TimaDatabase,
@@ -59,7 +60,12 @@ class EncryptedSqlDelightMessagingCache(
         mutex.withLock {
             val key = cacheKey()
             val local = readMessages(chatId, key)
-                .filter { it.messageId == null || it.delivery == MessageDeliveryState.ERROR }
+                .filter {
+                    it.messageId == null ||
+                        it.delivery == MessageDeliveryState.PENDING ||
+                        it.delivery == MessageDeliveryState.SENDING ||
+                        it.delivery == MessageDeliveryState.ERROR
+                }
             writeMessages(chatId, (value + local).distinctBy(MessageBubble::localId), key)
         }
     }
@@ -88,11 +94,77 @@ class EncryptedSqlDelightMessagingCache(
         }
     }
 
+    override suspend fun enqueueSend(value: DurableSend, bubble: MessageBubble) {
+        require(value.localId == bubble.localId && value.chatId == bubble.chatId) {
+            "outbox and bubble identifiers differ"
+        }
+        mutex.withLock {
+            val key = cacheKey()
+            val messages = updatedMessages(bubble, key)
+            val encrypted = messages.map { encode(key, it) }
+            queries.transaction {
+                writeMessagesPrepared(bubble.chatId, messages, encrypted)
+                queries.insertOutbox(
+                    local_id = value.localId,
+                    idempotency_key = value.idempotencyKey,
+                    chat_id = value.chatId,
+                    request_path = value.requestPath,
+                    envelope = value.envelope,
+                    next_attempt_epoch_ms = value.nextAttemptEpochMillis,
+                    created_at_epoch_ms = value.createdAtEpochMillis,
+                )
+            }
+        }
+    }
+
+    override suspend fun outboxSend(localId: String): DurableSend? = mutex.withLock {
+        queries.selectOutboxById(localId).executeAsOneOrNull()?.toDurableSend()
+    }
+
+    override suspend fun dueOutboxSends(nowEpochMillis: Long, limit: Long): List<DurableSend> =
+        mutex.withLock {
+            queries.selectDueOutbox(nowEpochMillis, limit).executeAsList().map { it.toDurableSend() }
+        }
+
+    override suspend fun recoverSendingOutbox(nowEpochMillis: Long) {
+        mutex.withLock { queries.recoverSendingOutbox(nowEpochMillis) }
+    }
+
+    override suspend fun claimOutboxSend(localId: String): Boolean = mutex.withLock {
+        queries.markOutboxSending(localId)
+        queries.selectOutboxById(localId).executeAsOneOrNull()?.state == "sending"
+    }
+
+    override suspend fun scheduleOutboxRetry(localId: String, nextAttemptEpochMillis: Long) {
+        mutex.withLock { queries.markOutboxRetry(nextAttemptEpochMillis, localId) }
+    }
+
+    override suspend fun makeOutboxSendDue(localId: String, nowEpochMillis: Long) {
+        mutex.withLock { queries.markOutboxPending(nowEpochMillis, localId) }
+    }
+
+    override suspend fun terminallyFailOutboxSend(localId: String, bubble: MessageBubble?) {
+        if (bubble == null) {
+            mutex.withLock { queries.markOutboxTerminal(localId) }
+        } else {
+            updateBubbleAndOutbox(bubble) {
+                queries.markOutboxTerminal(localId)
+            }
+        }
+    }
+
+    override suspend fun completeOutboxSend(localId: String, bubble: MessageBubble) {
+        updateBubbleAndOutbox(bubble) {
+            queries.deleteOutbox(localId)
+        }
+    }
+
     override suspend fun clear() {
         mutex.withLock {
             queries.transaction {
                 queries.deleteCachedChats()
                 queries.deleteAllCachedMessages()
+                queries.deleteAllOutbox()
             }
             try {
                 secureStorage.delete(CACHE_KEY_NAME)
@@ -137,19 +209,62 @@ class EncryptedSqlDelightMessagingCache(
         require(values.all { it.chatId == chatId }) { "message belongs to a different chat" }
         val encrypted = values.map { encode(key, it) }
         queries.transaction {
-            queries.deleteCachedMessagesForChat(chatId)
-            values.forEachIndexed { index, message ->
-                queries.insertCachedMessage(
-                    local_id = message.localId,
-                    chat_id = message.chatId,
-                    message_id = message.messageId?.toString(),
-                    delivery_state = message.delivery.name,
-                    position = index.toLong(),
-                    ciphertext = encrypted[index],
-                )
+            writeMessagesPrepared(chatId, values, encrypted)
+        }
+    }
+
+    private fun writeMessagesPrepared(
+        chatId: String,
+        values: List<MessageBubble>,
+        encrypted: List<ByteArray>,
+    ) {
+        queries.deleteCachedMessagesForChat(chatId)
+        values.forEachIndexed { index, message ->
+            queries.insertCachedMessage(
+                local_id = message.localId,
+                chat_id = message.chatId,
+                message_id = message.messageId?.toString(),
+                delivery_state = message.delivery.name,
+                position = index.toLong(),
+                ciphertext = encrypted[index],
+            )
+        }
+    }
+
+    private fun updatedMessages(value: MessageBubble, key: ByteArray): List<MessageBubble> =
+        readMessages(value.chatId, key)
+            .filterNot {
+                it.localId == value.localId ||
+                    (value.messageId != null && it.messageId == value.messageId)
+            }
+            .plus(value)
+
+    private suspend fun updateBubbleAndOutbox(
+        bubble: MessageBubble,
+        outboxTransition: () -> Unit,
+    ) {
+        mutex.withLock {
+            val key = cacheKey()
+            val messages = updatedMessages(bubble, key)
+            val encrypted = messages.map { encode(key, it) }
+            queries.transaction {
+                writeMessagesPrepared(bubble.chatId, messages, encrypted)
+                outboxTransition()
             }
         }
     }
+
+    private fun com.tima.client.database.Sync_outbox.toDurableSend() = DurableSend(
+        localId = local_id,
+        idempotencyKey = idempotency_key,
+        chatId = chat_id,
+        requestPath = request_path,
+        envelope = envelope.copyOf(),
+        state = state,
+        retryCount = retry_count,
+        nextAttemptEpochMillis = next_attempt_epoch_ms,
+        createdAtEpochMillis = created_at_epoch_ms,
+    )
 
     private inline fun <reified T> encode(key: ByteArray, value: T): ByteArray {
         val plaintext = json.encodeToString(value).encodeToByteArray()

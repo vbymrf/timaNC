@@ -4,6 +4,7 @@ import com.tima.client.network.MessageReservationDto
 import com.tima.client.network.PrivateDocumentEnvelopeDto
 import com.tima.client.network.PrivateMessageHistoryDto
 import com.tima.client.network.PrivateMessageWriteDto
+import com.tima.client.network.PrivateMessageWriteCodec
 import com.tima.client.network.PrivateMetadataDto
 import com.tima.client.network.RestCryptoTransportAdapter
 import com.tima.client.network.TimaHttpTransport
@@ -79,7 +80,16 @@ class TimaMessagingRemoteDataSource(
         value: PrivateMessageWriteDto,
         idempotencyKey: String,
     ) {
-        transport.post("/v1/chats/$chatId/messages", value.toJson(), idempotencyKey)
+        sendSerialized(chatId, PrivateMessageWriteCodec.encode(value), idempotencyKey)
+    }
+
+    override suspend fun sendSerialized(
+        chatId: String,
+        envelope: ByteArray,
+        idempotencyKey: String,
+    ) {
+        PrivateMessageWriteCodec.decode(envelope)
+        transport.postJsonBytes("/v1/chats/$chatId/messages", envelope, idempotencyKey)
     }
 
     override suspend fun edit(

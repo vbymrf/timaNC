@@ -14,13 +14,11 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":modules:core:core-network"))
+            api(project(":modules:core:core-database"))
             implementation(libs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-        }
-        jvmMain.dependencies {
-            api(project(":modules:core:core-database"))
         }
         jvmTest.dependencies {
             implementation(libs.sqldelight.sqlite.driver)

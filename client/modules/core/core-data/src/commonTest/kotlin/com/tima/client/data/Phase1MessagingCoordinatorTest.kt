@@ -6,6 +6,7 @@ import com.tima.client.network.AuthContext
 import com.tima.client.network.PrivateDocumentEnvelopeDto
 import com.tima.client.network.PrivateMessageHistoryDto
 import com.tima.client.network.PrivateMessageWriteDto
+import com.tima.client.network.PrivateMessageWriteCodec
 import com.tima.client.network.PrivateMetadataDto
 import com.tima.client.network.ReservedMessageIds
 import com.tima.client.network.SecureStorage
@@ -73,7 +74,8 @@ class Phase1MessagingCoordinatorTest {
         fixture.coordinator.retrySend(localId)
 
         assertIs<SendUiState.Sent>(fixture.coordinator.state.value.send)
-        assertTrue(firstEnvelope === fixture.remote.lastWrite)
+        assertEquals(firstEnvelope, fixture.remote.lastWrite)
+        assertTrue(fixture.remote.serializedWrites[0].contentEquals(fixture.remote.serializedWrites[1]))
         assertEquals(firstKey, fixture.remote.lastSendKey)
         assertEquals(1, fixture.crypto.encryptCalls)
         assertEquals(2, fixture.remote.sendCalls)
@@ -199,7 +201,7 @@ class Phase1MessagingCoordinatorTest {
         val crypto = FakeCrypto()
         val values = ArrayDeque(
             listOf(
-                "local-1", "reserve-key", "send-key", TEST_REVISION,
+                "local-1", "reserve-key", "00000000-0000-4000-8000-000000000006", TEST_REVISION,
                 "edit-key", "more-1", "more-2", "more-3",
             ),
         )
@@ -211,6 +213,7 @@ class Phase1MessagingCoordinatorTest {
             cache = NonDurableInMemoryMessagingCache(),
             ids = IdGenerator { values.removeFirst() },
             connectivity = Connectivity { currentOnline },
+            nowEpochMillis = { 0L },
         )
         return Fixture(coordinator, remote, crypto, currentOnline) {
             currentOnline = it
@@ -269,6 +272,7 @@ class Phase1MessagingCoordinatorTest {
         var sendCalls = 0
         var editCalls = 0
         var lastWrite: PrivateMessageWriteDto? = null
+        val serializedWrites = mutableListOf<ByteArray>()
         var lastSendKey: String? = null
         var lastRead: ULong? = null
         var lastDeleted: ULong? = null
@@ -301,6 +305,15 @@ class Phase1MessagingCoordinatorTest {
                 failNextSend = false
                 throw IllegalStateException("temporary")
             }
+        }
+
+        override suspend fun sendSerialized(
+            chatId: String,
+            envelope: ByteArray,
+            idempotencyKey: String,
+        ) {
+            serializedWrites += envelope.copyOf()
+            send(chatId, PrivateMessageWriteCodec.decode(envelope), idempotencyKey)
         }
 
         override suspend fun edit(

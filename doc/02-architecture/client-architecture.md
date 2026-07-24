@@ -96,10 +96,13 @@ fail-closed блокирует private writes без verified production escrow 
 WNS не заявлен: UI честно показывает foreground periodic authenticated REST
 catch-up с интервалом 60 секунд.
 
-Durable decrypted UI history теперь реализована, но coordinator `PendingSend`
-и send/retry idempotency material остаются memory-only: restart не возобновляет
-отправку. Durable outbox, media UI и hosted native acceptance evidence для всех
-трёх platform slices остаются открытыми блокерами Phase 1.
+Durable decrypted UI history и post-encryption send/retry outbox реализованы на
+всех трёх клиентах. После reservation + encryption канонические ciphertext
+bytes и idempotency key записываются до первой попытки, а restart/resume
+восстанавливает stale `sending` и due retry без повторного шифрования.
+Reservation failure остаётся до durable boundary; полностью offline
+composition/send не заявлен. Media UI и hosted native acceptance evidence
+остаются открытыми блокерами Phase 1.
 
 ## 4. Platform adapters (`expect`/`actual`)
 
@@ -148,7 +151,7 @@ Operational endpoints (`/healthz`, `/readyz`, `/metrics`) не входят в c
 | `identity` | public keys, device id |
 | `search_fts` | decrypted index (private chats only) |
 | `media_queue` | `thumbnail/preview/full`, upload chunks, retry state; без Original |
-| `sync_outbox` | pending operations + idempotency keys |
+| `sync_outbox` | canonical ciphertext request bytes + idempotency/path/retry state; no private plaintext |
 | `inbox_local` | кэш inbox_threads/events, read-state |
 | `emotions_local` | pending emotion/recommendation sync |
 | `attributes_cache` | жанры, подписки на атрибуты |

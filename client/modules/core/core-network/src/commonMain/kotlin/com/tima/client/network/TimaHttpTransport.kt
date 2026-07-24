@@ -42,14 +42,23 @@ class TimaHttpTransport(
         body: JsonObject? = null,
         idempotencyKey: String? = null,
         headers: Map<String, String> = emptyMap(),
-    ): JsonObject = execute(HttpMethod.Post, path, body, idempotencyKey, headers)
+    ): JsonObject = execute(HttpMethod.Post, path, body?.toString(), idempotencyKey, headers)
+
+    suspend fun postJsonBytes(
+        path: String,
+        body: ByteArray,
+        idempotencyKey: String,
+    ): JsonObject {
+        require(body.isNotEmpty()) { "JSON request body must not be empty" }
+        return execute(HttpMethod.Post, path, body.decodeToString(), idempotencyKey, emptyMap())
+    }
 
     suspend fun put(
         path: String,
         body: JsonObject,
         idempotencyKey: String? = null,
         headers: Map<String, String> = emptyMap(),
-    ): JsonObject = execute(HttpMethod.Put, path, body, idempotencyKey, headers)
+    ): JsonObject = execute(HttpMethod.Put, path, body.toString(), idempotencyKey, headers)
 
     suspend fun delete(path: String): JsonObject =
         execute(HttpMethod.Delete, path, null, null, emptyMap())
@@ -57,7 +66,7 @@ class TimaHttpTransport(
     private suspend fun execute(
         method: HttpMethod,
         path: String,
-        body: JsonObject?,
+        body: String?,
         idempotencyKey: String?,
         headers: Map<String, String>,
     ): JsonObject {
@@ -73,7 +82,7 @@ class TimaHttpTransport(
             headers.forEach { (name, value) -> header(name, value) }
             if (body != null) {
                 contentType(ContentType.Application.Json)
-                setBody(body.toString())
+                setBody(body)
             }
         }
         val responseBody = response.bodyAsText()

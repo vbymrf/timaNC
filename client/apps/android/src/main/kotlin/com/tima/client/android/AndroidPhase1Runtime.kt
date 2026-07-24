@@ -52,6 +52,7 @@ class AndroidPhase1Runtime(
     private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { authContext })
     private var wakeSink: NotificationWakeSink? = null
     private val sessions = SecureStorageSessionRepository(secureStorage)
+    private val messagingStore = EncryptedSqlDelightMessagingCache(database, secureStorage)
     private val identities = AndroidDeviceIdentityRepository(secureStorage)
     private val trust = AndroidTrustMaterialProvider(transport, sessions, identities, developmentMode)
     private val attestationProvider: AttestationProvider = when {
@@ -77,8 +78,9 @@ class AndroidPhase1Runtime(
             senderDirectory = trust,
             escrowConfigs = trust,
         ),
-        cache = EncryptedSqlDelightMessagingCache(database, secureStorage),
+        cache = messagingStore,
         ids = IdGenerator { UUID.randomUUID().toString() },
+        nowEpochMillis = System::currentTimeMillis,
     )
     val authentication = AndroidAuthenticationClient(
         transport = transport,

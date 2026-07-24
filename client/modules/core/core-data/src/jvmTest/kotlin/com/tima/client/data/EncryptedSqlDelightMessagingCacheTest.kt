@@ -27,9 +27,22 @@ class EncryptedSqlDelightMessagingCacheTest {
             val cache = EncryptedSqlDelightMessagingCache(TimaDatabase(driver), storage)
             cache.replaceChats(listOf(chat))
             cache.upsertMessage(pending)
+            cache.enqueueSend(
+                DurableSend(
+                    localId = pending.localId,
+                    idempotencyKey = "00000000-0000-4000-8000-000000000090",
+                    chatId = pending.chatId,
+                    requestPath = "/v1/chats/${pending.chatId}/messages",
+                    envelope = byteArrayOf(1, 2, 3),
+                    nextAttemptEpochMillis = 1,
+                    createdAtEpochMillis = 1,
+                ),
+                pending,
+            )
             cache.upsertMessage(failed)
             cache.replaceRemoteMessages(chat.chatId, listOf(remote))
             assertEquals(listOf(remote, pending, failed), cache.messages(chat.chatId))
+            assertEquals(pending.localId, cache.outboxSend(pending.localId)?.localId)
         }
 
         val databaseBytes = Files.readAllBytes(path)
@@ -58,6 +71,7 @@ class EncryptedSqlDelightMessagingCacheTest {
             val queries = TimaDatabase(driver).phase1Queries
             assertTrue(queries.selectCachedChats().executeAsList().isEmpty())
             assertTrue(queries.selectCachedMessages(chat.chatId).executeAsList().isEmpty())
+            assertNull(queries.selectOutboxById(pending.localId).executeAsOneOrNull())
         }
         Files.deleteIfExists(path)
         Unit

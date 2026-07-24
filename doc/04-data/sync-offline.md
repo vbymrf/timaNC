@@ -26,10 +26,22 @@ Response содержит private `DocumentV2` и wrapped keys для **этог
 | `local_id` | UUID |
 | `idempotency_key` | Dedup server-side |
 | `document_envelope` | Pre-encrypted `DocumentV2` envelope |
-| `state` | pending / sent / failed |
+| `state` | pending / sending / retry / terminal |
 | `retry_count` | Exponential backoff |
 
-Outbox хранит уже канонизованный envelope: optional-поля представлены presence/absence, а не `null` или пустыми контейнерами.
+Outbox хранит exact bytes уже канонизованного encrypted write DTO: optional-поля
+представлены presence/absence, а не `null` или пустыми контейнерами. Каждая
+попытка повторно использует те же bytes и `idempotency_key`; plaintext остаётся
+только в отдельно зашифрованном UI cache. `sending` восстанавливается в `retry`
+после restart. Retryable transport errors получают ограниченный exponential
+backoff; non-retryable и malformed rows переходят в `terminal` и не запускаются
+автоматически, но допускают явный user retry. Logout атомарно по intent очищает
+UI cache/outbox и удаляет platform-protected cache key.
+
+Durable boundary начинается после успешных reservation и encryption, но до
+первого network send. Поэтому post-encryption retry переживает restart, а
+reservation failure и полностью offline composition до reservation пока не
+переживают завершение процесса.
 
 ## 4. Multi-device
 

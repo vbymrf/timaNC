@@ -51,6 +51,7 @@ class WindowsPhase1Runtime(
     private var auth: AuthContext? = null
     private val databaseDriver = openDatabase(databasePath)
     private val database = TimaDatabase(databaseDriver)
+    private val messagingStore = EncryptedSqlDelightMessagingCache(database, storage)
     private val httpClient = HttpClient(CIO)
     private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
     private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { auth })
@@ -69,8 +70,9 @@ class WindowsPhase1Runtime(
             senderDirectory = trust,
             escrowConfigs = trust,
         ),
-        cache = EncryptedSqlDelightMessagingCache(database, storage),
+        cache = messagingStore,
         ids = IdGenerator { UUID.randomUUID().toString() },
+        nowEpochMillis = System::currentTimeMillis,
     )
     val privateSendingEnabled: Boolean
         get() = developmentMode
@@ -131,14 +133,20 @@ class WindowsPhase1Runtime(
             return
         }
         auth = AuthContext(restored.accessToken, restored.deviceId)
-        messaging.loadSession()
-        val refreshed = transport.post(
-            "/v1/auth/refresh",
-            buildJsonObject {
-                put("refresh_token", restored.refreshToken)
-                put("device_id", restored.deviceId)
-            },
-        )
+        val refreshed = try {
+            transport.post(
+                "/v1/auth/refresh",
+                buildJsonObject {
+                    put("refresh_token", restored.refreshToken)
+                    put("device_id", restored.deviceId)
+                },
+            )
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            // Keep encrypted offline history available, but never replay an outbox with stale auth.
+            messaging.loadSession(drainOutbox = false)
+            throw error
+        }
         val session = ClientSession(
             accessToken = refreshed.string("access_token"),
             userId = refreshed.getValue("user").jsonObject.string("id"),

@@ -134,11 +134,30 @@ UPDATE sync_outbox
 SET state = 'retry',
     retry_count = retry_count + 1,
     next_attempt_epoch_ms = ?
+WHERE local_id = ? AND state = 'sending';
+
+markOutboxPending:
+UPDATE sync_outbox
+SET state = 'pending',
+    next_attempt_epoch_ms = ?
+WHERE local_id = ? AND state IN ('pending', 'retry', 'terminal');
+
+markOutboxTerminal:
+UPDATE sync_outbox
+SET state = 'terminal'
+WHERE local_id = ? AND state = 'sending';
+
+deleteOutbox:
+DELETE FROM sync_outbox
 WHERE local_id = ?;
+
+deleteAllOutbox:
+DELETE FROM sync_outbox;
 
 recoverSendingOutbox:
 UPDATE sync_outbox
-SET state = 'retry'
+SET state = 'retry',
+    next_attempt_epoch_ms = ?
 WHERE state = 'sending';
 
 insertRevision:

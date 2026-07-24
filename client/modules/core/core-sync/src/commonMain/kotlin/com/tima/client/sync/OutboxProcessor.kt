@@ -16,6 +16,10 @@ data class DrainResult(
     val retried: Int,
 )
 
+/**
+ * Generic KMP outbox utility retained for non-messaging queues. Private-message send reconciliation
+ * lives in core-data because it must atomically update the encrypted UI cache.
+ */
 class OutboxProcessor(
     private val database: TimaDatabase,
     private val sender: OutboxSender,
@@ -24,7 +28,7 @@ class OutboxProcessor(
 ) {
     suspend fun recoverAndDrain(nowEpochMillis: Long, limit: Long = 50): DrainResult {
         val queries = database.phase1Queries
-        queries.recoverSendingOutbox()
+        queries.recoverSendingOutbox(nowEpochMillis)
         val due = queries.selectDueOutbox(nowEpochMillis, limit).executeAsList()
         var sent = 0
         var retried = 0
@@ -35,10 +39,10 @@ class OutboxProcessor(
                 queries.markOutboxSent(item.local_id)
                 sent++
             } catch (cancelled: CancellationException) {
-                queries.markOutboxRetry(nowEpochMillis, item.local_id)
+                queries.recoverSendingOutbox(nowEpochMillis)
                 throw cancelled
-            } catch (_: Throwable) {
-                val retryAt = nowEpochMillis + retryDelay(item.retry_count)
+            } catch (_: Exception) {
+                val retryAt = safeAdd(nowEpochMillis, retryDelay(item.retry_count))
                 queries.markOutboxRetry(retryAt, item.local_id)
                 retried++
             }
@@ -48,9 +52,13 @@ class OutboxProcessor(
 
     private fun retryDelay(retryCount: Long): Long {
         var value = baseRetryMillis
-        repeat(retryCount.coerceAtMost(30).toInt()) {
-            value = (value * 2).coerceAtMost(maxRetryMillis)
+        repeat(retryCount.coerceIn(0, 62).toInt()) {
+            value = if (value >= maxRetryMillis || value > maxRetryMillis / 2) maxRetryMillis
+            else value * 2
         }
         return value
     }
+
+    private fun safeAdd(value: Long, increment: Long): Long =
+        if (increment > 0 && value > Long.MAX_VALUE - increment) Long.MAX_VALUE else value + increment
 }

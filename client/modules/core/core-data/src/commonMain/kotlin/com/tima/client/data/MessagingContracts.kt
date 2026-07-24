@@ -2,6 +2,7 @@ package com.tima.client.data
 
 import com.tima.client.network.PrivateMessageHistoryDto
 import com.tima.client.network.PrivateMessageWriteDto
+import com.tima.client.network.PrivateMessageWriteCodec
 import com.tima.client.network.ReservedMessageIds
 
 interface SessionRepository {
@@ -29,6 +30,9 @@ interface MessagingRemoteDataSource {
     suspend fun history(chatId: String, cursor: String? = null, limit: Int = 50): RemoteHistoryPage
     suspend fun reserveMessage(chatId: String, idempotencyKey: String): ReservedMessageIds
     suspend fun send(chatId: String, value: PrivateMessageWriteDto, idempotencyKey: String)
+    suspend fun sendSerialized(chatId: String, envelope: ByteArray, idempotencyKey: String) {
+        send(chatId, PrivateMessageWriteCodec.decode(envelope), idempotencyKey)
+    }
     suspend fun edit(
         chatId: String,
         messageId: ULong,
@@ -67,8 +71,29 @@ interface MessagingCache {
     suspend fun replaceRemoteMessages(chatId: String, value: List<MessageBubble>)
     suspend fun upsertMessage(value: MessageBubble)
     suspend fun removeMessage(chatId: String, messageId: ULong)
+    suspend fun enqueueSend(value: DurableSend, bubble: MessageBubble)
+    suspend fun outboxSend(localId: String): DurableSend?
+    suspend fun dueOutboxSends(nowEpochMillis: Long, limit: Long = 50): List<DurableSend>
+    suspend fun recoverSendingOutbox(nowEpochMillis: Long)
+    suspend fun claimOutboxSend(localId: String): Boolean
+    suspend fun scheduleOutboxRetry(localId: String, nextAttemptEpochMillis: Long)
+    suspend fun makeOutboxSendDue(localId: String, nowEpochMillis: Long)
+    suspend fun terminallyFailOutboxSend(localId: String, bubble: MessageBubble?)
+    suspend fun completeOutboxSend(localId: String, bubble: MessageBubble)
     suspend fun clear()
 }
+
+data class DurableSend(
+    val localId: String,
+    val idempotencyKey: String,
+    val chatId: String,
+    val requestPath: String,
+    val envelope: ByteArray,
+    val state: String = "pending",
+    val retryCount: Long = 0,
+    val nextAttemptEpochMillis: Long,
+    val createdAtEpochMillis: Long,
+)
 
 fun interface IdGenerator {
     fun next(): String

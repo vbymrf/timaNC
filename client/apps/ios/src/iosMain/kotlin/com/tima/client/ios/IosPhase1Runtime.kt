@@ -27,9 +27,12 @@ import com.tima.client.network.WakeSource
 import com.tima.client.sync.WakeToSyncCoordinator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlin.time.TimeSource
+import platform.posix.time
 import platform.Foundation.NSURL
 
+@OptIn(ExperimentalForeignApi::class)
 class IosPhase1Runtime(
     baseUrl: String,
     debugBuild: Boolean,
@@ -43,6 +46,7 @@ class IosPhase1Runtime(
     private var auth: AuthContext? = null
     private val databaseDriver = NativeSqliteDriver(TimaDatabase.Schema, "messaging-cache-v1.db")
     private val database = TimaDatabase(databaseDriver)
+    private val messagingStore = EncryptedSqlDelightMessagingCache(database, secureStorage)
     private val httpClient = HttpClient(Darwin)
     private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
     private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { auth })
@@ -73,8 +77,9 @@ class IosPhase1Runtime(
             senderDirectory = trust,
             escrowConfigs = trust,
         ),
-        cache = EncryptedSqlDelightMessagingCache(database, secureStorage),
+        cache = messagingStore,
         ids = IdGenerator(::newUuid),
+        nowEpochMillis = { time(null) * 1_000L },
     )
     val authentication = IosAuthenticationClient(
         transport,
