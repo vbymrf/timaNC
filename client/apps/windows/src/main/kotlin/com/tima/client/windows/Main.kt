@@ -49,9 +49,7 @@ fun main() {
     SwingUtilities.invokeLater {
         val baseUrl = System.getenv("TIMA_API_BASE_URL").orEmpty()
         val developmentMode = WindowsDevelopmentModeGate.enabled(
-            buildAllowsDevelopmentEscrow =
-                System.getProperty("tima.windows.developmentEscrowBuild", "false")
-                    .toBooleanStrictOrNull() == true,
+            buildAllowsDevelopmentEscrow = windowsDevelopmentEscrowBuildAllowed(),
             explicitEnvironmentOptIn =
                 System.getenv("TIMA_WINDOWS_ENABLE_DEVELOPMENT_ESCROW")
                     ?.toBooleanStrictOrNull() == true,
@@ -63,6 +61,10 @@ fun main() {
         WindowsShell(runtime).show()
     }
 }
+
+internal fun windowsDevelopmentEscrowBuildAllowed(
+    property: String? = System.getProperty("tima.windows.developmentEscrowBuild"),
+): Boolean = property?.toBooleanStrictOrNull() == true
 
 private class WindowsShell(
     private val runtime: WindowsPhase1Runtime,

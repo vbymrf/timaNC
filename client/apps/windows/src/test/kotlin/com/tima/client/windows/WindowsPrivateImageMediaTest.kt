@@ -14,9 +14,18 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WindowsPrivateImageMediaTest {
+    @Test
+    fun missingOrMalformedDevelopmentBuildPropertyFailsClosed() {
+        assertFalse(windowsDevelopmentEscrowBuildAllowed(null))
+        assertFalse(windowsDevelopmentEscrowBuildAllowed(""))
+        assertFalse(windowsDevelopmentEscrowBuildAllowed("TRUE"))
+        assertTrue(windowsDevelopmentEscrowBuildAllowed("true"))
+    }
+
     @Test
     fun normalizerProducesExactBoundedJpegVariantsWithoutUpscaling() = runBlocking {
         val source = BufferedImage(640, 320, BufferedImage.TYPE_INT_RGB).apply {

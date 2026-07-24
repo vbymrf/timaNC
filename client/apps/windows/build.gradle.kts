@@ -78,6 +78,20 @@ val packageWindowsAppImage by tasks.registering(Exec::class) {
     }
 }
 
+val verifyWindowsAppImageConfiguration by tasks.registering {
+    group = "verification"
+    description = "Checks that the packaged runtime retains its fail-closed development gate."
+    dependsOn(packageWindowsAppImage)
+    doLast {
+        val config = jpackageOutput.get().file("Tima/app/Tima.cfg").asFile
+        check(config.isFile) { "jpackage runtime configuration was not generated" }
+        val expected = "java-options=-Dtima.windows.developmentEscrowBuild=${developmentEscrowBuild.get()}"
+        check(config.readLines().any { it.trim() == expected }) {
+            "jpackage runtime configuration omitted the development escrow build gate"
+        }
+    }
+}
+
 val prepareMsixInputs by tasks.registering {
     group = "distribution"
     description = "Stages the checked-in MSIX manifest and deterministic placeholder assets."
@@ -110,7 +124,7 @@ val prepareMsixInputs by tasks.registering {
 val packageMsixUnsigned by tasks.registering(Exec::class) {
     group = "distribution"
     description = "Builds an unsigned MSIX; release signing is intentionally delegated to CI."
-    dependsOn(packageWindowsAppImage, prepareMsixInputs)
+    dependsOn(verifyWindowsAppImageConfiguration, prepareMsixInputs)
     onlyIf { System.getProperty("os.name").startsWith("Windows", ignoreCase = true) }
     doFirst {
         val stage = msixStage.get().asFile
