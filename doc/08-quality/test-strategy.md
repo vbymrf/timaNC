@@ -21,6 +21,9 @@
 
 ## 3. Critical user journeys (E2E)
 
+Phase 1 Android/iOS/Windows execution and immutable artifact requirements are
+defined in [phase1-native-acceptance.md](./phase1-native-acceptance.md).
+
 1. Register + attestation → send private message → offline receive
 2. Upload encrypted photo → download decrypt
 3. 1:1 audio call Android ↔ iOS

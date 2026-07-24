@@ -16,7 +16,7 @@
 | 05-api | 9 | done |
 | 06-realtime | 4 | done |
 | 07-operations | 7 | done (merge этап 6 + Phase 1 release policy) |
-| 08-quality | 3 | done |
+| 08-quality | 5 | done (включая Phase 1 native acceptance gate) |
 | 09-delivery | 4 | done |
 | adr | 18 | done |
 | doc_UI | 38 | done (merge doc_ver2 этап 2) |
@@ -135,6 +135,7 @@
 | Q-02 | [load-test-plan.md](./08-quality/load-test-plan.md) | SRE | Scale | done | merge этап 6: S7–S11 social/bot scenarios |
 | Q-03 | [security-test-plan.md](./08-quality/security-test-plan.md) | Security | Beta | done | merge этап 6: social/inbox/bot threats |
 | Q-04 | [bot-platform-test-plan.md](./08-quality/bot-platform-test-plan.md) | QA | Beta | done (spec) | Phase 3b gate |
+| Q-05 | [phase1-native-acceptance.md](./08-quality/phase1-native-acceptance.md) | QA | Phase 1 | done (spec) | Android/iOS/Windows immutable acceptance evidence |
 
 ---
 

@@ -99,9 +99,10 @@ other Phase 2 service remain outside the default stack and this review.
 
 ## Current Phase 1 blockers
 
-1. Complete native acceptance journeys. Current platform shells wire trust,
-   storage, push and Windows linking, but do not yet constitute the full
-   end-user messaging UI.
+1. Complete the Android/iOS/Windows journeys and retain the manifests required
+   by [phase1-native-acceptance.md](../08-quality/phase1-native-acceptance.md).
+   Current platform shells wire trust, storage, push and Windows linking, but
+   do not yet have three-platform execution evidence.
 2. Validate the implemented iOS PHPicker/UIKit normalization and SwiftUI render
    bridge with an actual Xcode Swift build/archive, then retain hosted
    Android/iOS/Windows encrypted-media acceptance evidence.
