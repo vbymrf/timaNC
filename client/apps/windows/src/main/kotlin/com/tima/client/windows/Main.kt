@@ -50,7 +50,8 @@ fun main() {
         val baseUrl = System.getenv("TIMA_API_BASE_URL").orEmpty()
         val developmentMode = WindowsDevelopmentModeGate.enabled(
             buildAllowsDevelopmentEscrow =
-                System.getProperty("tima.windows.developmentEscrowBuild").toBooleanStrictOrNull() == true,
+                System.getProperty("tima.windows.developmentEscrowBuild", "false")
+                    .toBooleanStrictOrNull() == true,
             explicitEnvironmentOptIn =
                 System.getenv("TIMA_WINDOWS_ENABLE_DEVELOPMENT_ESCROW")
                     ?.toBooleanStrictOrNull() == true,

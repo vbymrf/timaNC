@@ -26,13 +26,15 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
+val developmentEscrowBuild = providers.gradleProperty("tima.windows.enableDevelopmentEscrow")
+    .map { it.toBooleanStrictOrNull() ?: false }
+    .orElse(false)
+
 application {
     mainClass.set("com.tima.client.windows.MainKt")
     applicationName = "Tima"
-    val developmentEscrowBuild = providers.gradleProperty("tima.windows.enableDevelopmentEscrow")
-        .orNull?.toBooleanStrictOrNull() ?: false
     applicationDefaultJvmArgs = listOf(
-        "-Dtima.windows.developmentEscrowBuild=$developmentEscrowBuild",
+        "-Dtima.windows.developmentEscrowBuild=${developmentEscrowBuild.get()}",
     )
 }
 
@@ -69,6 +71,8 @@ val packageWindowsAppImage by tasks.registering(Exec::class) {
             "--input", jpackageInput.get().asFile.absolutePath,
             "--main-jar", tasks.jar.get().archiveFileName.get(),
             "--main-class", application.mainClass.get(),
+            "--java-options",
+            "-Dtima.windows.developmentEscrowBuild=${developmentEscrowBuild.get()}",
             "--dest", jpackageOutput.get().asFile.absolutePath,
         )
     }
