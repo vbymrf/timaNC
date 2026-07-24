@@ -69,18 +69,33 @@ session/chat/thread/send, encrypted REST adapter и `Phase1MessagingCoordinator`
 
 Доступный сейчас `NonDurableInMemoryMessagingCache` — только детерминированный
 process cache для первой интеграции UI и тестов. Он не является durable
-offline-first хранилищем. Первые Android Views и iOS SwiftUI native slices
-используют общий coordinator, Keychain/Keystore session и device identity,
-encrypted Path-B send/retry/edit/read/delete и foreground/resume catch-up.
-Plaintext остаётся только в UI/process cache и очищается при logout.
+offline-first хранилищем. Первые Android Views, iOS SwiftUI и Windows Swing
+native slices используют общий coordinator, платформенное secure storage и
+device identity, encrypted Path-B send/retry/edit/read/delete и
+foreground/lifecycle catch-up. Plaintext остаётся только в UI/process cache и
+очищается при logout.
 
 iOS development OTP/HMAC и development escrow root разрешены только сочетанием
 Xcode `DEBUG` и явного `TimaEnableDevelopmentAuth`; production profile использует
 App Attest boundary и fail-closed блокирует private writes без provisioned
 verified escrow roots. Без APNs UI честно сообщает только foreground/resume
-catch-up, не background wake. Durable SQLDelight messaging persistence,
-Windows native messaging slice, media UI и native acceptance evidence остаются
-открытыми блокерами Phase 1.
+catch-up, не background wake.
+
+Windows сохраняет существующий QR start/claim flow и использует созданные им
+device seed и linked-user session: seed и refresh/session credentials защищены
+DPAPI, параллельная identity не создаётся. После restore refresh token
+ротируется, а Swing shell предоставляет chat list/create/open, history,
+encrypted send/retry/edit/read/delete и logout с очисткой decrypted process
+cache. Development escrow fixture требует одновременно Gradle build flag
+`tima.windows.enableDevelopmentEscrow=true` и runtime environment opt-in
+`TIMA_WINDOWS_ENABLE_DEVELOPMENT_ESCROW=true`; только в этом режиме разрешён
+loopback HTTP. Обычная MSIX/app-image сборка оставляет fixture выключенным и
+fail-closed блокирует private writes без verified production escrow roots.
+WNS не заявлен: UI честно показывает foreground periodic authenticated REST
+catch-up с интервалом 60 секунд.
+
+Durable SQLDelight messaging persistence, media UI и hosted native acceptance
+evidence для всех трёх platform slices остаются открытыми блокерами Phase 1.
 
 ## 4. Platform adapters (`expect`/`actual`)
 

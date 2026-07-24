@@ -48,15 +48,21 @@ ratchet path A.
 
 **Current review:** [Phase 1 exit is BLOCKED](./phase1-exit-review.md). Hybrid
 notification implementation and the hosted CI matrix pass; native acceptance
-remains open. Android Views and iOS SwiftUI now have first private 1:1 slices for
-secure session restore, development registration/login, chat/thread operations,
-encrypted send/retry/edit/read/delete and foreground/resume catch-up over shared
-core-data. Their development OTP/HMAC and escrow fixtures require explicit debug
-build flags; production profiles fail closed with encrypted writes disabled until
-platform attestation enrollment and verified production escrow roots are
-provisioned. iOS without APNs advertises foreground/resume catch-up only.
-Windows native messaging, durable offline storage on all clients, media UI and
-hosted native acceptance evidence remain incomplete.
+remains open. Android Views, iOS SwiftUI and Windows Swing now have first
+private 1:1 slices over shared core-data. Android/iOS provide secure session
+restore, development registration/login, chat/thread operations, encrypted
+send/retry/edit/read/delete and foreground/resume catch-up. Windows preserves QR
+start/claim, reuses its DPAPI-backed linked identity/session, adds equivalent
+chat/thread and encrypted message operations, wipes decrypted process cache on
+logout, and advertises periodic foreground REST catch-up rather than WNS.
+Development OTP/HMAC and escrow fixtures require explicit platform build/runtime
+flags; Windows additionally permits HTTP only for loopback in that mode.
+Production profiles fail closed with encrypted writes disabled until platform
+attestation enrollment where applicable and verified production escrow roots
+are provisioned. iOS without APNs advertises foreground/resume catch-up only.
+Durable offline storage on all clients, media UI and hosted native acceptance
+evidence for the three platform slices remain incomplete, so Phase 1 stays
+BLOCKED.
 Notification behavior is specified in
 [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
 Phase 2 does not start while Phase 1 remains blocked.

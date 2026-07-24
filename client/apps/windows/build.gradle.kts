@@ -20,11 +20,17 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.jna.platform)
     implementation(libs.zxing.core)
+    testImplementation(kotlin("test"))
 }
 
 application {
     mainClass.set("com.tima.client.windows.MainKt")
     applicationName = "Tima"
+    val developmentEscrowBuild = providers.gradleProperty("tima.windows.enableDevelopmentEscrow")
+        .orNull?.toBooleanStrictOrNull() ?: false
+    applicationDefaultJvmArgs = listOf(
+        "-Dtima.windows.developmentEscrowBuild=$developmentEscrowBuild",
+    )
 }
 
 tasks.jar {

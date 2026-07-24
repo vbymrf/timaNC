@@ -1,6 +1,8 @@
 package com.tima.client.windows
 
 import com.tima.client.crypto.DeviceIdentity
+import com.tima.client.data.ClientSession
+import com.tima.client.data.SessionRepository
 import com.tima.client.network.SecureStorage
 import com.tima.client.network.TimaHttpTransport
 import kotlinx.serialization.json.buildJsonObject
@@ -20,12 +22,14 @@ data class PendingWindowsLink(
 data class LinkedWindowsSession(
     val accessToken: String,
     val refreshToken: String,
+    val userId: String,
     val deviceId: String,
 )
 
 class WindowsLinkingClient(
     private val transport: TimaHttpTransport,
     private val storage: SecureStorage,
+    private val sessions: SessionRepository,
 ) {
     suspend fun start(desktopName: String): PendingWindowsLink {
         require(desktopName.isNotBlank() && desktopName.length <= 100)
@@ -62,11 +66,11 @@ class WindowsLinkingClient(
         val linked = LinkedWindowsSession(
             accessToken = response.string("access_token"),
             refreshToken = response.string("refresh_token"),
+            userId = response.getValue("user").jsonObject.string("id"),
             deviceId = response.getValue("device").jsonObject.string("id"),
         )
-        storage.write(ACCESS_TOKEN, linked.accessToken.encodeToByteArray())
         storage.write(REFRESH_TOKEN, linked.refreshToken.encodeToByteArray())
-        storage.write(DEVICE_ID, linked.deviceId.encodeToByteArray())
+        sessions.save(ClientSession(linked.accessToken, linked.userId, linked.deviceId))
         storage.write(
             WRAPPED_DEVICE_SECRET,
             Base64.getDecoder().decode(response.string("wrapped_device_secret")),
@@ -77,10 +81,32 @@ class WindowsLinkingClient(
     }
 
     suspend fun restoredSession(): LinkedWindowsSession? {
-        val access = storage.read(ACCESS_TOKEN)?.decodeToString() ?: return null
-        val refresh = storage.read(REFRESH_TOKEN)?.decodeToString() ?: return null
-        val device = storage.read(DEVICE_ID)?.decodeToString() ?: return null
-        return LinkedWindowsSession(access, refresh, device)
+        val session = sessions.current() ?: return null
+        val bytes = storage.read(REFRESH_TOKEN) ?: return null
+        val refresh = try {
+            bytes.decodeToString()
+        } finally {
+            bytes.fill(0)
+        }
+        return LinkedWindowsSession(
+            session.accessToken,
+            refresh,
+            session.userId,
+            session.deviceId,
+        )
+    }
+
+    suspend fun saveRefreshedSession(session: ClientSession, refreshToken: String) {
+        sessions.save(session)
+        storage.write(REFRESH_TOKEN, refreshToken.encodeToByteArray())
+    }
+
+    suspend fun clearLinkedSession() {
+        sessions.clear()
+        storage.delete(REFRESH_TOKEN)
+        storage.delete(WRAPPED_DEVICE_SECRET)
+        storage.delete(PENDING_SESSION)
+        storage.delete(PENDING_CLAIM_TOKEN)
     }
 
     private suspend fun loadIdentity(): DeviceIdentity {
@@ -89,7 +115,11 @@ class WindowsLinkingClient(
             storage.write(DEVICE_SEED, it)
         }
         check(seed.size == 32) { "stored Windows device seed has an invalid length" }
-        return DeviceIdentity.fromSeed(seed)
+        return try {
+            DeviceIdentity.fromSeed(seed)
+        } finally {
+            seed.fill(0)
+        }
     }
 
     private suspend fun SecureStorage.requiredString(key: String): String =
@@ -99,11 +129,9 @@ class WindowsLinkingClient(
     private fun kotlinx.serialization.json.JsonObject.string(name: String): String =
         getValue(name).jsonPrimitive.content
 
-    private companion object {
+    companion object {
         const val DEVICE_SEED = "device.identity-seed"
-        const val ACCESS_TOKEN = "auth.access-token"
         const val REFRESH_TOKEN = "auth.refresh-token"
-        const val DEVICE_ID = "auth.device-id"
         const val WRAPPED_DEVICE_SECRET = "device.wrapped-secret"
         const val PENDING_SESSION = "link.pending-session"
         const val PENDING_CLAIM_TOKEN = "link.pending-claim-token"
