@@ -178,6 +178,7 @@
 				FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
 				INFOPLIST_FILE = Tima/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+				OTHER_LDFLAGS = ("$(inherited)", "-lsqlite3");
 				PRODUCT_BUNDLE_IDENTIFIER = com.tima.client.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -195,6 +196,7 @@
 				FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
 				INFOPLIST_FILE = Tima/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+				OTHER_LDFLAGS = ("$(inherited)", "-lsqlite3");
 				PRODUCT_BUNDLE_IDENTIFIER = com.tima.client.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
