@@ -41,7 +41,7 @@
 - [x] Durable post-encryption client send/retry outbox across process restart on Android/iOS/Windows
 - [x] Private 1:1 single-image alpha shared pipeline: exactly three encrypted JPEG variants, durable retry and media-only DocumentV2
 - [x] Android Views and Windows Swing image picker, progress, thumbnail and in-app preview
-- [ ] iOS PHPicker/UIKit normalization and SwiftUI thumbnail/preview source implemented; Xcode Swift archive validation pending
+- [x] iOS PHPicker/UIKit normalization and SwiftUI thumbnail/preview pass hosted Xcode Swift simulator build/package validation
 - [ ] Complete native messaging UI and Phase 1 acceptance journeys
 
 **Exit:** hosted repository-controlled CI matrix проходит; hybrid notification
@@ -70,10 +70,10 @@ Encrypted durable chat/history restoration and the post-encryption send/retry
 outbox are implemented on all clients. The exact ciphertext request and
 idempotency key survive restart; reservation must still complete online before
 the durable boundary, so completely offline composition/send is not claimed.
-Android/Windows private image alpha is implemented over the shared secure
-pipeline. iOS native picker/render source is wired and KMP targets compile, but
-Xcode Swift/archive validation and hosted three-platform media acceptance
-evidence remain incomplete, so Phase 1 stays BLOCKED.
+Android/iOS/Windows private image alpha is implemented over the shared secure
+pipeline. Hosted platform tests, unsigned packages and the iOS Xcode Swift
+simulator build pass in run `30114458115`; three-platform execution manifests
+remain incomplete, so Phase 1 stays BLOCKED.
 Notification behavior is specified in
 [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
 Phase 2 does not start while Phase 1 remains blocked.
