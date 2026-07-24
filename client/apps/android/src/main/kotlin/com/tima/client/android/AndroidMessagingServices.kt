@@ -236,3 +236,6 @@ class AndroidTrustMaterialProvider(
 
 private fun JsonObject.string(name: String): String =
     getValue(name).jsonPrimitive.contentOrNull ?: error("$name is missing")
+
+private fun JsonObject.int(name: String): Int =
+    getValue(name).jsonPrimitive.int

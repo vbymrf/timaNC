@@ -183,6 +183,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TIMA_ENABLE_DEVELOPMENT_AUTH = NO;
 			};
 			name = Debug;
 		};
@@ -199,6 +200,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TIMA_ENABLE_DEVELOPMENT_AUTH = NO;
 			};
 			name = Release;
 		};

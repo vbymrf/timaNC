@@ -8,6 +8,8 @@ kotlin {
     val frameworkName = "TimaIosApp"
     val xcframework = XCFramework(frameworkName)
 
+    // Executes common iOS-facing presenter/gate tests on credential-free CI hosts.
+    jvm()
     listOf(
         iosX64(),
         iosArm64(),
@@ -28,6 +30,9 @@ kotlin {
             api(project(":modules:core:core-sync"))
             api(project(":modules:messenger-crypto"))
             implementation(libs.kotlinx.coroutines.core)
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

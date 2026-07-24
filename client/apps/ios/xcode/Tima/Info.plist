@@ -24,6 +24,8 @@
     <true/>
     <key>TimaBaseURL</key>
     <string></string>
+    <key>TimaEnableDevelopmentAuth</key>
+    <string>$(TIMA_ENABLE_DEVELOPMENT_AUTH)</string>
     <key>UILaunchScreen</key>
     <dict/>
     <key>UIApplicationSceneManifest</key>

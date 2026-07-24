@@ -22,8 +22,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         if let baseURL = Bundle.main.object(forInfoDictionaryKey: "TimaBaseURL") as? String,
            !baseURL.isEmpty {
-            runtime = IosPhase1Runtime(baseUrl: baseURL)
-            Task { try? await runtime?.restoreSession() }
+            #if DEBUG
+            let debugBuild = true
+            #else
+            let debugBuild = false
+            #endif
+            let developmentFlag =
+                Bundle.main.object(forInfoDictionaryKey: "TimaEnableDevelopmentAuth")
+            let explicitDevelopmentAuth =
+                (developmentFlag as? Bool) == true ||
+                (developmentFlag as? String)?.lowercased() == "true"
+            runtime = IosPhase1Runtime(
+                baseUrl: baseURL,
+                debugBuild: debugBuild,
+                explicitDevelopmentAuth: explicitDevelopmentAuth
+            )
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) {
                 granted, _ in
                 if granted {
@@ -38,18 +51,23 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
-        Task { try? await runtime?.apns.didRegisterForRemoteNotifications(deviceToken: deviceToken) }
+        Task { try? await runtime?.apnsDidRegister(deviceToken: deviceToken) }
     }
 
     func application(
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
-        Task { try? await runtime?.apns.didFailToRegisterForRemoteNotifications() }
+        Task { try? await runtime?.apnsDidFail() }
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        Task { try? await runtime?.applicationDidBecomeActive() }
+        Task {
+            try? await runtime?.applicationDidBecomeActive()
+            await MainActor.run {
+                NotificationCenter.default.post(name: .timaDidCatchUp, object: nil)
+            }
+        }
     }
 
     func application(
@@ -57,7 +75,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        let allowed = ["type", "chat_id", "preview", "encrypted", "collapse_key", "event_id"]
+        // Generic wake metadata only. Private plaintext/preview fields are deliberately discarded.
+        let allowed = ["type", "chat_id", "encrypted", "collapse_key", "event_id"]
         let payload = allowed.reduce(into: [String: String]()) { values, key in
             if let value = userInfo[key] as? String {
                 values[key] = value
@@ -74,4 +93,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             }
         }
     }
+}
+
+extension Notification.Name {
+    static let timaDidCatchUp = Notification.Name("com.tima.client.didCatchUp")
 }

@@ -69,8 +69,18 @@ session/chat/thread/send, encrypted REST adapter и `Phase1MessagingCoordinator`
 
 Доступный сейчас `NonDurableInMemoryMessagingCache` — только детерминированный
 process cache для первой интеграции UI и тестов. Он не является durable
-offline-first хранилищем. Android/iOS drivers и защищённая platform persistence
-ещё не подключены, поэтому это остаётся блокером завершения native Phase 1 UI.
+offline-first хранилищем. Первые Android Views и iOS SwiftUI native slices
+используют общий coordinator, Keychain/Keystore session и device identity,
+encrypted Path-B send/retry/edit/read/delete и foreground/resume catch-up.
+Plaintext остаётся только в UI/process cache и очищается при logout.
+
+iOS development OTP/HMAC и development escrow root разрешены только сочетанием
+Xcode `DEBUG` и явного `TimaEnableDevelopmentAuth`; production profile использует
+App Attest boundary и fail-closed блокирует private writes без provisioned
+verified escrow roots. Без APNs UI честно сообщает только foreground/resume
+catch-up, не background wake. Durable SQLDelight messaging persistence,
+Windows native messaging slice, media UI и native acceptance evidence остаются
+открытыми блокерами Phase 1.
 
 ## 4. Platform adapters (`expect`/`actual`)
 
