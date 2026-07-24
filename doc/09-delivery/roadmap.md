@@ -47,8 +47,8 @@ envelope-only development и становится blocking перед внешн
 ratchet path A.
 
 **Current review:** [Phase 1 exit is BLOCKED](./phase1-exit-review.md). Hybrid
-notification implementation passes local verification; a green hosted CI rerun
-and the native messaging UI remain open.
+notification implementation and the hosted CI matrix pass; the native messaging
+UI remains open.
 Notification behavior is specified in
 [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
 Phase 2 does not start while Phase 1 remains blocked.

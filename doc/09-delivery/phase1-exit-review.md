@@ -2,15 +2,15 @@
 
 Review date: 2026-07-24
 Baseline: `870849e`
-Hosted-CI commit: `e384fbb`
+Hosted-CI commit: `159e2ad`
 Decision: **BLOCKED**
 
 Phase 1 is not declared exited. Repository-controlled server, contract, migration,
 JVM, Compose, black-box messaging and bounded local SLO gates passed locally.
 After the GitHub remote was configured, the first hosted run exposed reproducible
-CI/platform failures. Their fixes and hybrid notification delivery now pass local
-verification, but the hosted matrix has not rerun and the full messaging UI is
-still incomplete.
+CI/platform failures. Their fixes and hybrid notification delivery now pass both
+local verification and the hosted matrix. The full messaging UI is still
+incomplete.
 
 ## Current development posture
 
@@ -50,7 +50,19 @@ The k6 run is a bounded development smoke, not statistical proof for an invited
 100-user cohort. It therefore supports implementation readiness but does not
 satisfy the deferred Phase 5 cohort gate by itself.
 
-## First hosted CI run
+## Current hosted CI rerun
+
+| Workflow | Result | Evidence |
+|---|---|---|
+| Phase 1 contract gate | PASS | [run 30076152784](https://github.com/vbymrf/timaNC/actions/runs/30076152784) |
+| Phase 1 Server | PASS | [run 30076152779](https://github.com/vbymrf/timaNC/actions/runs/30076152779) |
+| Phase 1 Dev Stack | PASS | [run 30076152839](https://github.com/vbymrf/timaNC/actions/runs/30076152839) |
+| Client platform validation | PASS | [run 30076152813](https://github.com/vbymrf/timaNC/actions/runs/30076152813) |
+| Phase 0 Contracts | PASS | [run 30076152829](https://github.com/vbymrf/timaNC/actions/runs/30076152829) |
+
+This rerun closes the repository-controlled hosted CI blocker.
+
+## Previous hosted CI run at `e384fbb`
 
 | Workflow | Result | Evidence |
 |---|---|---|
@@ -60,8 +72,8 @@ satisfy the deferred Phase 5 cohort gate by itself.
 | Client platform validation | FAIL | [run 30071068088](https://github.com/vbymrf/timaNC/actions/runs/30071068088): Android, iOS and Windows packaging |
 | Phase 0 Contracts | FAIL | [run 30071068104](https://github.com/vbymrf/timaNC/actions/runs/30071068104): generated-file drift on Windows |
 
-These failures are repository-controlled blockers. Local success does not
-override a red hosted matrix.
+These historical failures were repository-controlled and are superseded by the
+green rerun above.
 
 ## Implemented but not externally verified
 
@@ -83,9 +95,7 @@ other Phase 2 service remain outside the default stack and this review.
 
 ## Current Phase 1 blockers
 
-1. Make every repository-controlled hosted workflow green on Linux,
-   macOS/Xcode and Windows runners.
-2. Complete native acceptance journeys. Current platform shells wire trust,
+1. Complete native acceptance journeys. Current platform shells wire trust,
    storage, push and Windows linking, but do not yet constitute the full
    end-user messaging UI.
 
