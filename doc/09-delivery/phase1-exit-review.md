@@ -3,7 +3,7 @@
 Review date: 2026-07-24
 Baseline: `870849e`
 Hosted-CI commit: `159e2ad`
-Native-media hosted commit: `ee3eef6`
+Native-media hosted commit: `2ceaefe`
 Decision: **BLOCKED**
 
 Phase 1 is not declared exited. Repository-controlled server, contract, migration,
@@ -15,7 +15,7 @@ evidence is still incomplete.
 
 ## Current development posture
 
-- `main` through `ee3eef6` tracks `timaNC/main`; authenticated pushes and hosted
+- `main` through `2ceaefe` tracks `timaNC/main`; authenticated pushes and hosted
   workflow queries succeed. The earlier no-remote/no-API-access blocker is
   closed.
 - Development continues without Apple Developer or Google Play Console accounts
@@ -42,7 +42,7 @@ evidence is still incomplete.
 | Windows JVM package input | PASS | tests, `packageWindowsAppImage`, `prepareMsixInputs` |
 | Docker Compose rebuild | PASS | clean volumes, default Phase 1 profile, all services healthy |
 | Hybrid notification routing | PASS | Go gateway/unit/integration tests, Android FCM + UnifiedPush registration, primary/fallback worker tests and common wake-to-sync tests |
-| Client package/unit evidence with encrypted media | PASS | [run 30117799598](https://github.com/vbymrf/timaNC/actions/runs/30117799598): Android AAB, iOS XCFramework + unsigned simulator app, Windows MSIX, platform/shared tests and commit-bound checksums |
+| Client package/unit evidence with encrypted media | PASS | [run 30124957450](https://github.com/vbymrf/timaNC/actions/runs/30124957450): Android AAB, iOS XCFramework + unsigned simulator app, Windows MSIX, platform/shared tests and commit-bound checksums |
 | Mandatory HTTP/WebSocket black-box E2E | PASS | registration, Android dev attestation, Windows link, escrow send/decrypt, media, edit, read and delete |
 | Local send-to-ack gate | PASS | 7/7 successful samples in the server `le="0.8"` bucket |
 | Local online-delivery smoke | PASS | k6: 5/5 sends and WS deliveries; send p95 36.095 ms, WS p95 133.6 ms |
@@ -109,8 +109,17 @@ other Phase 2 service remain outside the default stack and this review.
    do not yet have three-platform execution evidence.
 
 The iOS PHPicker/UIKit normalization and SwiftUI render bridge now pass a real
-hosted Xcode Swift simulator build and packaging step in run `30117799598`.
+hosted Xcode Swift simulator build and packaging step in run `30124957450`.
 Signed device archive/install remains a deferred Phase 5 credentialed gate.
+
+Android now has retained
+[partial native evidence](../08-quality/evidence/android-2ceaefe/manifest.md)
+for secure login/session rotation, chat/history, encrypted text send/edit,
+three-variant private image upload, thumbnail/preview decrypt, offline cache and
+logout wipe. The run remains `FAIL` by policy because native peer receive,
+forced outbox recovery, peer mark-read and author/peer delete restrictions were
+not completed. During this run, two server/client media contract mismatches and
+the missing mobile refresh-token rotation were fixed in `2ceaefe`.
 
 Windows local acceptance has started. The development stack health/ready probes,
 Windows unit/media/migration tests, unsigned MSIX build, packaged development

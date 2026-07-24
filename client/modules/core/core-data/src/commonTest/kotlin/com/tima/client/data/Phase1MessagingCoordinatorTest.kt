@@ -194,6 +194,16 @@ class Phase1MessagingCoordinatorTest {
     }
 
     @Test
+    fun signedOutWakeDoesNotCallMessagingEndpoints() = runBlocking {
+        val fixture = fixture(authenticated = false)
+
+        fixture.coordinator.catchUp(emptySet())
+
+        assertEquals(0, fixture.remote.listCalls)
+        assertTrue(fixture.remote.historyCalls.isEmpty())
+    }
+
+    @Test
     fun editAndDeleteUpdateThreadState() = runBlocking {
         val fixture = fixture()
         fixture.remote.historyByChat[TEST_CHAT] = listOf(history(5uL, TEST_USER, "before"))
@@ -271,9 +281,10 @@ class Phase1MessagingCoordinatorTest {
         )
     }
 
-    private fun fixture(online: Boolean = true): Fixture {
+    private fun fixture(online: Boolean = true, authenticated: Boolean = true): Fixture {
         val sessions = object : SessionRepository {
-            override suspend fun current() = ClientSession("token", TEST_USER, TEST_DEVICE)
+            override suspend fun current() =
+                ClientSession("token", TEST_USER, TEST_DEVICE).takeIf { authenticated }
             override suspend fun save(session: ClientSession) = Unit
             override suspend fun clear() = Unit
         }
@@ -361,6 +372,7 @@ class Phase1MessagingCoordinatorTest {
     private class FakeRemote : MessagingRemoteDataSource {
         var chats = emptyList<RemoteChat>()
         var failure: Throwable? = null
+        var listCalls = 0
         val historyByChat = mutableMapOf<String, List<PrivateMessageHistoryDto>>()
         val historyCalls = mutableListOf<String>()
         var failNextSend = false
@@ -375,6 +387,7 @@ class Phase1MessagingCoordinatorTest {
         var lastDeleted: ULong? = null
 
         override suspend fun listChats(limit: Int): List<RemoteChat> {
+            listCalls++
             failure?.let { throw it }
             return chats
         }

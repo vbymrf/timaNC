@@ -146,7 +146,8 @@ class Phase1MessagingCoordinator(
     }
 
     override suspend fun catchUp(chatIds: Set<String>) {
-        if (sessions.current() != null) drainDue(recoverStale = true)
+        if (sessions.current() == null) return
+        drainDue(recoverStale = true)
         val targets = if (chatIds.isEmpty()) {
             refreshChats()
             cache.chats().map(ChatPreview::chatId).toSet()

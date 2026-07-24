@@ -72,9 +72,12 @@ idempotency key survive restart; reservation must still complete online before
 the durable boundary, so completely offline composition/send is not claimed.
 Android/iOS/Windows private image alpha is implemented over the shared secure
 pipeline. Hosted platform tests, unsigned packages and the iOS Xcode Swift
-simulator build pass in run `30117799598`. Windows additionally passes local
-UI startup and the HTTP link/encrypted roundtrip harness; steps 1–9 execution
-manifests remain incomplete, so Phase 1 stays BLOCKED.
+simulator build pass in run `30124957450`. Android additionally has a retained
+partial `2ceaefe` emulator manifest covering session rotation, text/media send,
+in-app decrypt, offline cache and logout wipe; native peer and forced-outbox
+steps remain incomplete. Windows passes local UI startup and the HTTP
+link/encrypted roundtrip harness. No platform has a complete reviewed steps
+1–9 manifest set, so Phase 1 stays BLOCKED.
 Notification behavior is specified in
 [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
 Phase 2 does not start while Phase 1 remains blocked.
