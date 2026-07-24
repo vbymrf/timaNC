@@ -63,14 +63,31 @@ jobs:
       - name: Build unsigned release bundle
         working-directory: client
         run: >-
-          gradle --no-daemon :apps:android:bundleRelease
+          gradle --no-daemon
+          :modules:core:core-media:jvmTest
+          :modules:core:core-data:jvmTest
+          :apps:android:testReleaseUnitTest
+          :apps:android:bundleRelease
           -Ptima.android.baseUrl=https://invalid.example
           -Ptima.android.integrityProjectNumber=0
+      - name: Record Android validation evidence
+        shell: bash
+        run: |
+          {
+            echo "commit=${GITHUB_SHA}"
+            echo "runner=${RUNNER_OS}"
+            sha256sum client/apps/android/build/outputs/bundle/release/*.aab
+          } > client/build/android-validation-evidence.txt
       - name: Upload unsigned internal AAB
         uses: actions/upload-artifact@v4
         with:
           name: android-internal-unsigned-aab
-          path: client/apps/android/build/outputs/bundle/release/*.aab
+          path: |
+            client/apps/android/build/outputs/bundle/release/*.aab
+            client/apps/android/build/test-results/testReleaseUnitTest/*.xml
+            client/modules/core/core-media/build/test-results/jvmTest/*.xml
+            client/modules/core/core-data/build/test-results/jvmTest/*.xml
+            client/build/android-validation-evidence.txt
           if-no-files-found: error
 
   ios-kotlin-xcode:
@@ -88,7 +105,12 @@ jobs:
           gradle-version: "8.14.2"
       - name: Build Kotlin XCFramework
         working-directory: client
-        run: gradle --no-daemon :apps:ios:assembleTimaIosAppDebugXCFramework
+        run: >-
+          gradle --no-daemon
+          :modules:core:core-media:jvmTest
+          :modules:core:core-data:jvmTest
+          :apps:ios:jvmTest
+          :apps:ios:assembleTimaIosAppDebugXCFramework
       - name: Build unsigned simulator app
         working-directory: client
         run: |
@@ -102,7 +124,14 @@ jobs:
             build
       - name: Archive unsigned simulator app
         working-directory: client
-        run: ditto -c -k --sequesterRsrc --keepParent build/ios-derived-data/Build/Products/Debug-iphonesimulator/Tima.app build/Tima-ios-simulator-unsigned.zip
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/ios-derived-data/Build/Products/Debug-iphonesimulator/Tima.app build/Tima-ios-simulator-unsigned.zip
+          {
+            echo "commit=${GITHUB_SHA}"
+            echo "runner=${RUNNER_OS}"
+            xcodebuild -version
+            shasum -a 256 build/Tima-ios-simulator-unsigned.zip
+          } > build/ios-validation-evidence.txt
       - name: Upload iOS validation artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -110,6 +139,10 @@ jobs:
           path: |
             client/apps/ios/build/XCFrameworks/debug/*.xcframework
             client/build/Tima-ios-simulator-unsigned.zip
+            client/apps/ios/build/test-results/jvmTest/*.xml
+            client/modules/core/core-media/build/test-results/jvmTest/*.xml
+            client/modules/core/core-data/build/test-results/jvmTest/*.xml
+            client/build/ios-validation-evidence.txt
           if-no-files-found: error
 
   windows-msix:
@@ -127,10 +160,31 @@ jobs:
           gradle-version: "8.14.2"
       - name: Build unsigned MSIX
         working-directory: client
-        run: gradle --no-daemon :apps:windows:packageMsixUnsigned
+        run: >-
+          gradle --no-daemon
+          :modules:core:core-media:jvmTest
+          :modules:core:core-data:jvmTest
+          :apps:windows:test
+          :apps:windows:packageMsixUnsigned
+      - name: Record Windows validation evidence
+        shell: pwsh
+        run: |
+          $package = Get-ChildItem "client/apps/windows/build/distributions/*-unsigned.msix" |
+            Select-Object -First 1
+          @(
+            "commit=$env:GITHUB_SHA"
+            "runner=$env:RUNNER_OS"
+            "sha256=$((Get-FileHash $package.FullName -Algorithm SHA256).Hash.ToLower())"
+            "artifact=$($package.Name)"
+          ) | Set-Content "client/build/windows-validation-evidence.txt"
       - name: Upload unsigned MSIX
         uses: actions/upload-artifact@v4
         with:
           name: windows-unsigned-msix
-          path: client/apps/windows/build/distributions/*-unsigned.msix
+          path: |
+            client/apps/windows/build/distributions/*-unsigned.msix
+            client/apps/windows/build/test-results/test/*.xml
+            client/modules/core/core-media/build/test-results/jvmTest/*.xml
+            client/modules/core/core-data/build/test-results/jvmTest/*.xml
+            client/build/windows-validation-evidence.txt
           if-no-files-found: error
