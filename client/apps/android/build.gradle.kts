@@ -11,6 +11,9 @@ if (file("google-services.json").isFile) {
 android {
     namespace = "com.tima.client.android"
     compileSdk = 35
+    buildFeatures {
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = "com.tima.client"
@@ -25,8 +28,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            val developmentAuth = providers.gradleProperty("tima.android.enableDevelopmentAuth")
+                .orNull?.toBooleanStrictOrNull() ?: false
+            buildConfigField("boolean", "ENABLE_DEVELOPMENT_AUTH", developmentAuth.toString())
+        }
         release {
             isMinifyEnabled = false
+            buildConfigField("boolean", "ENABLE_DEVELOPMENT_AUTH", "false")
             // CI supplies the release signing configuration.
         }
     }
@@ -41,6 +50,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":modules:core:core-data"))
     implementation(project(":modules:core:core-network"))
     implementation(project(":modules:core:core-sync"))
     implementation(project(":modules:messenger-crypto"))

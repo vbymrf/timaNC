@@ -1,10 +1,21 @@
 package com.tima.client.android
 
 import android.content.Context
+import com.tima.client.crypto.HybridKodiumEscrowBlobBuilder
+import com.tima.client.crypto.MessengerCrypto
+import com.tima.client.data.ClientSession
+import com.tima.client.data.IdGenerator
+import com.tima.client.data.NonDurableInMemoryMessagingCache
+import com.tima.client.data.Phase1MessagingCoordinator
+import com.tima.client.data.ProductionPrivateMessageCrypto
+import com.tima.client.data.SecureStorageSessionRepository
+import com.tima.client.data.TimaMessagingRemoteDataSource
 import com.tima.client.network.AttestationCoordinator
+import com.tima.client.network.AttestationProvider
 import com.tima.client.network.AuthContext
 import com.tima.client.network.ForegroundRealtimeSync
 import com.tima.client.network.NotificationWakeSink
+import com.tima.client.network.PlatformServiceUnavailableException
 import com.tima.client.network.Phase1PlatformClient
 import com.tima.client.network.RealtimeReconnect
 import com.tima.client.network.RestGapFill
@@ -13,33 +24,86 @@ import com.tima.client.network.TimaRealtimeTransport
 import com.tima.client.sync.WakeToSyncCoordinator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import java.net.URI
+import java.util.UUID
 
 class AndroidPhase1Runtime(
     context: Context,
     baseUrl: String,
     cloudProjectNumber: Long,
+    val developmentMode: Boolean,
 ) : AutoCloseable {
     val secureStorage = AndroidKeystoreSecureStorage(context)
-    val integrity = PlayIntegrityAttestationProvider(context, cloudProjectNumber)
+    val integrity = cloudProjectNumber.takeIf { it > 0 }?.let {
+        PlayIntegrityAttestationProvider(context, it)
+    }
     val pushTokens = FcmPushTokenProvider(context)
     val unifiedPush = UnifiedPushEndpointProvider(context)
 
-    private var auth: AuthContext? = null
+    private var authContext: AuthContext? = null
     private val httpClient = HttpClient(OkHttp)
-    private val validatedBaseUrl = validBaseUrl(baseUrl)
-    private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { auth })
-    private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { auth })
+    private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
+    private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { authContext })
+    private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { authContext })
     private var wakeSink: NotificationWakeSink? = null
+    private val sessions = SecureStorageSessionRepository(secureStorage)
+    private val identities = AndroidDeviceIdentityRepository(secureStorage)
+    private val trust = AndroidTrustMaterialProvider(transport, sessions, identities, developmentMode)
+    private val attestationProvider: AttestationProvider = when {
+        developmentMode -> DevelopmentAndroidAttestationProvider.create(
+            debugBuild = BuildConfig.DEBUG,
+            explicitDevelopmentAuth = BuildConfig.ENABLE_DEVELOPMENT_AUTH,
+        )
+        integrity != null -> integrity
+        else -> object : AttestationProvider {
+            override suspend fun attest(action: String, requestBodySha256: ByteArray) =
+                throw PlatformServiceUnavailableException("Play Integrity configuration")
+        }
+    }
+    private val attestation = AttestationCoordinator(transport, attestationProvider)
+    val messaging = Phase1MessagingCoordinator(
+        sessions = sessions,
+        remote = TimaMessagingRemoteDataSource(transport),
+        crypto = ProductionPrivateMessageCrypto(
+            messengerCrypto = MessengerCrypto(HybridKodiumEscrowBlobBuilder()),
+            sessions = sessions,
+            identities = identities,
+            recipientDirectory = trust,
+            senderDirectory = trust,
+            escrowConfigs = trust,
+        ),
+        cache = NonDurableInMemoryMessagingCache(),
+        ids = IdGenerator { UUID.randomUUID().toString() },
+    )
+    val authentication = AndroidAuthenticationClient(
+        transport = transport,
+        attestation = attestation,
+        sessions = sessions,
+        identities = identities,
+        onSession = ::installSession,
+    )
+    val privateSendingEnabled: Boolean
+        get() = developmentMode
+    val trustSummary: String
+        get() = if (developmentMode) {
+            "Development escrow trust is explicit; encrypted Path-B sends are enabled."
+        } else {
+            "Sending blocked: production escrow signing roots are not provisioned in this slice."
+        }
     val phase1 = Phase1PlatformClient(
         transport,
-        AttestationCoordinator(transport, integrity),
+        attestation,
         pushTokens,
     )
     val unifiedPushPhase1 = Phase1PlatformClient(
         transport,
-        AttestationCoordinator(transport, integrity),
+        attestation,
         unifiedPush,
     )
+
+    init {
+        installWakeCoordinator(messaging, RealtimeReconnect { })
+    }
 
     fun installWakeCoordinator(coordinator: NotificationWakeSink) {
         wakeSink?.let(AndroidNotificationWakeBridge::uninstall)
@@ -65,20 +129,16 @@ class AndroidPhase1Runtime(
     }
 
     suspend fun restoreSession() {
-        val token = secureStorage.read(ACCESS_TOKEN)?.decodeToString()
-        val deviceId = secureStorage.read(DEVICE_ID)?.decodeToString()
-        auth = if (!token.isNullOrBlank() && !deviceId.isNullOrBlank()) {
-            AuthContext(token, deviceId)
-        } else {
-            null
-        }
+        sessions.current()?.let(::installSession)
+        messaging.loadSession()
+        if (authContext != null) messaging.refreshChats()
     }
 
-    suspend fun persistSession(accessToken: String, deviceId: String) {
-        require(accessToken.isNotBlank() && deviceId.isNotBlank())
-        secureStorage.write(ACCESS_TOKEN, accessToken.encodeToByteArray())
-        secureStorage.write(DEVICE_ID, deviceId.encodeToByteArray())
-        auth = AuthContext(accessToken, deviceId)
+    suspend fun logout() {
+        runCatching { transport.post("/v1/auth/logout") }
+        sessions.clear()
+        authContext = null
+        messaging.clearSessionState()
     }
 
     override fun close() {
@@ -86,15 +146,18 @@ class AndroidPhase1Runtime(
         httpClient.close()
     }
 
-    private fun validBaseUrl(value: String): String {
-        require(value.startsWith("https://") || value.startsWith("http://localhost")) {
-            "Tima API base URL must use HTTPS (localhost is allowed for development)"
+    private fun validBaseUrl(value: String, developmentMode: Boolean): String {
+        val uri = URI(value)
+        val developmentLoopback = developmentMode &&
+            uri.scheme == "http" &&
+            uri.host in setOf("localhost", "127.0.0.1", "10.0.2.2")
+        require(uri.scheme == "https" || developmentLoopback) {
+            "Tima API base URL must use HTTPS; explicit development builds may use a loopback host"
         }
         return value
     }
 
-    private companion object {
-        const val ACCESS_TOKEN = "auth.access-token"
-        const val DEVICE_ID = "auth.device-id"
+    private fun installSession(session: ClientSession) {
+        authContext = AuthContext(session.accessToken, session.deviceId)
     }
 }

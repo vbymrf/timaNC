@@ -59,6 +59,19 @@ flowchart TB
 3. **Crypto:** private DocumentV2 имеет `metadata.content_mode=private`; присутствующие `encrypted_nodes`/`encrypted_metadata` шифруются до enqueue, открытые `markup`/`metadata` входят в signature/AAD; ключи в Secure Enclave / Android Keystore / Windows DPAPI+phone trust.
 4. **Revision:** edit создаёт новую immutable revision; pending revision не переписывает уже подтверждённую.
 
+### 3.1. Текущий Phase 1 UI data foundation
+
+`client/modules/core/core-data` содержит общие immutable UI-модели, контракты
+session/chat/thread/send, encrypted REST adapter и `Phase1MessagingCoordinator`,
+который реализует `RestGapFill`. Production crypto adapter использует
+`MessengerCrypto`/`RestCryptoTransportAdapter` и fail-closed блокирует send, если
+нет device identity, directory keys или проверенного escrow config.
+
+Доступный сейчас `NonDurableInMemoryMessagingCache` — только детерминированный
+process cache для первой интеграции UI и тестов. Он не является durable
+offline-first хранилищем. Android/iOS drivers и защищённая platform persistence
+ещё не подключены, поэтому это остаётся блокером завершения native Phase 1 UI.
+
 ## 4. Platform adapters (`expect`/`actual`)
 
 | Capability | Android | iOS | Windows |

@@ -51,6 +51,9 @@ class TimaHttpTransport(
         headers: Map<String, String> = emptyMap(),
     ): JsonObject = execute(HttpMethod.Put, path, body, idempotencyKey, headers)
 
+    suspend fun delete(path: String): JsonObject =
+        execute(HttpMethod.Delete, path, null, null, emptyMap())
+
     private suspend fun execute(
         method: HttpMethod,
         path: String,

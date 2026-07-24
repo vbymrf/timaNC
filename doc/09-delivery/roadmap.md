@@ -48,7 +48,12 @@ ratchet path A.
 
 **Current review:** [Phase 1 exit is BLOCKED](./phase1-exit-review.md). Hybrid
 notification implementation and the hosted CI matrix pass; the native messaging
-UI remains open.
+UI remains open. Android now has a first private 1:1 Views acceptance slice for
+development registration/login, chat/thread operations and generic notification
+catch-up. Its development OTP/HMAC and escrow fixture require an explicit debug
+build flag; release builds fail closed with encrypted sending/edit/retry disabled
+until production escrow signing roots are provisioned. Durable Android offline
+storage and native iOS/Windows messaging acceptance remain incomplete.
 Notification behavior is specified in
 [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
 Phase 2 does not start while Phase 1 remains blocked.
