@@ -19,6 +19,8 @@ kotlin {
             baseName = frameworkName
             isStatic = true
             binaryOption("bundleId", "com.tima.client.ios.shared")
+            export(project(":modules:core:core-data"))
+            export(project(":modules:core:core-media"))
             xcframework.add(this)
         }
     }
@@ -27,6 +29,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":modules:core:core-data"))
             api(project(":modules:core:core-database"))
+            api(project(":modules:core:core-media"))
             api(project(":modules:core:core-network"))
             api(project(":modules:core:core-sync"))
             api(project(":modules:messenger-crypto"))
