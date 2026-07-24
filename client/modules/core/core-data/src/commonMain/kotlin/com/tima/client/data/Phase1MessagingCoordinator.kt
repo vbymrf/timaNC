@@ -28,8 +28,8 @@ interface Phase1MessagingRepository : RestGapFill {
 /**
  * Shared Phase 1 state holder and transport-backed messaging orchestration.
  *
- * Durable offline behavior depends on the injected MessagingCache. The supplied
- * NonDurableInMemoryMessagingCache is only a process cache and never queues across restarts.
+ * Durable offline reads depend on the injected MessagingCache. PendingSend remains memory-only,
+ * so this coordinator does not provide durable send/retry across process restarts.
  */
 class Phase1MessagingCoordinator(
     private val sessions: SessionRepository,

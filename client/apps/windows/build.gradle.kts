@@ -13,6 +13,7 @@ kotlin {
 
 dependencies {
     implementation(project(":modules:core:core-data"))
+    implementation(project(":modules:core:core-database"))
     implementation(project(":modules:core:core-network"))
     implementation(project(":modules:core:core-sync"))
     implementation(project(":modules:messenger-crypto"))
@@ -20,6 +21,7 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.jna.platform)
     implementation(libs.zxing.core)
+    implementation(libs.sqldelight.sqlite.driver)
     testImplementation(kotlin("test"))
 }
 

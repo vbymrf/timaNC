@@ -37,6 +37,8 @@
 - [x] Private 1:1 participant E2E (envelope + escrow)
 - [x] Hybrid generic notification delivery: repository-owned Go gateway, FCM/APNs/WNS adapters, Android UnifiedPush fallback, generic payload policy and shared WS/REST catch-up
 - [x] Unsigned Android/iOS/Windows validation workflows; signed/internal-track artifacts deferred to Phase 5
+- [x] Encrypted-at-rest SQLDelight UI cache on Android/iOS/Windows with platform-protected row key and logout wipe
+- [ ] Durable client send/retry outbox across process restart (coordinator `PendingSend` remains memory-only)
 - [ ] Complete native messaging UI and Phase 1 acceptance journeys
 
 **Exit:** hosted repository-controlled CI matrix проходит; hybrid notification
@@ -53,16 +55,17 @@ private 1:1 slices over shared core-data. Android/iOS provide secure session
 restore, development registration/login, chat/thread operations, encrypted
 send/retry/edit/read/delete and foreground/resume catch-up. Windows preserves QR
 start/claim, reuses its DPAPI-backed linked identity/session, adds equivalent
-chat/thread and encrypted message operations, wipes decrypted process cache on
-logout, and advertises periodic foreground REST catch-up rather than WNS.
+chat/thread and encrypted message operations, wipes its encrypted offline cache
+and protected key on logout, and advertises periodic foreground REST catch-up
+rather than WNS.
 Development OTP/HMAC and escrow fixtures require explicit platform build/runtime
 flags; Windows additionally permits HTTP only for loopback in that mode.
 Production profiles fail closed with encrypted writes disabled until platform
 attestation enrollment where applicable and verified production escrow roots
 are provisioned. iOS without APNs advertises foreground/resume catch-up only.
-Durable offline storage on all clients, media UI and hosted native acceptance
-evidence for the three platform slices remain incomplete, so Phase 1 stays
-BLOCKED.
+Encrypted durable chat/history restoration is implemented on all clients.
+Durable send/retry outbox state across restart, media UI and hosted native
+acceptance evidence remain incomplete, so Phase 1 stays BLOCKED.
 Notification behavior is specified in
 [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
 Phase 2 does not start while Phase 1 remains blocked.

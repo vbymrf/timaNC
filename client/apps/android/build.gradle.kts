@@ -51,6 +51,7 @@ kotlin {
 
 dependencies {
     implementation(project(":modules:core:core-data"))
+    implementation(project(":modules:core:core-database"))
     implementation(project(":modules:core:core-network"))
     implementation(project(":modules:core:core-sync"))
     implementation(project(":modules:messenger-crypto"))
@@ -59,5 +60,6 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.play.integrity)
     implementation(libs.firebase.messaging)
+    implementation(libs.sqldelight.android.driver)
     testImplementation(kotlin("test"))
 }

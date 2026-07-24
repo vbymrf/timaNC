@@ -1,15 +1,17 @@
 package com.tima.client.android
 
 import android.content.Context
+import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.tima.client.crypto.HybridKodiumEscrowBlobBuilder
 import com.tima.client.crypto.MessengerCrypto
 import com.tima.client.data.ClientSession
+import com.tima.client.data.EncryptedSqlDelightMessagingCache
 import com.tima.client.data.IdGenerator
-import com.tima.client.data.NonDurableInMemoryMessagingCache
 import com.tima.client.data.Phase1MessagingCoordinator
 import com.tima.client.data.ProductionPrivateMessageCrypto
 import com.tima.client.data.SecureStorageSessionRepository
 import com.tima.client.data.TimaMessagingRemoteDataSource
+import com.tima.client.database.TimaDatabase
 import com.tima.client.network.AttestationCoordinator
 import com.tima.client.network.AttestationProvider
 import com.tima.client.network.AuthContext
@@ -41,6 +43,9 @@ class AndroidPhase1Runtime(
     val unifiedPush = UnifiedPushEndpointProvider(context)
 
     private var authContext: AuthContext? = null
+    private val databaseDriver =
+        AndroidSqliteDriver(TimaDatabase.Schema, context.applicationContext, "messaging-cache-v1.db")
+    private val database = TimaDatabase(databaseDriver)
     private val httpClient = HttpClient(OkHttp)
     private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
     private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { authContext })
@@ -72,7 +77,7 @@ class AndroidPhase1Runtime(
             senderDirectory = trust,
             escrowConfigs = trust,
         ),
-        cache = NonDurableInMemoryMessagingCache(),
+        cache = EncryptedSqlDelightMessagingCache(database, secureStorage),
         ids = IdGenerator { UUID.randomUUID().toString() },
     )
     val authentication = AndroidAuthenticationClient(
@@ -144,6 +149,7 @@ class AndroidPhase1Runtime(
     override fun close() {
         wakeSink?.let(AndroidNotificationWakeBridge::uninstall)
         httpClient.close()
+        databaseDriver.close()
     }
 
     private fun validBaseUrl(value: String, developmentMode: Boolean): String {

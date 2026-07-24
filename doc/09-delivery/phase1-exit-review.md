@@ -98,6 +98,12 @@ other Phase 2 service remain outside the default stack and this review.
 1. Complete native acceptance journeys. Current platform shells wire trust,
    storage, push and Windows linking, but do not yet constitute the full
    end-user messaging UI.
+2. Persist send/retry operations and idempotency material in a durable client
+   outbox. The encrypted SQLDelight UI cache survives restart, but coordinator
+   `PendingSend` state remains memory-only and must not be described as durable
+   retry.
+3. Complete encrypted media UI journeys and retain hosted Android/iOS/Windows
+   native evidence.
 
 ## Deferred Phase 5 evidence
 

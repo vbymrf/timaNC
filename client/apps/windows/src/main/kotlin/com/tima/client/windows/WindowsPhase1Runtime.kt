@@ -1,15 +1,17 @@
 package com.tima.client.windows
 
+import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.tima.client.crypto.HybridKodiumEscrowBlobBuilder
 import com.tima.client.crypto.MessengerCrypto
 import com.tima.client.data.ClientSession
+import com.tima.client.data.EncryptedSqlDelightMessagingCache
 import com.tima.client.data.IdGenerator
 import com.tima.client.data.MessageBubble
-import com.tima.client.data.NonDurableInMemoryMessagingCache
 import com.tima.client.data.Phase1MessagingCoordinator
 import com.tima.client.data.ProductionPrivateMessageCrypto
 import com.tima.client.data.SecureStorageSessionRepository
 import com.tima.client.data.TimaMessagingRemoteDataSource
+import com.tima.client.database.TimaDatabase
 import com.tima.client.network.AuthContext
 import com.tima.client.network.ForegroundRealtimeSync
 import com.tima.client.network.NotificationWakeSignal
@@ -23,6 +25,8 @@ import com.tima.client.sync.WakeToSyncCoordinator
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -39,11 +43,14 @@ class WindowsPhase1Runtime(
     baseUrl: String,
     val developmentMode: Boolean,
     val storage: DpapiSecureStorage = DpapiSecureStorage(),
+    databasePath: Path = defaultDatabasePath(),
 ) : AutoCloseable {
     private val sessions = SecureStorageSessionRepository(storage)
     private val identities = WindowsDeviceIdentityRepository(storage)
 
     private var auth: AuthContext? = null
+    private val databaseDriver = openDatabase(databasePath)
+    private val database = TimaDatabase(databaseDriver)
     private val httpClient = HttpClient(CIO)
     private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
     private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { auth })
@@ -62,7 +69,7 @@ class WindowsPhase1Runtime(
             senderDirectory = trust,
             escrowConfigs = trust,
         ),
-        cache = NonDurableInMemoryMessagingCache(),
+        cache = EncryptedSqlDelightMessagingCache(database, storage),
         ids = IdGenerator { UUID.randomUUID().toString() },
     )
     val privateSendingEnabled: Boolean
@@ -193,6 +200,7 @@ class WindowsPhase1Runtime(
 
     override fun close() {
         httpClient.close()
+        databaseDriver.close()
     }
 
     private fun installSession(session: ClientSession) {
@@ -200,6 +208,20 @@ class WindowsPhase1Runtime(
     }
 
     companion object {
+        private fun defaultDatabasePath(): Path {
+            val localAppData = System.getenv("LOCALAPPDATA")
+                ?: throw IllegalStateException("LOCALAPPDATA is required for the messaging cache")
+            return Path.of(localAppData, "Tima", "data", "messaging-cache-v1.db")
+        }
+
+        private fun openDatabase(path: Path): JdbcSqliteDriver {
+            Files.createDirectories(requireNotNull(path.parent))
+            val create = Files.notExists(path)
+            return JdbcSqliteDriver("jdbc:sqlite:${path.toAbsolutePath()}").also {
+                if (create) TimaDatabase.Schema.create(it)
+            }
+        }
+
         fun validBaseUrl(value: String, developmentMode: Boolean): String {
             val uri = URI(value)
             val developmentLoopback = developmentMode &&

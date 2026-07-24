@@ -57,8 +57,8 @@ interface PrivateMessageCrypto {
 }
 
 /**
- * Plaintext cache boundary used by UI state. Implementations must document their durability
- * and platform protection. The default implementation is process-memory-only.
+ * Decrypted-model cache boundary used by UI state. Implementations must document their durability
+ * and platform protection. Tests may continue to use the process-memory implementation.
  */
 interface MessagingCache {
     suspend fun chats(): List<ChatPreview>

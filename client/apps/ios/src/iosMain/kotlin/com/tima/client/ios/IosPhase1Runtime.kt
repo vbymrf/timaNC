@@ -1,15 +1,17 @@
 package com.tima.client.ios
 
+import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import com.tima.client.crypto.HybridKodiumEscrowBlobBuilder
 import com.tima.client.crypto.MessengerCrypto
 import com.tima.client.data.ClientSession
+import com.tima.client.data.EncryptedSqlDelightMessagingCache
 import com.tima.client.data.IdGenerator
 import com.tima.client.data.MessageBubble
-import com.tima.client.data.NonDurableInMemoryMessagingCache
 import com.tima.client.data.Phase1MessagingCoordinator
 import com.tima.client.data.ProductionPrivateMessageCrypto
 import com.tima.client.data.SecureStorageSessionRepository
 import com.tima.client.data.TimaMessagingRemoteDataSource
+import com.tima.client.database.TimaDatabase
 import com.tima.client.network.AttestationCoordinator
 import com.tima.client.network.AttestationProvider
 import com.tima.client.network.AuthContext
@@ -39,6 +41,8 @@ class IosPhase1Runtime(
     val apns = ApnsPushTokenProvider(secureStorage)
 
     private var auth: AuthContext? = null
+    private val databaseDriver = NativeSqliteDriver(TimaDatabase.Schema, "messaging-cache-v1.db")
+    private val database = TimaDatabase(databaseDriver)
     private val httpClient = HttpClient(Darwin)
     private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
     private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { auth })
@@ -69,7 +73,7 @@ class IosPhase1Runtime(
             senderDirectory = trust,
             escrowConfigs = trust,
         ),
-        cache = NonDurableInMemoryMessagingCache(),
+        cache = EncryptedSqlDelightMessagingCache(database, secureStorage),
         ids = IdGenerator(::newUuid),
     )
     val authentication = IosAuthenticationClient(
@@ -208,6 +212,7 @@ class IosPhase1Runtime(
 
     fun close() {
         httpClient.close()
+        databaseDriver.close()
     }
 
     private fun validBaseUrl(value: String, developmentMode: Boolean): String {

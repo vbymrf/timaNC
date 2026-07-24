@@ -101,7 +101,7 @@ private class WindowsShell(
     private val markRead = JButton("Mark read")
         .identified("message.mark-read", "Mark through selected incoming message as read")
     private val logout = JButton("Logout")
-        .identified("session.logout", "Logout and wipe decrypted messaging process cache")
+        .identified("session.logout", "Logout and wipe the encrypted offline messaging cache")
     private val frame = JFrame("Tima")
     private var rendered: WindowsMessagingViewState? = null
 
@@ -252,7 +252,7 @@ private class WindowsShell(
             }
         }
         logout.addActionListener {
-            runOperation("Signed out; decrypted process cache wiped") { runtime.logout() }
+            runOperation("Signed out; encrypted offline cache and protected key wiped") { runtime.logout() }
         }
     }
 

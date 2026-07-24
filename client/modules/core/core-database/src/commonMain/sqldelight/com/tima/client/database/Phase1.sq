@@ -55,6 +55,51 @@ CREATE TABLE media_queue (
   created_at_epoch_ms INTEGER NOT NULL
 );
 
+CREATE TABLE ui_chat_cache (
+  chat_id TEXT NOT NULL PRIMARY KEY,
+  position INTEGER NOT NULL,
+  ciphertext BLOB NOT NULL
+);
+
+CREATE TABLE ui_message_cache (
+  local_id TEXT NOT NULL PRIMARY KEY,
+  chat_id TEXT NOT NULL,
+  message_id TEXT,
+  delivery_state TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  ciphertext BLOB NOT NULL
+);
+
+CREATE INDEX ui_message_cache_chat_position
+  ON ui_message_cache(chat_id, position);
+
+CREATE INDEX ui_message_cache_server_id
+  ON ui_message_cache(chat_id, message_id);
+
+selectCachedChats:
+SELECT * FROM ui_chat_cache ORDER BY position;
+
+deleteCachedChats:
+DELETE FROM ui_chat_cache;
+
+insertCachedChat:
+INSERT INTO ui_chat_cache(chat_id, position, ciphertext)
+VALUES (?, ?, ?);
+
+selectCachedMessages:
+SELECT * FROM ui_message_cache WHERE chat_id = ? ORDER BY position;
+
+deleteCachedMessagesForChat:
+DELETE FROM ui_message_cache WHERE chat_id = ?;
+
+insertCachedMessage:
+INSERT INTO ui_message_cache(
+  local_id, chat_id, message_id, delivery_state, position, ciphertext
+) VALUES (?, ?, ?, ?, ?, ?);
+
+deleteAllCachedMessages:
+DELETE FROM ui_message_cache;
+
 insertOutbox:
 INSERT INTO sync_outbox(
   local_id, idempotency_key, chat_id, request_path, envelope,

@@ -26,6 +26,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":modules:core:core-data"))
+            api(project(":modules:core:core-database"))
             api(project(":modules:core:core-network"))
             api(project(":modules:core:core-sync"))
             api(project(":modules:messenger-crypto"))
@@ -36,6 +37,7 @@ kotlin {
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
+            implementation(libs.sqldelight.native.driver)
         }
     }
 }

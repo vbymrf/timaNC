@@ -1,11 +1,16 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.library)
     alias(libs.plugins.sqldelight)
 }
 
 kotlin {
     jvmToolchain(17)
     jvm()
+    androidTarget()
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {
@@ -19,6 +24,21 @@ kotlin {
         jvmTest.dependencies {
             implementation(libs.sqldelight.sqlite.driver)
         }
+        androidMain.dependencies {
+            implementation(libs.sqldelight.android.driver)
+        }
+        iosMain.dependencies {
+            implementation(libs.sqldelight.native.driver)
+        }
+    }
+}
+
+android {
+    namespace = "com.tima.client.database"
+    compileSdk = 35
+
+    defaultConfig {
+        minSdk = 26
     }
 }
 

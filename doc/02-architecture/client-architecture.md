@@ -67,13 +67,15 @@ session/chat/thread/send, encrypted REST adapter и `Phase1MessagingCoordinator`
 `MessengerCrypto`/`RestCryptoTransportAdapter` и fail-closed блокирует send, если
 нет device identity, directory keys или проверенного escrow config.
 
-Доступный сейчас `NonDurableInMemoryMessagingCache` — только детерминированный
-process cache для первой интеграции UI и тестов. Он не является durable
-offline-first хранилищем. Первые Android Views, iOS SwiftUI и Windows Swing
-native slices используют общий coordinator, платформенное secure storage и
-device identity, encrypted Path-B send/retry/edit/read/delete и
-foreground/lifecycle catch-up. Plaintext остаётся только в UI/process cache и
-очищается при logout.
+Android Views, iOS SwiftUI и Windows Swing runtime используют
+`EncryptedSqlDelightMessagingCache`: app-private SQLite хранит только
+идентификаторы/порядок для lookup, а полный `ChatPreview` и `MessageBubble`
+записывается как Kodium authenticated ciphertext. Случайный 32-byte row key
+`messaging-cache-row-key-v1` защищён Android Keystore-backed secure storage,
+iOS Keychain или Windows DPAPI. Формат ciphertext versioned; неизвестная версия,
+повреждённый key/row и расхождение открытых индексов с decrypted payload
+fail-closed. Logout транзакционно удаляет cache rows и затем protected key.
+`NonDurableInMemoryMessagingCache` остаётся для детерминированных unit tests.
 
 iOS development OTP/HMAC и development escrow root разрешены только сочетанием
 Xcode `DEBUG` и явного `TimaEnableDevelopmentAuth`; production profile использует
@@ -85,8 +87,8 @@ Windows сохраняет существующий QR start/claim flow и ис�
 device seed и linked-user session: seed и refresh/session credentials защищены
 DPAPI, параллельная identity не создаётся. После restore refresh token
 ротируется, а Swing shell предоставляет chat list/create/open, history,
-encrypted send/retry/edit/read/delete и logout с очисткой decrypted process
-cache. Development escrow fixture требует одновременно Gradle build flag
+encrypted send/retry/edit/read/delete и logout с полной очисткой encrypted
+offline cache и DPAPI-protected row key. Development escrow fixture требует одновременно Gradle build flag
 `tima.windows.enableDevelopmentEscrow=true` и runtime environment opt-in
 `TIMA_WINDOWS_ENABLE_DEVELOPMENT_ESCROW=true`; только в этом режиме разрешён
 loopback HTTP. Обычная MSIX/app-image сборка оставляет fixture выключенным и
@@ -94,8 +96,10 @@ fail-closed блокирует private writes без verified production escrow 
 WNS не заявлен: UI честно показывает foreground periodic authenticated REST
 catch-up с интервалом 60 секунд.
 
-Durable SQLDelight messaging persistence, media UI и hosted native acceptance
-evidence для всех трёх platform slices остаются открытыми блокерами Phase 1.
+Durable decrypted UI history теперь реализована, но coordinator `PendingSend`
+и send/retry idempotency material остаются memory-only: restart не возобновляет
+отправку. Durable outbox, media UI и hosted native acceptance evidence для всех
+трёх platform slices остаются открытыми блокерами Phase 1.
 
 ## 4. Platform adapters (`expect`/`actual`)
 
@@ -138,8 +142,8 @@ Operational endpoints (`/healthz`, `/readyz`, `/metrics`) не входят в c
 
 | Table group | Содержимое |
 |-------------|------------|
-| `messages` | immutable DocumentV2 revisions, ciphertext refs, local plaintext cache, sync cursor |
-| `chats` | metadata, last message, unread |
+| `ui_message_cache` | lookup columns + encrypted complete `MessageBubble`; не является durable send outbox |
+| `ui_chat_cache` | lookup/order columns + encrypted complete `ChatPreview` |
 | `crypto_sessions` | ratchet state (encrypted blob) |
 | `identity` | public keys, device id |
 | `search_fts` | decrypted index (private chats only) |

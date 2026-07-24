@@ -65,7 +65,7 @@ struct ContentView: View {
                 } else {
                     Section("Account") {
                         Button("Logout", role: .destructive) {
-                            run("Signed out") {
+                            run("Signed out; encrypted offline cache wiped") {
                                 try await requireRuntime().logout()
                                 password = ""
                                 otp = ""

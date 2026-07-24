@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android.library)
 }
 
@@ -15,6 +16,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":modules:core:core-domain"))
             api(project(":modules:core:core-network"))
+            implementation(project(":modules:core:core-database"))
             implementation(project(":modules:messenger-crypto"))
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
@@ -24,6 +26,9 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.mock)
+        }
+        jvmTest.dependencies {
+            implementation(libs.sqldelight.sqlite.driver)
         }
     }
 }

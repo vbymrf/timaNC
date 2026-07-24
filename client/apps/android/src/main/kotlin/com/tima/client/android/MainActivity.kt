@@ -134,7 +134,7 @@ class MainActivity : Activity() {
         register = button(R.id.auth_register, "Register") { register() }
         login = button(R.id.auth_login, "Login") { login() }
         logout = button(R.id.auth_logout, "Logout") {
-            runOperation("Signed out") { checkNotNull(runtime).logout() }
+            runOperation("Signed out; encrypted offline cache wiped") { checkNotNull(runtime).logout() }
         }
         peerId = input(R.id.chat_peer_user_id, "Peer user UUID", InputType.TYPE_CLASS_TEXT)
         createChat = button(R.id.chat_create, "Create / open 1:1 chat") {

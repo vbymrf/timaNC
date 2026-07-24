@@ -1,7 +1,9 @@
 package com.tima.client.data
 
+import kotlinx.serialization.Serializable
+
 /**
- * UI-facing load state. Offline is explicit and never implies that cached data is durable.
+ * UI-facing load state. Offline is explicit; cache durability depends on the injected runtime.
  */
 sealed interface UiLoadState<out T> {
     data object Loading : UiLoadState<Nothing>
@@ -28,6 +30,7 @@ sealed interface SessionUiState {
     data class Error(val code: String) : SessionUiState
 }
 
+@Serializable
 data class ChatPreview(
     val chatId: String,
     val peerUserId: String,
@@ -36,6 +39,7 @@ data class ChatPreview(
     val unreadCount: Int,
 )
 
+@Serializable
 enum class MessageDeliveryState {
     PENDING,
     SENDING,
@@ -44,6 +48,7 @@ enum class MessageDeliveryState {
     ERROR,
 }
 
+@Serializable
 data class MessageBubble(
     val localId: String,
     val chatId: String,
