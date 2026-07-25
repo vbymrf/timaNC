@@ -69,7 +69,13 @@ func (s *Service) StartDeviceLink(ctx context.Context, in LinkSession) (LinkChal
 		s.tokenHash(qrSecret), s.tokenHash(claimToken), expires); err != nil {
 		return LinkChallenge{}, err
 	}
-	qrPayload := fmt.Sprintf("tima://link/v1?session_id=%s&secret=%s", sessionID, qrSecret)
+	qrPayload := fmt.Sprintf(
+		"tima://link/v1?session_id=%s&secret=%s&identity_key=%s&signing_key=%s",
+		sessionID,
+		qrSecret,
+		base64.RawURLEncoding.EncodeToString(identityKey),
+		base64.RawURLEncoding.EncodeToString(signingKey),
+	)
 	return LinkChallenge{
 		SessionID: sessionID, QRPayload: qrPayload, ClaimToken: claimToken, ExpiresAt: expires,
 	}, nil

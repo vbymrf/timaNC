@@ -53,6 +53,7 @@ class MainActivity : Activity() {
     private lateinit var retryMedia: Button
     private lateinit var mediaState: TextView
     private lateinit var diagnostics: LinearLayout
+    private lateinit var windowsLinkPayload: EditText
     private var activeChatId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -231,6 +232,24 @@ class MainActivity : Activity() {
         id = R.id.diagnostics_panel
         orientation = LinearLayout.VERTICAL
         visibility = View.GONE
+        windowsLinkPayload = input(
+            R.id.diagnostics_windows_link_payload,
+            "Windows link QR payload",
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
+        )
+        addView(windowsLinkPayload)
+        addView(button(R.id.diagnostics_confirm_windows_link, "Confirm Windows link") {
+            val payload = windowsLinkPayload.text.toString()
+            runOperation("Windows link confirmed") {
+                checkNotNull(runtime).windowsLink.confirm(payload)
+                windowsLinkPayload.text.clear()
+            }
+        })
+        addView(button(R.id.diagnostics_force_next_send_failure, "Fail next send after encryption") {
+            runOperation("Next encrypted send will fail once with retryable status") {
+                checkNotNull(runtime).armNextSendFailure()
+            }
+        })
         addView(button(R.id.diagnostics_prepare_trust, "Prepare Play Integrity") { prepareTrust() })
         addView(button(R.id.diagnostics_register_fcm, "Register FCM token") {
             runOperation("FCM token registered") { checkNotNull(runtime).phase1.registerCurrentPushToken() }

@@ -150,13 +150,19 @@ func TestAccountDeviceTrustAndDirectoryIntegration(t *testing.T) {
 		t.Fatalf("stored prekeys = %d, %v", prekeyCount, err)
 	}
 
+	desktopIdentityKey := make([]byte, 32)
+	desktopSigningKey := make([]byte, 32)
 	link, err := service.StartDeviceLink(ctx, LinkSession{
-		DesktopPublicKey: base64.StdEncoding.EncodeToString(make([]byte, 32)),
-		SigningPublicKey: base64.StdEncoding.EncodeToString(make([]byte, 32)),
+		DesktopPublicKey: base64.StdEncoding.EncodeToString(desktopIdentityKey),
+		SigningPublicKey: base64.StdEncoding.EncodeToString(desktopSigningKey),
 		DesktopName:      "integration desktop",
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(link.QRPayload, "identity_key="+base64.RawURLEncoding.EncodeToString(desktopIdentityKey)) ||
+		!strings.Contains(link.QRPayload, "signing_key="+base64.RawURLEncoding.EncodeToString(desktopSigningKey)) {
+		t.Fatalf("link QR does not bind the desktop public keys: %q", link.QRPayload)
 	}
 	if _, err = service.ClaimDeviceLink(ctx, LinkClaim{
 		SessionID: link.SessionID, ClaimToken: link.ClaimToken,

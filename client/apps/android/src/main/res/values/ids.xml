@@ -23,6 +23,9 @@
     <item name="media_retry" type="id" />
     <item name="diagnostics_toggle" type="id" />
     <item name="diagnostics_panel" type="id" />
+    <item name="diagnostics_windows_link_payload" type="id" />
+    <item name="diagnostics_confirm_windows_link" type="id" />
+    <item name="diagnostics_force_next_send_failure" type="id" />
     <item name="diagnostics_prepare_trust" type="id" />
     <item name="diagnostics_register_fcm" type="id" />
     <item name="diagnostics_register_unified_push" type="id" />

@@ -15,6 +15,7 @@ import com.tima.client.network.PrivateMetadataDto
 import com.tima.client.network.ReservedMessageIds
 import com.tima.client.network.SecureStorage
 import com.tima.client.network.TimaHttpTransport
+import com.tima.client.network.TimaTransportException
 import com.tima.client.network.WrappedKeyDto
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -28,6 +29,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
@@ -484,6 +486,34 @@ class TimaMessagingRemotePrivacyTest {
         assertFalse(body.contains("plaintext must stay local"))
         assertTrue(body.contains("ciphertext-only"))
         assertTrue(body.contains("escrow-ciphertext"))
+    }
+
+    @Test
+    fun serializedSendHookCanForceFailureBeforeTransport() = runBlocking {
+        var requests = 0
+        val engine = MockEngine {
+            requests++
+            respond("{}", HttpStatusCode.Created)
+        }
+        val transport = TimaHttpTransport(
+            HttpClient(engine),
+            "https://api.example.test",
+            { AuthContext("token", TEST_DEVICE) },
+        )
+        val remote = TimaMessagingRemoteDataSource(transport) {
+            throw TimaTransportException(503, "ACCEPTANCE_FORCED_RETRYABLE", true)
+        }
+
+        val error = assertFailsWith<TimaTransportException> {
+            remote.send(
+                TEST_CHAT,
+                encryptedWrite(1uL, TEST_REVISION),
+                "00000000-0000-4000-8000-000000000006",
+            )
+        }
+
+        assertTrue(error.retryable)
+        assertEquals(0, requests)
     }
 }
 

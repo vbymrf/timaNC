@@ -27,6 +27,7 @@ import kotlinx.serialization.json.putJsonObject
  */
 class TimaMessagingRemoteDataSource(
     private val transport: TimaHttpTransport,
+    private val beforeSerializedSend: suspend () -> Unit = {},
 ) : MessagingRemoteDataSource {
     override suspend fun listChats(limit: Int): List<RemoteChat> {
         require(limit in 1..100)
@@ -89,6 +90,7 @@ class TimaMessagingRemoteDataSource(
         idempotencyKey: String,
     ) {
         PrivateMessageWriteCodec.decode(envelope)
+        beforeSerializedSend()
         transport.postJsonBytes("/v1/chats/$chatId/messages", envelope, idempotencyKey)
     }
 

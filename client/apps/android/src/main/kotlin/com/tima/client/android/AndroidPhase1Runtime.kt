@@ -26,6 +26,7 @@ import com.tima.client.network.RealtimeReconnect
 import com.tima.client.network.RestGapFill
 import com.tima.client.network.TimaHttpTransport
 import com.tima.client.network.TimaRealtimeTransport
+import com.tima.client.network.TimaTransportException
 import com.tima.client.media.MediaIdGenerator
 import com.tima.client.media.MediaMessageSender
 import com.tima.client.media.PrivateImageUploadCoordinator
@@ -36,6 +37,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import java.net.URI
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 
 class AndroidPhase1Runtime(
@@ -60,6 +62,7 @@ class AndroidPhase1Runtime(
     private val validatedBaseUrl = validBaseUrl(baseUrl, developmentMode)
     private val transport = TimaHttpTransport(httpClient, validatedBaseUrl, { authContext })
     private val realtime = TimaRealtimeTransport(httpClient, validatedBaseUrl, { authContext })
+    private val forceNextSendFailure = AtomicBoolean(false)
     private var wakeSink: NotificationWakeSink? = null
     private val sessions = SecureStorageSessionRepository(secureStorage)
     private val refreshTokens = SecureStorageRefreshTokenRepository(secureStorage)
@@ -72,6 +75,7 @@ class AndroidPhase1Runtime(
     private val messagingStore = EncryptedSqlDelightMessagingCache(database, secureStorage)
     private val mediaQueue = EncryptedSqlDelightMediaQueueStore(database, secureStorage)
     private val identities = AndroidDeviceIdentityRepository(secureStorage)
+    val windowsLink = AndroidWindowsLinkConfirmationClient(transport, identities)
     private val trust = AndroidTrustMaterialProvider(transport, sessions, identities, developmentMode)
     private val attestationProvider: AttestationProvider = when {
         developmentMode -> DevelopmentAndroidAttestationProvider.create(
@@ -87,7 +91,11 @@ class AndroidPhase1Runtime(
     private val attestation = AttestationCoordinator(transport, attestationProvider)
     val messaging = Phase1MessagingCoordinator(
         sessions = sessions,
-        remote = TimaMessagingRemoteDataSource(transport),
+        remote = TimaMessagingRemoteDataSource(transport) {
+            if (forceNextSendFailure.getAndSet(false)) {
+                throw TimaTransportException(503, "ACCEPTANCE_FORCED_RETRYABLE", true)
+            }
+        },
         crypto = ProductionPrivateMessageCrypto(
             messengerCrypto = MessengerCrypto(HybridKodiumEscrowBlobBuilder()),
             sessions = sessions,
@@ -188,11 +196,19 @@ class AndroidPhase1Runtime(
 
     suspend fun logout() {
         runCatching { transport.post("/v1/auth/logout") }
+        forceNextSendFailure.set(false)
         refreshTokens.clear()
         sessions.clear()
         authContext = null
         media.wipeSession()
         messaging.clearSessionState()
+    }
+
+    fun armNextSendFailure() {
+        check(developmentMode) { "acceptance failure injection requires explicit development mode" }
+        check(forceNextSendFailure.compareAndSet(false, true)) {
+            "the next encrypted send is already armed to fail"
+        }
     }
 
     override fun close() {
