@@ -524,10 +524,10 @@ private class WindowsShell(
         (0 until messageModel.size()).firstOrNull {
             messageModel.getElementAt(it).localId == selectedMessage
         }?.let { messages.selectedIndex = it }
-        if (acceptanceAutoOpen && messageModel.size() > 0 && messages.selectedIndex < 0) {
+        if (acceptanceAutoOpen && messageModel.size() > 0) {
             (messageModel.size() - 1 downTo 0).firstOrNull {
                 messageModel.getElementAt(it).senderUserId != view.currentUserId
-            }?.let { messages.selectedIndex = it }
+            }?.takeIf { it != messages.selectedIndex }?.let { messages.selectedIndex = it }
         }
         if (view.messages.isEmpty() && view.threadStatus != null && view.activeChatId != null) {
             status.text = view.threadStatus
