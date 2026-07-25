@@ -18,6 +18,9 @@ import java.awt.Color
 import java.awt.Component
 import java.awt.Dimension
 import java.awt.GridLayout
+import java.awt.Toolkit
+import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.StringSelection
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.awt.image.BufferedImage
@@ -82,6 +85,9 @@ private class WindowsShell(
     private val claim = JButton("Claim confirmed link")
         .identified("link.claim", "Claim a link confirmed by a trusted mobile device")
         .apply { isEnabled = false }
+    private val copyLinkPayload = JButton("Copy link payload")
+        .identified("link.copy-payload", "Copy the pending QR payload for a trusted mobile device")
+        .apply { isEnabled = false }
     private val linkingPanel = JPanel(BorderLayout(8, 8))
         .identified("link.panel", "Windows device linking controls")
     private val peer = JTextField()
@@ -134,6 +140,7 @@ private class WindowsShell(
         linkingPanel.add(JPanel().apply {
             layout = BoxLayout(this, BoxLayout.X_AXIS)
             add(startLink)
+            add(copyLinkPayload)
             add(claim)
         }, BorderLayout.SOUTH)
         val chatPanel = JPanel(BorderLayout(8, 8)).apply {
@@ -183,6 +190,7 @@ private class WindowsShell(
         frame.defaultCloseOperation = JFrame.DISPOSE_ON_CLOSE
         frame.addWindowListener(object : WindowAdapter() {
             override fun windowClosed(event: WindowEvent) {
+                clearCopiedLinkPayload()
                 scope.cancel()
                 runtime.close()
             }
@@ -228,10 +236,17 @@ private class WindowsShell(
                     qr.icon = ImageIcon(qrImage(pending.qrPayload))
                     qr.toolTipText = pending.qrPayload
                     status.text = "Scan before ${pending.expiresAt}; no QR secret is logged."
+                    copyLinkPayload.isEnabled = true
                     claim.isEnabled = true
                 },
                 failure = { startLink.isEnabled = true },
             )
+        }
+        copyLinkPayload.addActionListener {
+            qr.toolTipText?.let { payload ->
+                Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(payload), null)
+                status.text = "Link payload copied; clear the clipboard after confirmation."
+            }
         }
         claim.addActionListener {
             claim.isEnabled = false
@@ -240,6 +255,9 @@ private class WindowsShell(
                 operation = runtime::claimLink,
                 success = { session ->
                     qr.icon = null
+                    copyLinkPayload.isEnabled = false
+                    clearCopiedLinkPayload()
+                    qr.toolTipText = null
                     status.text =
                         "Linked user ${session.userId}; device ${session.deviceId}; credentials protected with DPAPI."
                 },
@@ -335,6 +353,17 @@ private class WindowsShell(
                 thumbnailCache.clear()
                 thumbnailLoading.clear()
             }
+        }
+    }
+
+    private fun clearCopiedLinkPayload() {
+        val payload = qr.toolTipText ?: return
+        val clipboard = Toolkit.getDefaultToolkit().systemClipboard
+        val current = runCatching {
+            clipboard.getData(DataFlavor.stringFlavor) as? String
+        }.getOrNull()
+        if (current == payload) {
+            clipboard.setContents(StringSelection(""), null)
         }
     }
 
