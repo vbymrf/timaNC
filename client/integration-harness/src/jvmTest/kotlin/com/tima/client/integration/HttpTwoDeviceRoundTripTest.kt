@@ -514,7 +514,10 @@ class HttpTwoDeviceRoundTripTest {
             },
         )
         val sessionId = challenge.string("session_id")
-        val qrSecret = challenge.string("qr_payload").substringAfter("&secret=")
+        val qrSecret = URI(challenge.string("qr_payload")).rawQuery
+            .split('&')
+            .single { it.startsWith("secret=") }
+            .substringAfter('=')
         check(qrSecret.isNotBlank()) { "link QR omitted secret" }
         val wrappedSecret = ByteArray(48).also(java.security.SecureRandom()::nextBytes)
         val signingInput = ByteArrayOutputStream().apply {
