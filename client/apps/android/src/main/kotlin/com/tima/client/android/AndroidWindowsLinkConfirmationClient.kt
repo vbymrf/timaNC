@@ -57,7 +57,10 @@ class AndroidWindowsLinkConfirmationClient(
     }
 
     private fun parsePayload(value: String): Map<String, String> {
-        val uri = URI(value.trim())
+        val normalized = value.trim().let { input ->
+            if (input.startsWith(HEX_PREFIX)) decodeHex(input.removePrefix(HEX_PREFIX)) else input
+        }
+        val uri = URI(normalized)
         require(uri.scheme == "tima" && uri.host == "link" && uri.path == "/v1") {
             "unsupported Windows link QR payload"
         }
@@ -77,4 +80,18 @@ class AndroidWindowsLinkConfirmationClient(
 
     private fun decode(value: String): String =
         URLDecoder.decode(value, StandardCharsets.UTF_8.name())
+
+    private fun decodeHex(value: String): String {
+        require(value.length % 2 == 0 && value.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) {
+            "malformed hex Windows link payload"
+        }
+        return value.chunked(2)
+            .map { it.toInt(16).toByte() }
+            .toByteArray()
+            .decodeToString()
+    }
+
+    private companion object {
+        const val HEX_PREFIX = "hex:"
+    }
 }
