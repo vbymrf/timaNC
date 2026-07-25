@@ -21,6 +21,7 @@ import java.awt.GridLayout
 import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
+import java.awt.event.KeyEvent
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.awt.image.BufferedImage
@@ -82,12 +83,19 @@ private class WindowsShell(
     private val qr = JLabel().identified("link.qr", "QR code for linking this Windows device")
     private val startLink = JButton("Start Windows link")
         .identified("link.start", "Start linking this Windows device")
+        .apply { mnemonic = KeyEvent.VK_S }
     private val claim = JButton("Claim confirmed link")
         .identified("link.claim", "Claim a link confirmed by a trusted mobile device")
-        .apply { isEnabled = false }
+        .apply {
+            mnemonic = KeyEvent.VK_L
+            isEnabled = false
+        }
     private val copyLinkPayload = JButton("Copy link payload")
         .identified("link.copy-payload", "Copy the pending QR payload for a trusted mobile device")
-        .apply { isEnabled = false }
+        .apply {
+            mnemonic = KeyEvent.VK_P
+            isEnabled = false
+        }
     private val linkingPanel = JPanel(BorderLayout(8, 8))
         .identified("link.panel", "Windows device linking controls")
     private val peer = JTextField()
