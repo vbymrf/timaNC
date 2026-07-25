@@ -77,6 +77,20 @@ private class WindowsShell(
     private val acceptanceAutoLink =
         runtime.developmentMode &&
             System.getenv("TIMA_WINDOWS_ACCEPTANCE_AUTOSTART_LINK")?.toBooleanStrictOrNull() == true
+    private val acceptanceAutoOpen =
+        runtime.developmentMode &&
+            System.getenv("TIMA_WINDOWS_ACCEPTANCE_AUTOOPEN_CHAT")?.toBooleanStrictOrNull() == true
+    private val acceptanceAutoMarkRead =
+        acceptanceAutoOpen &&
+            System.getenv("TIMA_WINDOWS_ACCEPTANCE_MARK_READ")?.toBooleanStrictOrNull() == true
+    private val acceptanceAutoPreview =
+        acceptanceAutoOpen &&
+            System.getenv("TIMA_WINDOWS_ACCEPTANCE_OPEN_PREVIEW")?.toBooleanStrictOrNull() == true
+    private val acceptanceReplyText = if (acceptanceAutoOpen) {
+        System.getenv("TIMA_WINDOWS_ACCEPTANCE_REPLY_TEXT")?.takeIf(String::isNotBlank)
+    } else {
+        null
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val status = JLabel("Tima Phase 1 private messaging")
         .identified("phase1.status", "Current Windows messaging operation status")
@@ -151,6 +165,9 @@ private class WindowsShell(
     private var rendered: WindowsMessagingViewState? = null
     private val thumbnailCache = mutableMapOf<String, ImageIcon>()
     private val thumbnailLoading = mutableSetOf<String>()
+    private var acceptanceMarkReadSent = false
+    private var acceptancePreviewOpened = false
+    private var acceptanceReplySent = false
 
     fun show() {
         configureActions()
@@ -497,6 +514,9 @@ private class WindowsShell(
         (0 until chatModel.size()).firstOrNull {
             chatModel.getElementAt(it).chatId == selectedChat
         }?.let { chats.selectedIndex = it }
+        if (acceptanceAutoOpen && selectedChat == null && chatModel.size() > 0 && chats.selectedIndex < 0) {
+            chats.selectedIndex = 0
+        }
 
         val selectedMessage = messages.selectedValue?.localId
         messageModel.clear()
@@ -504,10 +524,30 @@ private class WindowsShell(
         (0 until messageModel.size()).firstOrNull {
             messageModel.getElementAt(it).localId == selectedMessage
         }?.let { messages.selectedIndex = it }
+        if (acceptanceAutoOpen && messageModel.size() > 0 && messages.selectedIndex < 0) {
+            (messageModel.size() - 1 downTo 0).firstOrNull {
+                messageModel.getElementAt(it).senderUserId != view.currentUserId
+            }?.let { messages.selectedIndex = it }
+        }
         if (view.messages.isEmpty() && view.threadStatus != null && view.activeChatId != null) {
             status.text = view.threadStatus
         }
         updateMessageActions()
+        if (acceptanceAutoMarkRead && markRead.isEnabled && !acceptanceMarkReadSent) {
+            acceptanceMarkReadSent = true
+            markRead.doClick()
+        }
+        if (acceptanceAutoPreview && openPreview.isEnabled && !acceptancePreviewOpened) {
+            acceptancePreviewOpened = true
+            openPreview.doClick()
+        }
+        acceptanceReplyText?.let { reply ->
+            if (view.activeChatId != null && view.sendEnabled && !acceptanceReplySent) {
+                acceptanceReplySent = true
+                compose.text = reply
+                send.doClick()
+            }
+        }
     }
 
     private fun updateMessageActions() {
