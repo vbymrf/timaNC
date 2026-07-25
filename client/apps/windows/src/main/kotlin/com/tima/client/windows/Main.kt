@@ -73,6 +73,9 @@ internal fun windowsDevelopmentEscrowBuildAllowed(
 private class WindowsShell(
     private val runtime: WindowsPhase1Runtime,
 ) {
+    private val acceptanceAutoLink =
+        runtime.developmentMode &&
+            System.getenv("TIMA_WINDOWS_ACCEPTANCE_AUTOSTART_LINK")?.toBooleanStrictOrNull() == true
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val status = JLabel("Tima Phase 1 private messaging")
         .identified("phase1.status", "Current Windows messaging operation status")
@@ -207,6 +210,7 @@ private class WindowsShell(
         frame.setSize(1100, 760)
         frame.setLocationRelativeTo(null)
         frame.isVisible = true
+        if (acceptanceAutoLink) startLink.doClick()
 
         scope.launch {
             runtime.messaging.state.collect { state ->
@@ -246,6 +250,7 @@ private class WindowsShell(
                     status.text = "Scan before ${pending.expiresAt}; no QR secret is logged."
                     copyLinkPayload.isEnabled = true
                     claim.isEnabled = true
+                    if (acceptanceAutoLink) copyLinkPayload.doClick()
                 },
                 failure = { startLink.isEnabled = true },
             )
