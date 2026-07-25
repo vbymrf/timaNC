@@ -43,6 +43,7 @@ import javax.swing.JPanel
 import javax.swing.JScrollPane
 import javax.swing.JSplitPane
 import javax.swing.SwingUtilities
+import javax.swing.Timer
 import javax.swing.JTextArea
 import javax.swing.JTextField
 import javax.swing.ListSelectionModel
@@ -99,6 +100,14 @@ private class WindowsShell(
             mnemonic = KeyEvent.VK_P
             isEnabled = false
         }
+    private var acceptanceClaimAttempts = 0
+    private val acceptanceClaimTimer = Timer(1_000) {
+        acceptanceClaimAttempts++
+        when {
+            acceptanceClaimAttempts > 300 -> (it.source as Timer).stop()
+            claim.isEnabled -> claim.doClick()
+        }
+    }
     private val linkingPanel = JPanel(BorderLayout(8, 8))
         .identified("link.panel", "Windows device linking controls")
     private val peer = JTextField()
@@ -201,6 +210,7 @@ private class WindowsShell(
         frame.defaultCloseOperation = JFrame.DISPOSE_ON_CLOSE
         frame.addWindowListener(object : WindowAdapter() {
             override fun windowClosed(event: WindowEvent) {
+                acceptanceClaimTimer.stop()
                 clearCopiedLinkPayload()
                 scope.cancel()
                 runtime.close()
@@ -250,7 +260,11 @@ private class WindowsShell(
                     status.text = "Scan before ${pending.expiresAt}; no QR secret is logged."
                     copyLinkPayload.isEnabled = true
                     claim.isEnabled = true
-                    if (acceptanceAutoLink) copyLinkPayload.doClick()
+                    if (acceptanceAutoLink) {
+                        copyLinkPayload.doClick()
+                        acceptanceClaimAttempts = 0
+                        acceptanceClaimTimer.start()
+                    }
                 },
                 failure = { startLink.isEnabled = true },
             )
@@ -267,6 +281,7 @@ private class WindowsShell(
                 successMessage = "Linked session established",
                 operation = runtime::claimLink,
                 success = { session ->
+                    acceptanceClaimTimer.stop()
                     qr.icon = null
                     copyLinkPayload.isEnabled = false
                     clearCopiedLinkPayload()
