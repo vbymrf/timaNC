@@ -464,6 +464,72 @@ class Phase1MessagingCoordinatorTest {
 
 class TimaMessagingRemotePrivacyTest {
     @Test
+    fun mediaHistoryAcceptsServerNullEncryptedNodes() = runBlocking {
+        val engine = MockEngine {
+            respond(
+                """
+                {
+                  "items": [{
+                    "id": "4",
+                    "conversation_id": "$TEST_CHAT",
+                    "sender_id": "00000000-0000-4000-8000-000000000002",
+                    "sender_device_id": "00000000-0000-4000-8000-000000000004",
+                    "current_revision_id": "$TEST_REVISION",
+                    "message_key_id": 0,
+                    "parent_revision_id": null,
+                    "created_at": "2026-07-25T07:05:31Z",
+                    "document": {
+                      "encrypted_nodes": null,
+                      "markup": {
+                        "entities": [{
+                          "type": "media",
+                          "media_id": "00000000-0000-4000-8000-000000000009",
+                          "secret_ref": "media.key"
+                        }]
+                      },
+                      "encrypted_metadata": "ciphertext",
+                      "metadata": {
+                        "content_mode": "private",
+                        "format_version": 2,
+                        "revision_number": 1
+                      },
+                      "protocol_version": 2,
+                      "presence_bitmap": 12,
+                      "key_commitment": "commitment",
+                      "escrow_blob": "escrow",
+                      "ratchet_envelope": null,
+                      "signature": "signature"
+                    },
+                    "wrapped_keys": [{
+                      "device_id": "$TEST_DEVICE",
+                      "wrapped_key": "wrapped",
+                      "protocol_version": 2,
+                      "key_commitment": "commitment"
+                    }],
+                    "deleted_at": null
+                  }],
+                  "next_cursor": null
+                }
+                """.trimIndent(),
+                HttpStatusCode.OK,
+            )
+        }
+        val remote = TimaMessagingRemoteDataSource(
+            TimaHttpTransport(
+                HttpClient(engine),
+                "https://api.example.test",
+                { AuthContext("token", TEST_DEVICE) },
+            ),
+        )
+
+        val media = remote.history(TEST_CHAT).items.single()
+
+        assertTrue(media.document.encrypted_nodes.isEmpty())
+        assertNotNull(media.document.markup)
+        assertEquals("ciphertext", media.document.encrypted_metadata)
+    }
+
+    @Test
     fun textSendTransportBodyContainsCiphertextButNoPlaintext() = runBlocking {
         var body = ""
         val engine = MockEngine { request ->

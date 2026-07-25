@@ -9,6 +9,7 @@ import com.tima.client.network.PrivateMetadataDto
 import com.tima.client.network.RestCryptoTransportAdapter
 import com.tima.client.network.TimaHttpTransport
 import com.tima.client.network.WrappedKeyDto
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -142,9 +143,11 @@ class TimaMessagingRemoteDataSource(
             parent_revision_id = this["parent_revision_id"]?.jsonPrimitive?.contentOrNull,
             created_at = string("created_at"),
             document = PrivateDocumentEnvelopeDto(
-                encrypted_nodes = document["encrypted_nodes"]?.jsonArray
+                encrypted_nodes = document["encrypted_nodes"]
+                    ?.takeUnless { it is JsonNull }
+                    ?.jsonArray
                     ?.map { it.jsonPrimitive.content }.orEmpty(),
-                markup = document["markup"]?.jsonObject,
+                markup = document["markup"]?.takeUnless { it is JsonNull }?.jsonObject,
                 encrypted_metadata = document["encrypted_metadata"]?.jsonPrimitive?.contentOrNull,
                 metadata = PrivateMetadataDto(
                     content_mode = metadata.string("content_mode"),

@@ -529,7 +529,7 @@ private class WindowsShell(
                 messageModel.getElementAt(it).senderUserId != view.currentUserId
             }?.takeIf { it != messages.selectedIndex }?.let { messages.selectedIndex = it }
         }
-        if (view.messages.isEmpty() && view.threadStatus != null && view.activeChatId != null) {
+        if (view.threadStatus != null && view.activeChatId != null) {
             status.text = view.threadStatus
         }
         updateMessageActions()
