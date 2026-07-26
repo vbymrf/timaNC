@@ -17,6 +17,7 @@ schema/.tools/
 *.exe
 *.test
 coverage.out
+/scripts/setup-windows-log.txt
 
 # Runtime data and local configuration.
 .env
@@ -28,9 +29,18 @@ coverage.out
 **/*.p8
 **/secrets/
 
+# Machine transfer pack (binaries / dumps). Keep the howto in git.
+/perenos/**
+!/perenos/HOW_TO_TRANSFER.md
+!/perenos/env/
+!/perenos/env/.env.example
+!/perenos/env/NOTE.txt
+
 # Editors and operating systems.
 /.claude/
-/.cursor/
+/.cursor/*
+!/.cursor/skills/
+!/.cursor/skills/**
 .idea/
 .vscode/
 *.code-workspace

@@ -59,7 +59,7 @@ Release smoke проверяет URL-контракт: `/healthz`, `/readyz`, `/
 |-------|----------------|--------------|---------|
 | 0 | core schema + migration baseline | — | schema validation + clean `golang-migrate up` |
 | 1 | `auth`, `messages`, `media`, realtime, hybrid push | — | messaging HTTP/WS/push E2E + content/media/revision + unsigned platform matrix |
-| 2 | `calls` | `calls` | not started while Phase 1 is BLOCKED; call interoperability and Communication MVP gates |
+| 2 | `calls` | `calls` | may start under the approved non-blocking deferred iOS Phase 1 exception; call interoperability and Communication MVP gates remain required |
 | 3 | `feed`, `emotions`, `attributes`, `shelves`, `inbox` | `public_feed`, `social_inbox`, `emotions` | [test-strategy.md](../08-quality/test-strategy.md) §8 Phase 3 |
 | 3b | `bot_gateway`, webhook workers | `bot_platform` | [bot-platform-test-plan.md](../08-quality/bot-platform-test-plan.md) §12 |
 | 4+ | sharding, HSM escrow, retention/legal hold | `blogger_mode` | HSM mandatory before production; load S1–S13 + hold drill |

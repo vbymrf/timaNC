@@ -42,18 +42,23 @@
 - [x] Private 1:1 single-image alpha shared pipeline: exactly three encrypted JPEG variants, durable retry and media-only DocumentV2
 - [x] Android Views and Windows Swing image picker, progress, thumbnail and in-app preview
 - [x] iOS PHPicker/UIKit normalization and SwiftUI thumbnail/preview pass hosted Xcode Swift simulator build/package validation
-- [ ] Complete native messaging UI and Phase 1 acceptance journeys
+- [x] Complete Android and Windows native messaging acceptance journeys
+- [ ] Complete iOS native acceptance steps 1–9 on a separate Mac — approved non-blocking deferred exception
 
 **Exit:** hosted repository-controlled CI matrix проходит; hybrid notification
 fallback и native messaging acceptance подтверждены; local message smoke
 выполнен; каждое private message имеет `escrow_blob`;
 content/media/revision contract gates проходят. Signed PreKey не блокирует
 envelope-only development и становится blocking перед внешним тестированием
-ratchet path A.
+ratchet path A. The approved iOS exception permits Phase 2 repository work but
+does not count as completed three-platform native acceptance.
 
-**Current review:** [Phase 1 exit is BLOCKED](./phase1-exit-review.md). Hybrid
-notification implementation and the hosted CI matrix pass; native acceptance
-remains open. Android Views, iOS SwiftUI and Windows Swing now have first
+**Current review:** [Phase 1 exited with a non-blocking deferred iOS
+exception](./phase1-exit-review.md). Hybrid notification implementation and the
+hosted CI matrix pass. Android and Windows native journeys pass on `f17548e`;
+iOS native acceptance is **NOT RUN / DEFERRED** until it can be executed later
+on a separate Mac with Xcode. Android
+Views, iOS SwiftUI and Windows Swing now have first
 private 1:1 slices over shared core-data. Android/iOS provide secure session
 restore, development registration/login, chat/thread operations, encrypted
 send/retry/edit/read/delete and foreground/resume catch-up. Windows preserves QR
@@ -72,17 +77,25 @@ idempotency key survive restart; reservation must still complete online before
 the durable boundary, so completely offline composition/send is not claimed.
 Android/iOS/Windows private image alpha is implemented over the shared secure
 pipeline. Hosted platform tests, unsigned packages and the iOS Xcode Swift
-simulator build pass in run `30124957450`. Android additionally has a retained
-partial `2ceaefe` emulator manifest covering session rotation, text/media send,
-in-app decrypt, offline cache and logout wipe; native peer and forced-outbox
-steps remain incomplete. Windows passes local UI startup and the HTTP
-link/encrypted roundtrip harness. No platform has a complete reviewed steps
-1–9 manifest set, so Phase 1 stays BLOCKED.
+simulator build pass in run `30150128033`. Android and Windows each retain a
+reviewed PASS manifest on `f17548e`, including peer exchange, forced durable
+outbox recovery, media peer preview, offline cache and logout wipe. iOS still
+needs the equivalent steps 1–9 on that separate macOS/Xcode computer or a
+representative device. Hosted [run
+30150128033](https://github.com/vbymrf/timaNC/actions/runs/30150128033) is
+live-verified green for all 3 platform-build jobs, but it does not complete the
+deferred iOS native journey. The approved exception is non-blocking for Phase 2
+repository development and remains blocking for a claim of complete
+three-platform native acceptance.
 Notification behavior is specified in
 [hybrid-notification-delivery.md](../02-architecture/hybrid-notification-delivery.md);
-Phase 2 does not start while Phase 1 remains blocked.
+Phase 2 may start under this documented exception.
 
 ## Phase 2: Communication MVP (Month 3)
+
+Phase 2 repository development may proceed on the current Windows environment.
+iOS-specific execution and evidence remain deferred to the separate Mac and
+must be completed before Phase 2 can claim cross-platform exit.
 
 - [ ] LiveKit deploy + Call Service
 - [ ] 1:1 and group calls (SFU) on Android and iOS

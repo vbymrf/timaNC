@@ -1,0 +1,3 @@
+На момент экспорта (см. MANIFEST.txt) файла infra/.env на этой машине не было.
+Используйте .env.example как шаблон: Copy-Item perenos\env\.env.example infra\.env
+Если появится реальный infra/.env — скопируйте его сюда как perenos\env\.env перед переносом.

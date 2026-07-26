@@ -1,21 +1,24 @@
 # Phase 1 exit review
 
-Review date: 2026-07-24
+Review date: 2026-07-26
 Baseline: `870849e`
 Hosted-CI commit: `159e2ad`
 Native-media hosted commit: `2ceaefe`
-Decision: **BLOCKED**
+Native-acceptance commit: `f17548e`
+Decision: **EXITED WITH NON-BLOCKING DEFERRED iOS EXCEPTION**
 
-Phase 1 is not declared exited. Repository-controlled server, contract, migration,
-JVM, Compose, black-box messaging and bounded local SLO gates passed locally.
+Phase 1 is declared exited for continued repository development under an
+explicit non-blocking iOS exception. Repository-controlled server, contract,
+migration, JVM, Compose, black-box messaging and bounded local SLO gates passed locally.
 After the GitHub remote was configured, the first hosted run exposed reproducible
 CI/platform failures. Their fixes and hybrid notification delivery now pass both
-local verification and the hosted matrix. Three-platform native journey
-evidence is still incomplete.
+local verification and the hosted matrix. Android and Windows native journeys
+pass on `f17548e`. The iOS native journey is **NOT RUN / DEFERRED** and will be
+executed later on a separate Mac with Xcode.
 
 ## Current development posture
 
-- `main` through `2ceaefe` tracks `timaNC/main`; authenticated pushes and hosted
+- `main` through `6b22a50` tracks `timaNC/main`; authenticated pushes and hosted
   workflow queries succeed. The earlier no-remote/no-API-access blocker is
   closed.
 - Development continues without Apple Developer or Google Play Console accounts
@@ -25,7 +28,8 @@ evidence is still incomplete.
 - Signed artifacts, real vendor attestation/push and invited-cohort evidence are
   deferred to Phase 5 and are not claimed as complete.
 - Platform shells are integration boundaries, not a complete end-user messaging UI.
-- Phase 2 and LiveKit work do not start while this review remains **BLOCKED**.
+- Phase 2 and LiveKit work may start. iOS-native Phase 1 acceptance remains
+  deferred and must not be reported as passed.
 
 ## Verified gates
 
@@ -39,10 +43,13 @@ evidence is still incomplete.
 | Migrations 000005–000007 | PASS | `verify_phase1.sql`, including trust objects, attestation backfill, monotonic read state and hybrid push routing |
 | KMP JVM tests | PASS | `gradle jvmTest` |
 | iOS Kotlin targets | PASS | x64, arm64 and simulator-arm64 compilation |
+| iOS native journey | DEFERRED | Not run; reserved for a separate macOS/Xcode computer. Hosted build evidence is not native acceptance. |
 | Windows JVM package input | PASS | tests, `packageWindowsAppImage`, `prepareMsixInputs` |
+| Android native journey | PASS | [Android `f17548e` manifest](../08-quality/evidence/android-f17548e/manifest.md), steps 1–9 |
+| Windows native journey | PASS | [Windows `f17548e` manifest](../08-quality/evidence/windows-f17548e/manifest.md), steps 1–9 |
 | Docker Compose rebuild | PASS | clean volumes, default Phase 1 profile, all services healthy |
 | Hybrid notification routing | PASS | Go gateway/unit/integration tests, Android FCM + UnifiedPush registration, primary/fallback worker tests and common wake-to-sync tests |
-| Client package/unit evidence with encrypted media | PASS | [run 30124957450](https://github.com/vbymrf/timaNC/actions/runs/30124957450): Android AAB, iOS XCFramework + unsigned simulator app, Windows MSIX, platform/shared tests and commit-bound checksums |
+| Client package/unit evidence with encrypted media | PASS | Live-verified [run 30150128033](https://github.com/vbymrf/timaNC/actions/runs/30150128033) on `f17548e`: 3/3 jobs passed for Android AAB, iOS XCFramework + unsigned simulator app and Windows MSIX |
 | Mandatory HTTP/WebSocket black-box E2E | PASS | registration, Android dev attestation, Windows link, escrow send/decrypt, media, edit, read and delete |
 | Local send-to-ack gate | PASS | 7/7 successful samples in the server `le="0.8"` bucket |
 | Local online-delivery smoke | PASS | k6: 5/5 sends and WS deliveries; send p95 36.095 ms, WS p95 133.6 ms |
@@ -61,6 +68,7 @@ satisfy the deferred Phase 5 cohort gate by itself.
 | Phase 1 Server | PASS | [run 30076152779](https://github.com/vbymrf/timaNC/actions/runs/30076152779) |
 | Phase 1 Dev Stack | PASS | [run 30076152839](https://github.com/vbymrf/timaNC/actions/runs/30076152839) |
 | Client platform validation | PASS | [run 30076152813](https://github.com/vbymrf/timaNC/actions/runs/30076152813) |
+| Client platform validation on native-acceptance SHA | PASS | Live-verified [run 30150128033](https://github.com/vbymrf/timaNC/actions/runs/30150128033), `f17548e`, 3/3 jobs |
 | Phase 0 Contracts | PASS | [run 30076152829](https://github.com/vbymrf/timaNC/actions/runs/30076152829) |
 
 This rerun closes the repository-controlled hosted CI blocker.
@@ -101,32 +109,38 @@ Production source does not fall back to development HMAC attestation or generate
 push/signing credentials. Kodium remains pinned to `1.0.0`. LiveKit and every
 other Phase 2 service remain outside the default stack and this review.
 
-## Current Phase 1 blockers
+## Non-blocking deferred iOS exception
 
-1. Complete the Android/iOS/Windows journeys and retain the manifests required
-   by [phase1-native-acceptance.md](../08-quality/phase1-native-acceptance.md).
-   Current platform shells wire trust, storage, push and Windows linking, but
-   do not yet have three-platform execution evidence.
+Later, on a separate Mac with Xcode, complete the deferred iOS journey on
+`f17548e` and retain the manifest required by
+[phase1-native-acceptance.md](../08-quality/phase1-native-acceptance.md).
+Android and Windows have reviewed PASS manifests on that commit; the
+three-platform evidence set remains incomplete. Current iOS status is **NOT RUN
+/ DEFERRED**, not failed and not passed. This exception does not block Phase 2
+repository development, but it blocks any claim that three-platform native
+acceptance is complete.
 
 The iOS PHPicker/UIKit normalization and SwiftUI render bridge now pass a real
-hosted Xcode Swift simulator build and packaging step in run `30124957450`.
+hosted Xcode Swift simulator build and packaging step in live-verified run
+`30150128033`.
 Signed device archive/install remains a deferred Phase 5 credentialed gate.
 
-Android now has retained
-[partial native evidence](../08-quality/evidence/android-2ceaefe/manifest.md)
-for secure login/session rotation, chat/history, encrypted text send/edit,
-three-variant private image upload, thumbnail/preview decrypt, offline cache and
-logout wipe. The run remains `FAIL` by policy because native peer receive,
-forced outbox recovery, peer mark-read and author/peer delete restrictions were
-not completed. During this run, two server/client media contract mismatches and
-the missing mobile refresh-token rotation were fixed in `2ceaefe`.
+Android has retained reviewed
+[PASS evidence on `f17548e`](../08-quality/evidence/android-f17548e/manifest.md)
+for secure session restore, peer text exchange, forced durable-outbox recovery,
+edit/read/delete restrictions, three-variant private media, peer decrypt and
+preview, offline cache and logout wipe.
 
-Windows local acceptance has started. The development stack health/ready probes,
-Windows unit/media/migration tests, unsigned MSIX build, packaged development
-gate verification, UI startup and the real HTTP Windows-link/encrypted
-message/media harness pass. The packaged startup fix is retained in `159fef2`
-and its fail-closed regression checks in `ee3eef6`. This is partial evidence,
-not a completed steps 1–9 Windows manifest.
+Windows has retained reviewed
+[PASS evidence on `f17548e`](../08-quality/evidence/windows-f17548e/manifest.md)
+for DPAPI session restore, peer text exchange, a post-encryption transport fault
+and restart recovery, edit/read/delete restrictions, private media upload and
+peer preview, encrypted offline cache and logout wipe.
+
+iOS native acceptance is deliberately deferred to another computer: a Mac with
+Xcode or a representative iOS device capable of executing and retaining the
+same native steps 1–9. Hosted simulator build/package evidence does not replace
+that journey.
 
 The durable post-encryption send/retry item is complete. Android, iOS and
 Windows persist the exact canonical ciphertext body, message/revision identity
@@ -152,8 +166,8 @@ credential-free repository development:
 
 ## Exit decision rule
 
-Change the decision to **EXITED** only after every item under **Current Phase 1
-blockers** has an immutable artifact or CI link and the revised Phase 1 roadmap
-gates are checked. Deferred Phase 5 items must remain explicitly open and may
-not be reported as completed. A green local development stack is necessary but
-is not sufficient for Phase 1 exit.
+The approved decision is **EXITED WITH NON-BLOCKING DEFERRED iOS EXCEPTION**.
+Phase 2 repository development may proceed. The decision may be simplified to
+unqualified **EXITED** only after the iOS steps 1–9 have an immutable manifest on
+the accepted commit. Deferred iOS and Phase 5 items must remain explicitly open
+and may not be reported as completed.
